@@ -138,7 +138,14 @@ export function wsHealthHandler(
   const maxConn = parseInt(process.env.WS_MAX_CONNECTIONS || '1000');
   const utilization = clients.size / maxConn;
 
-  const status: WsHealthResponse['status'] = utilization > 0.9 ? 'DEGRADED' : staleClients > clients.size * 0.1 ? 'DEGRADED' : 'UP';
+  let status: WsHealthResponse['status'];
+  if (clients.size > 0 && staleClients === clients.size) {
+    status = 'DOWN';
+  } else if (utilization > 0.9 || staleClients > clients.size * 0.1) {
+    status = 'DEGRADED';
+  } else {
+    status = 'UP';
+  }
 
   const response: WsHealthResponse = {
     status,
