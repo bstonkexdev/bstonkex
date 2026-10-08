@@ -177,7 +177,18 @@ function handleMessage(client: Client, msg: Record<string, unknown>) {
 
       client.subscriptions.add(channel);
       log('info', `Subscribed: ${channel} (${client.subscriptions.size} subs)`);
-      
+
+      // Forward market channel subscriptions to the pipeline so it fetches data
+      if (channel.startsWith('market:')) {
+        const parts = channel.split(':');
+        if (parts.length >= 3) {
+          const chainId = parts[1];
+          const address = parts[2];
+          pipeline.addSubscription(chainId, address, address.slice(0, 10));
+          log('info', `Pipeline subscription added: ${chainId}:${address}`);
+        }
+      }
+
       // Confirm subscription
       send(client.ws, { type: 'subscribed', channel, timestamp: Date.now() });
       break;
@@ -188,6 +199,21 @@ function handleMessage(client: Client, msg: Record<string, unknown>) {
       if (!channel) break;
       
       client.subscriptions.delete(channel);
+
+      // Remove pipeline subscription if no other clients need this channel
+      if (channel.startsWith('market:')) {
+        const hasOther = [...clients.values()].some(
+          c => c.ws !== client.ws && c.subscriptions.has(channel)
+        );
+        if (!hasOther) {
+          const parts = channel.split(':');
+          if (parts.length >= 3) {
+            pipeline.removeSubscription(parts[1], parts[2]);
+            log('info', `Pipeline subscription removed: ${parts[1]}:${parts[2]}`);
+          }
+        }
+      }
+
       send(client.ws, { type: 'unsubscribed', channel, timestamp: Date.now() });
       break;
     }
