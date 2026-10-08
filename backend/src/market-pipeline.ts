@@ -31,6 +31,8 @@ interface TokenSubscription {
 
 // ── Chain Configuration ──────────────────────────────────────
 
+// process.env is available globally in Node.js runtime
+
 const CHAINS: Record<string, { rpc: string; dexScreenerId: string; isEvm: boolean }> = {
   bsc: {
     rpc: process.env.BSC_RPC_URL || 'https://bsc-dataseed1.binance.org',

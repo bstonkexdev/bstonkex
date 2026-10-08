@@ -7,8 +7,8 @@
  * Protocol matches src/lib/engine/realtime-ws.ts on the frontend.
  */
 
-import { createServer } from 'http';
-import { WebSocketServer, WebSocket } from 'ws';
+import { createServer, IncomingMessage, ServerResponse } from 'node:http';
+import { WebSocketServer, WebSocket, RawData } from 'ws';
 import { healthHandler, readyHandler, wsHealthHandler } from './health.js';
 import { MarketPipeline } from './market-pipeline.js';
 
@@ -54,7 +54,7 @@ function log(level: 'info' | 'warn' | 'error', ...args: unknown[]) {
 
 // ── HTTP Server ──────────────────────────────────────────────
 
-const httpServer = createServer((req, res) => {
+const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
   
   // CORS headers
@@ -77,7 +77,7 @@ const httpServer = createServer((req, res) => {
     return;
   }
   if (url.pathname === '/ready') {
-    readyHandler(req, res, { clients: clients.size, totalConnections });
+    readyHandler(req, res, { clients: clients.size, totalConnections, totalMessages });
     return;
   }
   if (url.pathname === '/ws/health') {
@@ -93,7 +93,7 @@ const httpServer = createServer((req, res) => {
 
 const wss = new WebSocketServer({ server: httpServer, path: WS_PATH });
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
   // Connection limit
   if (clients.size >= WS_MAX_CONNECTIONS) {
     ws.close(1013, 'Server at capacity');
@@ -127,9 +127,9 @@ wss.on('connection', (ws, req) => {
   // Send welcome
   send(ws, { type: 'connected', timestamp: Date.now() });
 
-  ws.on('message', (data) => {
+  ws.on('message', (data: RawData) => {
     try {
-      const msg = JSON.parse(data.toString());
+      const msg = JSON.parse(data.toString()) as Record<string, unknown>;
       handleMessage(client, msg);
     } catch {
       // Ignore malformed messages
@@ -141,7 +141,7 @@ wss.on('connection', (ws, req) => {
     log('info', `Client disconnected (${clients.size} active)`);
   });
 
-  ws.on('error', (err) => {
+  ws.on('error', (err: Error) => {
     log('error', `Client error: ${err.message}`);
     clients.delete(ws);
   });
@@ -261,10 +261,11 @@ const pipeline = new MarketPipeline();
 // Forward market events to subscribed clients
 pipeline.onEvent((event) => {
   const channel = `market:${event.chainId}:${event.tokenAddress}`;
-  broadcast(channel, event);
+  const eventData = event as unknown as Record<string, unknown>;
+  broadcast(channel, eventData);
   
   // Also broadcast to wildcard subscribers
-  broadcast('*', event);
+  broadcast('*', eventData);
 });
 
 // Start market data polling

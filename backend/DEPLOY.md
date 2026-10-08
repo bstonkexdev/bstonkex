@@ -1,169 +1,97 @@
-# BSTONKEX Backend Deployment Guide
+# BSTONKEX Backend — Railway Deployment
+
+## Quick Deploy
+
+1. **GitHub repo**: Push the repository to GitHub
+2. **Railway**: Create new project → Deploy from GitHub repo
+3. **Root Directory**: Set to `/backend` in Railway service settings
+4. **Environment Variables**: Set in Railway dashboard (see below)
+5. **Deploy**: Railway auto-detects Node.js and runs build/start
+
+## Build & Start Commands
+
+Railway auto-detects these from `backend/package.json` and `backend/railway.json`:
+
+| Step | Command |
+|------|---------|
+| Install | `npm install` |
+| Build | `npm run build` (runs `tsc`) |
+| Start | `npm run start` (runs `node dist/server.js`) |
+
+No Dockerfile needed — Nixpacks handles everything.
+
+## Environment Variables
+
+Set in Railway dashboard → Variables tab:
+
+### Required
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | Server port | `8080` (Railway sets this automatically) |
+| `NODE_ENV` | Environment | `production` |
+
+### Optional (RPC Endpoints)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BSC_RPC_URL` | BNB Chain RPC | Public Binance endpoint |
+| `BASE_RPC_URL` | Base L2 RPC | Public Base endpoint |
+| `SOLANA_RPC_URL` | Solana RPC | Public mainnet endpoint |
+| `ROBINHOOD_RPC_URL` | Robinhood Chain RPC | Ankr public (rate-limited) |
+| `ROBINHOOD_RPC_API_KEY` | Robinhood API key | Not set |
+
+### Optional (WebSocket)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `WS_PATH` | WebSocket path | `/ws` |
+| `WS_MAX_CONNECTIONS` | Max clients | `1000` |
+| `WS_HEARTBEAT_MS` | Ping interval | `15000` |
+
+### Optional (CORS)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ALLOWED_ORIGINS` | Comma-separated origins | `*` (all) |
+
+### Optional (Market Data)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `POLL_INTERVAL_MS` | DexScreener poll interval | `15000` |
+
+## Health Endpoints
+
+After deployment, verify:
+```
+GET https://your-service.railway.app/health
+GET https://your-service.railway.app/ready
+GET https://your-service.railway.app/ws/health
+```
+
+## WebSocket
+
+Connect to:
+```
+wss://your-service.railway.app/ws
+```
+
+## Node.js Version
+
+Pinned to Node.js 20.x via `engines` field in package.json.
+Railway respects this automatically.
 
 ## Architecture
 
 ```
-Blockchain/RPC → Chain Adapter → Indexer → Normalizer → Market Engine → WebSocket Gateway → BSTONKEX Frontend
+DexScreener API → Market Pipeline → WebSocket Gateway → BSTONKEX Frontend
+                         ↓
+              Health Endpoints (/health, /ready, /ws/health)
 ```
 
-## Components
+## Troubleshooting
 
-### 1. WebSocket Gateway (`src/server.ts`)
-- Production WebSocket server at `wss://api.bstonkex.xyz/ws`
-- Matches frontend protocol in `src/lib/engine/realtime-ws.ts`
-- Heartbeat, reconnect, subscriptions, sequence numbers, backpressure
+### "ExperimentalWarning: --experimental-loader"
+Fixed — backend now compiles TypeScript to JavaScript at build time.
 
-### 2. Health Endpoints (`src/health.ts`)
-- `GET /health` — Full health status with dependency checks
-- `GET /ready` — Readiness probe for load balancer
-- `GET /ws/health` — WebSocket-specific health metrics
+### "failed to solve: secret backend not found"
+This is a Railway/Nixpacks Docker layer caching issue. Redeploy or clear build cache.
 
-### 3. Market Pipeline (`src/market-pipeline.ts`)
-- Fetches real DexScreener data
-- Normalizes into MarketStreamEvent format
-- Broadcasts to subscribed WebSocket clients
-
-## Environment Variables
-
-See `backend/.env.example` for full configuration.
-
-**Critical:**
-- `ROBINHOOD_RPC_API_KEY` — Required for Robinhood Chain 4663 RPC access
-- `ALLOWED_ORIGINS` — CORS origins (comma-separated)
-- `PORT` — Server port (default: 8080)
-
-**Never commit:**
-- API keys
-- RPC credentials
-- Admin keys
-
-## Deployment Steps
-
-### 1. Prerequisites
-- Node.js 18+ or Bun 1.0+
-- Robinhood Chain API key (from Ankr, Alchemy, or Robinhood)
-- DNS configured for `api.bstonkex.xyz`
-- TLS certificate for WSS
-
-### 2. Install Dependencies
-```bash
-cd backend
-npm install  # or bun install
-```
-
-### 3. Configure Environment
-```bash
-cp .env.example .env
-# Edit .env with production values
-# Set ROBINHOOD_RPC_API_KEY
-# Set ALLOWED_ORIGINS
-```
-
-### 4. Start Server
-```bash
-npm start  # or bun run src/server.ts
-```
-
-### 5. Verify Health
-```bash
-curl https://api.bstonkex.xyz/health
-curl https://api.bstonkex.xyz/ready
-curl https://api.bstonkex.xyz/ws/health
-```
-
-### 6. Test WebSocket
-```javascript
-const ws = new WebSocket('wss://api.bstonkex.xyz/ws');
-ws.onopen = () => {
-  ws.send(JSON.stringify({ type: 'subscribe', channel: 'market:bsc:0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c' }));
-};
-ws.onmessage = (e) => console.log(JSON.parse(e.data));
-```
-
-## Health Response Format
-
-### `/health`
-```json
-{
-  "status": "UP",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "uptime": 3600,
-  "dependencies": [
-    { "name": "WebSocket", "status": "UP" },
-    { "name": "RPC (BSC)", "status": "UP", "latencyMs": 45 },
-    { "name": "RPC (Robinhood)", "status": "BLOCKED", "detail": "API key not configured" }
-  ],
-  "metrics": {
-    "activeConnections": 42,
-    "totalConnections": 150,
-    "totalMessages": 12345
-  }
-}
-```
-
-Status values: `UP`, `DEGRADED`, `DOWN`, `BLOCKED`
-
-### `/ws/health`
-```json
-{
-  "status": "UP",
-  "connections": 42,
-  "maxConnections": 1000,
-  "utilization": 4,
-  "metrics": {
-    "activeSubscriptions": 126,
-    "avgLatency": 23,
-    "staleClients": 0
-  }
-}
-```
-
-## WebSocket Protocol
-
-Matches frontend `src/lib/engine/realtime-ws.ts`:
-
-### Client → Server
-```json
-{ "type": "ping", "timestamp": 1234567890 }
-{ "type": "subscribe", "channel": "market:bsc:0x..." }
-{ "type": "unsubscribe", "channel": "market:bsc:0x..." }
-```
-
-### Server → Client
-```json
-{ "type": "pong", "timestamp": 1234567890, "serverTimestamp": 1234567891 }
-{ "type": "subscribed", "channel": "market:bsc:0x...", "timestamp": 1234567890 }
-{ "type": "event", "channel": "market:bsc:0x...", "sequence": 1, "timestamp": 1234567890, "data": {...} }
-```
-
-### Channels
-- `market:{chainId}:{tokenAddress}` — Market events for specific token
-- `trades:{chainId}` — All trades on chain
-- `*` — Wildcard (all events)
-
-## Backpressure
-
-- Clients with >1MB buffered messages are skipped during broadcast
-- Stale clients (no pong for 3x heartbeat) are disconnected
-- Subscription limit per client: 50 (configurable)
-
-## Graceful Shutdown
-
-Server handles SIGTERM and SIGINT:
-1. Stops market pipeline
-2. Closes all WebSocket connections with code 1001
-3. Closes HTTP server
-4. Exits cleanly
-
-## Production Checklist
-
-- [ ] Robinhood RPC API key configured (`ROBINHOOD_RPC_API_KEY`)
-- [ ] Backend deployed and running
-- [ ] WebSocket server accessible at `wss://api.bstonkex.xyz/ws`
-- [ ] DNS configured for `api.bstonkex.xyz`
-- [ ] TLS/WSS working (certificate valid)
-- [ ] Health endpoints responding
-- [ ] Market events flowing to frontend
-- [ ] Connection limits configured
-- [ ] Logging configured
-- [ ] Monitoring/alerting configured
+### Port binding errors
+Railway sets `PORT` automatically. Do not override it.

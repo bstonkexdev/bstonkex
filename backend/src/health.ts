@@ -5,8 +5,8 @@
  * Never exposes secrets or API keys.
  */
 
-import { IncomingMessage, ServerResponse } from 'http';
-import { WebSocket, WebSocketServer } from 'ws';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { WebSocket } from 'ws';
 
 interface HealthContext {
   clients: number;
@@ -138,7 +138,7 @@ export function wsHealthHandler(
   const maxConn = parseInt(process.env.WS_MAX_CONNECTIONS || '1000');
   const utilization = clients.size / maxConn;
 
-  const status = utilization > 0.9 ? 'DEGRADED' : staleClients > clients.size * 0.1 ? 'DEGRADED' : 'UP';
+  const status: WsHealthResponse['status'] = utilization > 0.9 ? 'DEGRADED' : staleClients > clients.size * 0.1 ? 'DEGRADED' : 'UP';
 
   const response: WsHealthResponse = {
     status,
