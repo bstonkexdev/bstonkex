@@ -1,10 +1,3 @@
-# Pin Node.js 20.x for Railway — prevents Node 24 compatibility issues
+# Pin Node.js 20.x — Nixpacks ignores package.json engines field
 [phases.setup]
-nixPkgs = ["nodejs_20"]
-
-[phases.build]
-dependsOn = ["setup"]
-cmds = ["npm install", "npm run build"]
-
-[start]
-cmd = "npm run start"
+nixPkgs = ["nodejs-20_x"]
