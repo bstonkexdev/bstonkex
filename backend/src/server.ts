@@ -56,7 +56,12 @@ function log(level: 'info' | 'warn' | 'error', ...args: unknown[]) {
 
 const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
-  
+
+  // Do NOT respond to WebSocket upgrade requests — let the WS server handle them
+  if (req.headers.upgrade?.toLowerCase() === 'websocket') {
+    return;
+  }
+
   // CORS headers
   const origin = req.headers.origin || '';
   if (ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin)) {
