@@ -6,16 +6,22 @@
     "node": ">=20.0.0 <23.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist/db/migrations && cp src/db/migrations/*.sql dist/db/migrations/",
     "start": "node dist/server.js",
     "dev": "node --watch --loader ts-node/esm src/server.ts",
+    "migrate": "node dist/db/migrate.js",
+    "test:db": "node --loader ts-node/esm src/__tests__/schema.test.ts",
+    "test:security": "node --loader ts-node/esm src/__tests__/security.test.ts",
     "health": "curl http://localhost:${PORT:-8080}/health"
   },
   "dependencies": {
+    "pg": "^8.12.0",
+    "viem": "^2.21.0",
     "ws": "^8.16.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "@types/pg": "^8.11.0",
     "@types/ws": "^8.5.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.0"

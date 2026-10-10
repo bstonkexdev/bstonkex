@@ -11,6 +11,10 @@ import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 import { WebSocketServer, WebSocket, RawData } from 'ws';
 import { healthHandler, readyHandler, wsHealthHandler } from './health.js';
 import { MarketPipeline } from './market-pipeline.js';
+import { routeDegen } from './degen-routes.js';
+import { isDbConfigured, pingDb, closePool, getDbStatus } from './db/pool.js';
+import { runMigrations, getMigrationStatus } from './db/migrate.js';
+import { routeRewards } from './reward-routes.js';
 
 // ── Configuration ────────────────────────────────────────────
 
@@ -67,8 +71,8 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
   if (ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin || '*');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Service-Key');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -82,11 +86,58 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     return;
   }
   if (url.pathname === '/ready') {
-    readyHandler(req, res, { clients: clients.size, totalConnections, totalMessages });
+    readyHandler(req, res, { clients: clients.size, totalConnections, totalMessages }).catch(() => {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ready: false, checks: { websocket: true, marketPipeline: true, rpcConnectivity: true, database: false, rewardProcessing: false } }));
+    });
     return;
   }
   if (url.pathname === '/ws/health') {
     wsHealthHandler(req, res, clients);
+    return;
+  }
+
+  // Degen Mode API routes
+  if (url.pathname.startsWith('/degen/')) {
+    if (routeDegen(req, res, url)) return;
+  }
+
+  // Reward + Auth API routes
+  if (url.pathname.startsWith('/auth/') || url.pathname.startsWith('/rewards/')) {
+    if (routeRewards(req, res, url)) return;
+  }
+
+  // ── Robinhood Alchemy RPC Proxy ────────────────────────────
+  // Proxies JSON-RPC requests to Alchemy using server-side RH_ALCHEMY_API_KEY.
+  // The API key is NEVER exposed to the browser bundle.
+  if (url.pathname === '/rpc/robinhood' && req.method === 'POST') {
+    const alchemyKey = process.env.RH_ALCHEMY_API_KEY;
+    if (!alchemyKey) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Robinhood RPC not configured' } }));
+      return;
+    }
+
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const alchemyUrl = `https://robinhood-mainnet.g.alchemy.com/v2/${alchemyKey}`;
+        const upstream = await fetch(alchemyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+          signal: AbortSignal.timeout(15000),
+        });
+        const data = await upstream.text();
+        res.writeHead(upstream.status, { 'Content-Type': 'application/json' });
+        res.end(data);
+      } catch (err: any) {
+        log('error', `Alchemy proxy error: ${err.message}`);
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Upstream RPC error' } }));
+      }
+    });
     return;
   }
 
@@ -302,14 +353,51 @@ pipeline.onEvent((event) => {
 // Start market data polling
 pipeline.start(parseInt(process.env.POLL_INTERVAL_MS || '15000'));
 
+// ── Database Initialization ───────────────────────────────────
+
+async function initDatabase(): Promise<void> {
+  if (!isDbConfigured()) {
+    log('warn', 'DATABASE_URL not set — PostgreSQL disabled. Reward processing unavailable.');
+    return;
+  }
+
+  log('info', 'PostgreSQL configured — checking connection...');
+  const reachable = await pingDb();
+  if (!reachable) {
+    log('error', 'PostgreSQL unreachable — reward processing will be unavailable');
+    log('error', 'Server will start but /ready will report not-ready for reward processing');
+    return;
+  }
+
+  log('info', 'PostgreSQL connected');
+  try {
+    const { applied, skipped } = await runMigrations();
+    if (applied.length > 0) {
+      log('info', `Migrations applied: ${applied.join(', ')}`);
+    }
+    if (skipped.length > 0) {
+      log('info', `Migrations already applied: ${skipped.join(', ')}`);
+    }
+    const status = await getMigrationStatus();
+    log('info', `Schema status: ${status.applied}/${status.total} migrations applied, ${status.pending} pending`);
+  } catch (err: any) {
+    log('error', `Migration failed: ${err.message}`);
+    log('error', 'Reward processing will NOT be available until migrations succeed');
+  }
+}
+
 // ── Start Server ─────────────────────────────────────────────
 
-httpServer.listen(PORT, HOST, () => {
-  log('info', `BSTONKEX WebSocket Gateway listening on ${HOST}:${PORT}`);
-  log('info', `WebSocket path: ${WS_PATH}`);
-  log('info', `Max connections: ${WS_MAX_CONNECTIONS}`);
-  log('info', `Heartbeat: ${WS_HEARTBEAT_MS}ms`);
-  log('info', `Allowed origins: ${ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS.join(', ') : 'all'}`);
+initDatabase().then(() => {
+  httpServer.listen(PORT, HOST, () => {
+    log('info', `BSTONKEX WebSocket Gateway listening on ${HOST}:${PORT}`);
+    log('info', `WebSocket path: ${WS_PATH}`);
+    log('info', `Max connections: ${WS_MAX_CONNECTIONS}`);
+    log('info', `Heartbeat: ${WS_HEARTBEAT_MS}ms`);
+    log('info', `Allowed origins: ${ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS.join(', ') : 'all'}`);
+    const db = getDbStatus();
+    log('info', `Database: ${db.configured ? (db.connected ? 'connected' : 'disconnected') : 'not configured'}`);
+  });
 });
 
 // ── Graceful Shutdown ────────────────────────────────────────
@@ -321,6 +409,7 @@ process.on('SIGTERM', () => {
     ws.close(1001, 'Server shutting down');
   }
   wss.close();
+  closePool().catch(() => {});
   httpServer.close(() => {
     log('info', 'Server stopped');
     process.exit(0);
