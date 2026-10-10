@@ -7,6 +7,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { WebSocket } from 'ws';
+import { getDbStatus, pingDb } from './db/pool.js';
 
 interface HealthContext {
   clients: number;
@@ -39,6 +40,8 @@ interface ReadyResponse {
     websocket: boolean;
     marketPipeline: boolean;
     rpcConnectivity: boolean;
+    database: boolean;
+    rewardProcessing: boolean;
   };
 }
 
@@ -63,6 +66,7 @@ export function healthHandler(
   res: ServerResponse,
   ctx: HealthContext
 ) {
+  const dbStatus = getDbStatus();
   const dependencies: DependencyStatus[] = [
     { name: 'WebSocket', status: ctx.clients >= 0 ? 'UP' : 'DOWN' },
     { name: 'Market Pipeline', status: 'UP' },
@@ -70,6 +74,13 @@ export function healthHandler(
     { name: 'RPC (Base)', status: 'UP' },
     { name: 'RPC (Solana)', status: 'UP' },
     { name: 'RPC (Robinhood)', status: process.env.ROBINHOOD_RPC_API_KEY ? 'UP' : 'BLOCKED' },
+    {
+      name: 'PostgreSQL',
+      status: !dbStatus.configured ? 'BLOCKED' : dbStatus.connected ? 'UP' : 'DOWN',
+      detail: dbStatus.configured
+        ? dbStatus.connected ? undefined : 'Connection failed'
+        : 'DATABASE_URL not configured',
+    },
   ];
 
   const hasDown = dependencies.some(d => d.status === 'DOWN');
@@ -96,19 +107,31 @@ export function healthHandler(
 
 // ── Ready Handler ─────────────────────────────────────────────
 
-export function readyHandler(
+export async function readyHandler(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: HealthContext
 ) {
+  const dbOk = await pingDb();
   const response: ReadyResponse = {
     ready: true,
     checks: {
       websocket: true,
       marketPipeline: true,
       rpcConnectivity: true,
+      database: dbOk,
+      rewardProcessing: dbOk,
     },
   };
+
+  // Not ready if database is configured but unreachable
+  if (getDbStatus().configured && !dbOk) {
+    response.ready = false;
+    response.checks.rewardProcessing = false;
+    res.writeHead(503, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(response, null, 2));
+    return;
+  }
 
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(response, null, 2));
