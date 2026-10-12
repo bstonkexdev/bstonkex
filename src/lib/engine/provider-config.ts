@@ -101,12 +101,21 @@ export function getBackendBaseUrl(): string | null {
 }
 
 /**
- * Get the backend quote proxy URL for 1inch quotes.
- * Returns null if backend is not configured (will use direct 1inch → 401).
+ * Get the backend quote proxy URL for 0x quotes.
+ * Returns null if backend is not configured.
  */
 export function getQuoteProxyUrl(): string | null {
   const base = getBackendBaseUrl();
   return base ? `${base}/api/quote` : null;
+}
+
+/**
+ * Get the backend swap TX proxy URL for 0x swap transaction building.
+ * Returns null if backend is not configured.
+ */
+export function getSwapProxyUrl(): string | null {
+  const base = getBackendBaseUrl();
+  return base ? `${base}/api/swap` : null;
 }
 
 export function getRouterProxyUrl(): string | null {

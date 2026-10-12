@@ -1,28 +1,23 @@
-# Cupcak8 Swap — GitHub Push Audit Report
+# Step 14 — 0x Swap API Integration ✅ COMPLETE
 
-## Repository State
-- **Remote**: `origin` → `https://github.com/bstonkexdev/bstonkex.git` (fetch + push)
-- **Branch**: `main` (up to date with `origin/main`)
-- **Latest commit**: `e91ad7b` — "fix: update WebSocket fallback URL to api.bstonkex.xyz"
+## Files Changed
+| File | Change |
+|------|--------|
+| `backend/src/server.ts` | Replaced 1inch with 0x Swap API v2. Added `/api/swap` endpoint. Chain allowlist: 56, 8453 only. |
+| `src/lib/engine/provider-config.ts` | Added `getSwapProxyUrl()` |
+| `src/lib/engine/evm-adapter.ts` | `buildSwapTransaction` uses backend `/api/swap`. Source label → `0x`. |
+| `src/lib/engine/discovery/route-verification.ts` | Updated comments, provider labels, Robinhood marked unsupported. |
 
-## File Counts
-- **130 modified** files (unstaged)
-- **179 untracked** files (unstaged)
-- **Total**: 309 files needing commit
+## API Endpoints
+- `GET /api/quote` — 0x quote proxy (maps to 1inch-compatible format)
+- `GET /api/swap` — 0x swap TX proxy (returns unsigned tx for wallet signing)
 
-## Security Scan
-- ✅ No `.env` files on disk or tracked
-- ✅ No hardcoded API keys, tokens, or secrets found in modified files
-- ✅ Only `.env.example` templates tracked (safe)
-- ✅ No private keys, PEM files, or credential files found
+## Chain Support
+- BSC (56) ✅
+- Base (8453) ✅
+- Robinhood (4663) ❌ — 501 Not Implemented
+- Solana — Jupiter (unchanged)
 
-## Ready to Commit
-All changes from Steps 1–13 including:
-- Route verification (`src/lib/engine/discovery/`)
-- Launchpad adapters (`src/lib/engine/launchpad-adapters/`)
-- Indexer (`src/lib/engine/indexer/`)
-- Quote proxy (`backend/src/server.ts` — 174 new lines)
-- All UI components, engine modules, and configuration updates
-
-## Action Required
-User must confirm before `git add` + `git commit` + `git push`.
+## Env Variables
+- Backend: `ZERO_EX_API_KEY` (server-side only)
+- Frontend: `VITE_WS_URL` (derives proxy URLs)

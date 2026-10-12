@@ -27,7 +27,7 @@ const WS_MAX_SUBS = parseInt(process.env.WS_MAX_SUBSCRIPTIONS_PER_CLIENT || '50'
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
 const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
 
-// Rate limiting for public API endpoints (1inch proxy)
+// Rate limiting for public API endpoints (0x quote/swap proxy)
 const rateLimitMap = new Map<string, number[]>();
 
 // ── Types ────────────────────────────────────────────────────
@@ -117,11 +117,13 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     return;
   }
 
-  // ── 1inch Quote Proxy (Step 11) ─────────────────────────────
-  // Proxies 1inch Swap API quote requests with server-side ONEINCH_API_KEY.
-  // Supports chains: 56 (BSC), 8453 (Base), 4663 (Robinhood).
-  // GET /api/quote?chainId=56&src=0x...&dst=0x...&amount=123
+  // ── 0x Quote Proxy ─────────────────────────────────────────
+  // Proxies 0x Swap API v2 quote requests with server-side ZERO_EX_API_KEY.
+  // Supports chains: 56 (BSC), 8453 (Base).
+  // Robinhood Chain (4663) is NOT supported by 0x — returns 501.
+  // GET /api/quote?chainId=56&src=0x...&dst=0x...&amount=123&slippageBps=100
   //
+  // Response is mapped to 1inch-compatible format for frontend compatibility.
   // Security: Rate-limited per IP, parameter-validated, CORS-restricted.
   if (url.pathname === '/api/quote' && req.method === 'GET') {
     // Rate limiting: max 30 requests per minute per IP
@@ -139,10 +141,10 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     requests.push(now);
     rateLimitMap.set(clientIp as string, requests);
 
-    const oneInchKey = process.env.ONEINCH_API_KEY;
-    if (!oneInchKey) {
+    const zeroExKey = process.env.ZERO_EX_API_KEY;
+    if (!zeroExKey) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'ONEINCH_API_KEY not configured on backend. Set server-side env variable.' }));
+      res.end(JSON.stringify({ error: 'ZERO_EX_API_KEY not configured on backend. Set server-side env variable.' }));
       return;
     }
 
@@ -150,58 +152,199 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     const src = url.searchParams.get('src');
     const dst = url.searchParams.get('dst');
     const amount = url.searchParams.get('amount');
+    const slippageBps = url.searchParams.get('slippageBps') || '100';
 
-    // Validate chain ID (allowlist only)
-    const allowedChains = ['56', '8453', '4663'];
+    // 0x-supported chains only
+    const allowedChains = ['56', '8453'];
     if (!chainId || !allowedChains.includes(chainId)) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: `Invalid chainId. Allowed: ${allowedChains.join(', ')}` }));
+      const status = chainId === '4663' ? 501 : 400;
+      const msg = chainId === '4663'
+        ? 'Robinhood Chain (4663) is not supported by 0x Swap API. Chain unavailable.'
+        : `Invalid chainId. Allowed: ${allowedChains.join(', ')}`;
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: msg }));
       return;
     }
-    // Validate required params
     if (!src || !dst || !amount) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Missing required params: src, dst, amount' }));
       return;
     }
-    // Validate EVM addresses (hex, 40 chars)
     if (!/^0x[0-9a-fA-F]{40}$/.test(src) || !/^0x[0-9a-fA-F]{40}$/.test(dst)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid address format' }));
       return;
     }
-    // Validate amount: positive integer, bounded (max 10^30 to prevent overflow)
     if (!/^\d{1,30}$/.test(amount) || amount === '0') {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid amount. Must be positive integer ≤ 30 digits.' }));
       return;
     }
 
-    // Proxy to 1inch with server-side API key (never logged)
-    const oneInchUrl = `https://api.1inch.dev/swap/v6.0/${chainId}/quote?src=${src}&dst=${dst}&amount=${amount}`;
-    fetch(oneInchUrl, {
+    // Proxy to 0x Swap API v2
+    const zeroExUrl = `https://api.0x.org/swap/allowance-holder/quote?chainId=${chainId}&sellToken=${src}&buyToken=${dst}&sellAmount=${amount}&slippageBps=${slippageBps}`;
+    fetch(zeroExUrl, {
       headers: {
-        'Authorization': `Bearer ${oneInchKey}`,
+        '0x-api-key': zeroExKey,
+        '0x-version': 'v2',
         'Accept': 'application/json',
       },
       signal: AbortSignal.timeout(15000),
     }).then(async (upstream) => {
-      const body = await upstream.text();
-      // CORS: allow frontend origin
       const origin = req.headers.origin || '';
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'X-Provider': '1inch',
+        'X-Provider': '0x',
         'X-Provider-Status': String(upstream.status),
       };
       if (ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin)) {
         headers['Access-Control-Allow-Origin'] = origin || '*';
       }
-      res.writeHead(upstream.status, headers);
-      res.end(body);
+
+      if (!upstream.ok) {
+        const errBody = await upstream.text();
+        res.writeHead(upstream.status, headers);
+        res.end(errBody);
+        return;
+      }
+
+      // Map 0x response to 1inch-compatible format for frontend
+      const z = await upstream.json();
+      const fills = z.route?.fills || [];
+      const hops = fills.map((f: any) => [{
+        name: f.source || '0x',
+        part: parseFloat(f.proportionBps || '10000') / 10000,
+        partAddress: f.to || '',
+      }]);
+      const mapped = {
+        dstAmount: z.buyAmount || '0',
+        srcAmount: z.sellAmount || amount,
+        gas: z.gas?.toString() || '300000',
+        priceImpact: parseFloat(z.estimatedPriceImpact || '0'),
+        protocols: hops.length > 0 ? [hops] : [[[{ name: '0x', part: 1, partAddress: '' }]]],
+        // Pass through 0x-specific data for swap building
+        _zeroEx: {
+          buyAmount: z.buyAmount,
+          sellAmount: z.sellAmount,
+          minBuyAmount: z.minBuyAmount,
+          gas: z.gas,
+          issues: z.issues,
+        },
+      };
+      res.writeHead(200, headers);
+      res.end(JSON.stringify(mapped));
     }).catch((err) => {
       res.writeHead(502, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: `1inch upstream error: ${err.message}` }));
+      res.end(JSON.stringify({ error: `0x upstream error: ${err.message}` }));
+    });
+    return;
+  }
+
+  // ── 0x Swap TX Proxy ───────────────────────────────────────
+  // Proxies 0x Swap API v2 swap transaction building.
+  // Returns unsigned transaction data for user wallet signing.
+  // GET /api/swap?chainId=56&src=0x...&dst=0x...&amount=123&slippageBps=100&from=0x...
+  if (url.pathname === '/api/swap' && req.method === 'GET') {
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const windowMs = 60_000;
+    const maxRequests = 30;
+    if (!rateLimitMap.has(clientIp as string)) rateLimitMap.set(clientIp as string, []);
+    const requests = rateLimitMap.get(clientIp as string)!.filter(t => now - t < windowMs);
+    if (requests.length >= maxRequests) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+      res.end(JSON.stringify({ error: 'Rate limit exceeded.' }));
+      return;
+    }
+    requests.push(now);
+    rateLimitMap.set(clientIp as string, requests);
+
+    const zeroExKey = process.env.ZERO_EX_API_KEY;
+    if (!zeroExKey) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'ZERO_EX_API_KEY not configured.' }));
+      return;
+    }
+
+    const chainId = url.searchParams.get('chainId');
+    const src = url.searchParams.get('src');
+    const dst = url.searchParams.get('dst');
+    const amount = url.searchParams.get('amount');
+    const slippageBps = url.searchParams.get('slippageBps') || '100';
+    const from = url.searchParams.get('from');
+
+    const allowedChains = ['56', '8453'];
+    if (!chainId || !allowedChains.includes(chainId)) {
+      const status = chainId === '4663' ? 501 : 400;
+      const msg = chainId === '4663'
+        ? 'Robinhood Chain (4663) is not supported by 0x Swap API.'
+        : `Invalid chainId. Allowed: ${allowedChains.join(', ')}`;
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: msg }));
+      return;
+    }
+    if (!src || !dst || !amount || !from) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing required params: src, dst, amount, from' }));
+      return;
+    }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(src) || !/^0x[0-9a-fA-F]{40}$/.test(dst) || !/^0x[0-9a-fA-F]{40}$/.test(from)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid address format' }));
+      return;
+    }
+    if (!/^\d{1,30}$/.test(amount) || amount === '0') {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid amount.' }));
+      return;
+    }
+
+    // Proxy to 0x Swap API v2 (swap endpoint)
+    const zeroExUrl = `https://api.0x.org/swap/allowance-holder/swap?chainId=${chainId}&sellToken=${src}&buyToken=${dst}&sellAmount=${amount}&slippageBps=${slippageBps}&taker=${from}`;
+    fetch(zeroExUrl, {
+      headers: {
+        '0x-api-key': zeroExKey,
+        '0x-version': 'v2',
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(15000),
+    }).then(async (upstream) => {
+      const origin = req.headers.origin || '';
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Provider': '0x',
+        'X-Provider-Status': String(upstream.status),
+      };
+      if (ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin)) {
+        headers['Access-Control-Allow-Origin'] = origin || '*';
+      }
+
+      if (!upstream.ok) {
+        const errBody = await upstream.text();
+        res.writeHead(upstream.status, headers);
+        res.end(errBody);
+        return;
+      }
+
+      const z = await upstream.json();
+      // Return the 0x transaction object in a flat format for the frontend
+      const tx = z.transaction || {};
+      const mapped = {
+        to: tx.to || '',
+        data: tx.data || '0x',
+        value: tx.value || '0',
+        gas: tx.gas || '300000',
+        gasPrice: tx.gasPrice || '',
+        // Include swap details for reference
+        buyAmount: z.buyAmount || '0',
+        sellAmount: z.sellAmount || amount,
+        minBuyAmount: z.minBuyAmount || '0',
+      };
+      res.writeHead(200, headers);
+      res.end(JSON.stringify(mapped));
+    }).catch((err) => {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: `0x upstream error: ${err.message}` }));
     });
     return;
   }

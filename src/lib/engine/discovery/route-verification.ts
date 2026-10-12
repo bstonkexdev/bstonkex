@@ -1,4 +1,4 @@
-// Cupcak8 Swap — Route Verification (Step 10)
+// Cupcak8 Swap — Route Verification (Step 14)
 // Verifies executable swap routes by requesting REAL quotes from chain providers.
 // Tests BOTH buy (native→token) and sell (token→native) directions.
 // A token is `execution_verified` ONLY when at least one direction returns a valid quote.
@@ -9,17 +9,13 @@
 //              Response: outAmount, routePlan[], priceImpactPct
 //              Auth: none (keyless free tier)
 //
-//   BSC      → 1inch Swap API v6.0  GET https://api.1inch.dev/swap/v6.0/56/quote
-//              Params: src, dst, amount
-//              Response: dstAmount, protocols[][]
-//              Auth: Bearer token REQUIRED (via backend proxy at /api/quote)
+//   BSC      → 0x Swap API v2  via backend proxy at /api/quote
+//              Chain 56 supported by 0x. Auth: ZERO_EX_API_KEY (server-side).
 //
-//   Base     → 1inch Swap API v6.0  GET https://api.1inch.dev/swap/v6.0/8453/quote
-//              Same schema as BSC. Auth: Bearer token REQUIRED.
+//   Base     → 0x Swap API v2  via backend proxy at /api/quote
+//              Chain 8453 supported by 0x. Auth: ZERO_EX_API_KEY (server-side).
 //
-//   Robinhood → 1inch Swap API v6.0  GET https://api.1inch.dev/swap/v6.0/4663/quote
-//              Chain ID 4663. Auth: Bearer token REQUIRED.
-//              Token-specific routes depend on actual pool liquidity.
+//   Robinhood → NOT supported by 0x Swap API. Chain 4663 returns 501.
 import type { ChainId } from '../../config';
 import { getQuoteProxyUrl } from '../provider-config';
 
@@ -128,9 +124,9 @@ async function jupiterQuote(
   return { success: true, outAmount: out, routeSteps: steps, error: null };
 }
 
-// ── 1inch quote (EVM) ───────────────────────────────────────
+// ── 0x quote (EVM) ──────────────────────────────────────────
 
-interface OneInchQuoteResponse {
+interface QuoteResponse {
   dstAmount: string;
   protocols: Array<Array<Array<{ name?: string }>>>;
   description?: string;
@@ -142,16 +138,16 @@ async function oneInchQuote(
 ): Promise<{ success: boolean; outAmount: string | null; routeSteps: number; error: string | null }> {
   const oneInchChainId = ONEINCH_CHAIN_ID[chainId];
   if (!oneInchChainId) {
-    return { success: false, outAmount: null, routeSteps: 0, error: `1inch chain ${chainId} not configured` };
+    return { success: false, outAmount: null, routeSteps: 0, error: `Chain ${chainId} not configured for EVM quotes` };
   }
 
   // SECURITY: EVM quotes MUST go through the backend proxy.
-  // Direct browser calls to api.1inch.dev are NOT allowed (API key must stay server-side).
+  // Direct browser calls to 0x API are NOT allowed (API key must stay server-side).
   const proxyUrl = getQuoteProxyUrl();
   if (!proxyUrl) {
     return {
       success: false, outAmount: null, routeSteps: 0,
-      error: `Backend proxy not configured. Set VITE_WS_URL to enable EVM quotes for ${chainId}. Direct 1inch calls from browser are disabled.`,
+      error: `Backend proxy not configured. Set VITE_WS_URL to enable EVM quotes for ${chainId}. Direct 0x calls from browser are disabled.`,
     };
   }
 
@@ -168,7 +164,7 @@ async function oneInchQuote(
     if (isOneInchAuthError(res.status, body)) {
       return {
         success: false, outAmount: null, routeSteps: 0,
-        error: `1inch API key required (HTTP ${res.status}). Set ONEINCH_API_KEY in backend environment.`,
+        error: `0x API key required (HTTP ${res.status}). Set ZERO_EX_API_KEY in backend environment.`,
       };
     }
     return {
@@ -177,7 +173,7 @@ async function oneInchQuote(
     };
   }
 
-  const data: OneInchQuoteResponse = await res.json();
+  const data: QuoteResponse = await res.json();
   const out = data.dstAmount;
   const protocols = data.protocols || [];
   const steps = protocols.length > 0 ? protocols[0].length : 0;
@@ -249,11 +245,10 @@ function getSellTestAmount(tokenDecimals: number): string {
   return (10n ** BigInt(exp)).toString();
 }
 
-// ── 1inch auth detection ────────────────────────────────────
+// ── Auth error detection ─────────────────────────────────────
 
 function isOneInchAuthError(status: number, body: any): boolean {
-  // 1inch returns 401 when API key is missing or invalid.
-  // Also detect "Unauthorized" in error messages.
+  // 0x returns 401 when API key is missing or invalid.
   if (status === 401) return true;
   const msg = (body?.description || body?.error || '').toLowerCase();
   return msg.includes('unauthorized') || msg.includes('api key') || msg.includes('invalid key');
@@ -342,7 +337,7 @@ export async function verifyTokenRoute(
   const base = {
     chainId,
     tokenAddress,
-    provider: chainId === 'solana' ? 'jupiter' : '1inch',
+    provider: chainId === 'solana' ? 'jupiter' : '0x',
     quoteAmountOut: null,
     routeSteps: 0,
     error: null,
@@ -404,7 +399,7 @@ export async function verifyTokenRoute(
     bothDirectionsVerified: buyOk && sellOk,
     chainId,
     tokenAddress: address,
-    provider: chainId === 'solana' ? 'jupiter' : '1inch',
+    provider: chainId === 'solana' ? 'jupiter' : '0x',
     direction,
     quoteAmountOut: primaryOut,
     routeSteps: primarySteps,
@@ -444,9 +439,9 @@ export function getProviderSupportMatrix(): Array<{
 }> {
   return [
     { chainId: 'solana', provider: 'jupiter-v6', supported: true, apiKeyRequired: false, authMethod: 'None (keyless free tier)' },
-    { chainId: 'bsc', provider: '1inch-v6.0', supported: true, apiKeyRequired: true, authMethod: 'Bearer token via backend proxy' },
-    { chainId: 'base', provider: '1inch-v6.0', supported: true, apiKeyRequired: true, authMethod: 'Bearer token via backend proxy' },
-    { chainId: 'robinhood', provider: '1inch-v6.0', supported: true, apiKeyRequired: true, authMethod: 'Bearer token via backend proxy' },
+    { chainId: 'bsc', provider: '0x-swap-v2', supported: true, apiKeyRequired: true, authMethod: 'ZERO_EX_API_KEY via backend proxy' },
+    { chainId: 'base', provider: '0x-swap-v2', supported: true, apiKeyRequired: true, authMethod: 'ZERO_EX_API_KEY via backend proxy' },
+    { chainId: 'robinhood', provider: 'none', supported: false, apiKeyRequired: false, authMethod: 'Not supported by 0x' },
   ];
 }
 

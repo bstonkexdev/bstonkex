@@ -8,9 +8,17 @@ const ERC20_ABI_DECIMALS = '0x313ce567';
 const ERC20_ABI_SYMBOL = '0x95d89b41';
 const ERC20_ABI_NAME = '0x06fdde03';
 
-// 1inch API — production aggregator for EVM chains
-// In production, set via environment / config. Using free-tier endpoint.
-const ONEINCH_API = 'https://api.1inch.dev/swap/v6.0';
+// 0x AllowanceHolder contract — deterministic CREATE2 address on all 0x-supported chains.
+// Verified per-chain in getAllowanceSpender(). Used only as fallback when the
+// quote response does not include issues.allowance.spender.
+const ZERO_EX_ALLOWANCE_HOLDER = '0x0000000000001fF3684f28c67538d4D072C22734';
+
+// Per-chain validated AllowanceHolder addresses (from 0x official docs).
+// Only these exact addresses are trusted as spenders.
+const VALIDATED_ALLOWANCE_HOLDERS: Record<number, string> = {
+  56:   '0x0000000000001fF3684f28c67538d4D072C22734', // BSC
+  8453: '0x0000000000001fF3684f28c67538d4D072C22734', // Base
+};
 
 export interface EvmChainConfig {
   chainId: ChainId;
@@ -141,7 +149,7 @@ export function createEvmAdapter(config: EvmChainConfig): ChainAdapter {
     const { tokenIn, tokenOut, amountIn, slippageBps, walletAddress } = params;
 
     // EVM quotes MUST go through the backend proxy (API key stays server-side).
-    // Direct browser calls to api.1inch.dev are NOT allowed.
+    // Direct browser calls to 0x API are NOT allowed.
     try {
       const srcToken = tokenIn === 'native' ? wrappedNative : tokenIn;
       const dstToken = tokenOut === 'native' ? wrappedNative : tokenOut;
@@ -158,7 +166,7 @@ export function createEvmAdapter(config: EvmChainConfig): ChainAdapter {
       });
 
       if (res.status === 401) {
-        return unavailableQuote('1inch API key required. Set ONEINCH_API_KEY in backend environment.');
+        return unavailableQuote('0x API key required. Set ZERO_EX_API_KEY in backend environment.');
       }
 
       if (res.ok) {
@@ -180,11 +188,11 @@ export function createEvmAdapter(config: EvmChainConfig): ChainAdapter {
             ? (BigInt(data.dstAmount) * BigInt(10000 - slippageBps) / BigInt(10000)).toString()
             : '0',
           priceImpactBps: Math.round((data.priceImpact || 0) * 100),
-          route: routes.length > 0 ? routes : [{ dex: '1inch', pool: '', tokenIn: srcToken, tokenOut: dstToken, pct: 100 }],
+          route: routes.length > 0 ? routes : [{ dex: '0x', pool: '', tokenIn: srcToken, tokenOut: dstToken, pct: 100 }],
           gasEstimate: data.gas || '300000',
           gasPriceUsd,
-          dexFeeUsd: 0, // 1inch fee is built into the rate
-          source: '1inch',
+          dexFeeUsd: 0, // 0x fee is built into the rate
+          source: '0x',
           raw: data,
         };
       }
@@ -234,25 +242,61 @@ export function createEvmAdapter(config: EvmChainConfig): ChainAdapter {
     }
   }
 
+  /**
+   * Get the validated 0x AllowanceHolder spender address.
+   * Primary: extract from the actual quote response (issues.allowance.spender).
+   * Fallback: use per-chain validated AllowanceHolder constant.
+   * Never returns an unvalidated or arbitrary address.
+   */
+  function getAllowanceSpender(quote: SwapQuote): string | null {
+    // 1. Try to extract from quote response — ground truth from 0x API
+    const fromQuote = quote.raw?._zeroEx?.issues?.allowance?.spender;
+    if (fromQuote && /^0x[0-9a-fA-F]{40}$/.test(fromQuote)) {
+      // Validate against known AllowanceHolder for this chain
+      const validated = VALIDATED_ALLOWANCE_HOLDERS[numericChainId];
+      if (validated && fromQuote.toLowerCase() === validated.toLowerCase()) {
+        return validated;
+      }
+      // If quote returns a different address, reject — do not trust unverified spender
+    }
+
+    // 2. Fallback: per-chain validated constant
+    const fallback = VALIDATED_ALLOWANCE_HOLDERS[numericChainId];
+    if (fallback && fallback === ZERO_EX_ALLOWANCE_HOLDER) {
+      return fallback;
+    }
+
+    return null;
+  }
+
   async function buildSwapTransaction(params: SwapParams, quote: SwapQuote): Promise<UnsignedTx> {
     const { tokenIn, tokenOut, amountIn, slippageBps, walletAddress } = params;
 
-    // Check allowance for ERC-20 tokens
+    // Check allowance for ERC-20 tokens — spender must be the 0x AllowanceHolder, NOT wrappedNative
     if (tokenIn !== 'native') {
-      const allowance = await checkAllowance(walletAddress, tokenIn, wrappedNative);
+      const spender = getAllowanceSpender(quote);
+      if (!spender) {
+        throw new Error('SWAP_UNAVAILABLE: No validated 0x AllowanceHolder for this chain. Cannot approve token.');
+      }
+      const allowance = await checkAllowance(walletAddress, tokenIn, spender);
       if (BigInt(allowance) < BigInt(amountIn)) {
-        // Return approval tx instead
-        return buildApprovalTx(tokenIn, wrappedNative);
+        // Return approval tx targeting the verified 0x AllowanceHolder
+        return buildApprovalTx(tokenIn, spender);
       }
     }
 
-    // Build swap via 1inch (keyless public tier — authenticated tier requires backend proxy)
+    // Build swap via backend 0x proxy (API key stays server-side)
     try {
       const srcToken = tokenIn === 'native' ? wrappedNative : tokenIn;
       const dstToken = tokenOut === 'native' ? wrappedNative : tokenOut;
-      const url = `${ONEINCH_API}/${oneInchChainId}/swap?src=${srcToken}&dst=${dstToken}&amount=${amountIn}&slippage=${slippageBps / 100}&from=${walletAddress}&destReceiver=${walletAddress}`;
 
-      // SECURITY (Step 5): No API key in browser. Use keyless headers only.
+      const { getSwapProxyUrl } = await import('./provider-config');
+      const proxyUrl = getSwapProxyUrl();
+      if (!proxyUrl) {
+        throw new Error('SWAP_UNAVAILABLE: Backend proxy not configured. Set VITE_WS_URL to enable swaps.');
+      }
+
+      const url = `${proxyUrl}?chainId=${oneInchChainId}&src=${srcToken}&dst=${dstToken}&amount=${amountIn}&slippageBps=${slippageBps}&from=${walletAddress}`;
       const res = await fetch(url, {
         headers: { 'Accept': 'application/json' },
       });
@@ -260,23 +304,19 @@ export function createEvmAdapter(config: EvmChainConfig): ChainAdapter {
       if (res.ok) {
         const data = await res.json();
         return {
-          to: data.tx.to,
-          data: data.tx.data,
-          value: data.tx.value || '0',
+          to: data.to,
+          data: data.data,
+          value: data.value || '0',
           chainId: numericChainId,
-          gasLimit: data.tx.gas?.toString() || quote.gasEstimate,
+          gasLimit: data.gas?.toString() || quote.gasEstimate,
         };
       }
-    } catch { /* fall through */ }
+    } catch (err: any) {
+      throw new Error(`SWAP_UNAVAILABLE: ${err?.message || 'Failed to build swap transaction'}`);
+    }
 
-    // Fallback: direct swap (would need DEX contract ABIs)
-    return {
-      to: wrappedNative,
-      data: '0x',
-      value: amountIn,
-      chainId: numericChainId,
-      gasLimit: quote.gasEstimate,
-    };
+    // If we reach here, the response was not OK — throw explicit error
+    throw new Error('SWAP_UNAVAILABLE: Backend swap endpoint returned non-OK response. Cannot build transaction.');
   }
 
   async function checkAllowance(owner: string, token: string, spender: string): Promise<string> {
