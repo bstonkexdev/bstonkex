@@ -1,3 +1,6 @@
 # Pin Node.js 20.x — Nixpacks ignores package.json engines field
 [phases.setup]
 nixPkgs = ["nodejs_20"]
+
+[variables]
+NPM_CONFIG_INCLUDE = "dev"
