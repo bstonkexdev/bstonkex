@@ -30,6 +30,11 @@ const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
 // Rate limiting for public API endpoints (0x quote/swap proxy)
 const rateLimitMap = new Map<string, number[]>();
 
+// ── 0x Integrator Fee Configuration ───────────────────────────
+// Platform fee: 40 basis points (0.40%). Fee is collected in the buy token.
+const SWAP_FEE_BPS = 40;
+const SWAP_FEE_RECIPIENT = process.env.SWAP_FEE_RECIPIENT || '0x8c802d64ee2a88a1e312735b6b7db85b9e4fb70a';
+
 // ── Types ────────────────────────────────────────────────────
 
 interface Client {
@@ -153,6 +158,7 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     const dst = url.searchParams.get('dst');
     const amount = url.searchParams.get('amount');
     const slippageBps = url.searchParams.get('slippageBps') || '100';
+    const taker = url.searchParams.get('taker');
 
     // 0x-supported chains only
     const allowedChains = ['56', '8453'];
@@ -165,12 +171,12 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
       res.end(JSON.stringify({ error: msg }));
       return;
     }
-    if (!src || !dst || !amount) {
+    if (!src || !dst || !amount || !taker) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing required params: src, dst, amount' }));
+      res.end(JSON.stringify({ error: 'Missing required params: src, dst, amount, taker' }));
       return;
     }
-    if (!/^0x[0-9a-fA-F]{40}$/.test(src) || !/^0x[0-9a-fA-F]{40}$/.test(dst)) {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(src) || !/^0x[0-9a-fA-F]{40}$/.test(dst) || !/^0x[0-9a-fA-F]{40}$/.test(taker)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid address format' }));
       return;
@@ -181,8 +187,9 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
       return;
     }
 
-    // Proxy to 0x Swap API v2
-    const zeroExUrl = `https://api.0x.org/swap/allowance-holder/quote?chainId=${chainId}&sellToken=${src}&buyToken=${dst}&sellAmount=${amount}&slippageBps=${slippageBps}`;
+    // Proxy to 0x Swap API v2 — with integrator fee (buy token preferred)
+    const feeToken = dst; // fee collected in buy token
+    const zeroExUrl = `https://api.0x.org/swap/allowance-holder/quote?chainId=${chainId}&sellToken=${src}&buyToken=${dst}&sellAmount=${amount}&slippageBps=${slippageBps}&taker=${taker}&swapFeeRecipient=${SWAP_FEE_RECIPIENT}&swapFeeBps=${SWAP_FEE_BPS}&swapFeeToken=${feeToken}`;
     fetch(zeroExUrl, {
       headers: {
         '0x-api-key': zeroExKey,
@@ -229,6 +236,7 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
           minBuyAmount: z.minBuyAmount,
           gas: z.gas,
           issues: z.issues,
+          fees: z.fees,
         },
       };
       res.writeHead(200, headers);
@@ -299,14 +307,28 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
       return;
     }
 
-    // Proxy to 0x Swap API v2 (swap endpoint)
-    const zeroExUrl = `https://api.0x.org/swap/allowance-holder/swap?chainId=${chainId}&sellToken=${src}&buyToken=${dst}&sellAmount=${amount}&slippageBps=${slippageBps}&taker=${from}`;
-    fetch(zeroExUrl, {
+    // Proxy to 0x Swap API v2 (swap endpoint — POST with JSON body per 0x API contract)
+    const feeToken = dst; // fee collected in buy token (same as quote)
+    const zeroExSwapBody = JSON.stringify({
+      chainId: parseInt(chainId),
+      sellToken: src,
+      buyToken: dst,
+      sellAmount: amount,
+      slippageBps: parseInt(slippageBps),
+      taker: from,
+      swapFeeRecipient: SWAP_FEE_RECIPIENT,
+      swapFeeBps: SWAP_FEE_BPS,
+      swapFeeToken: feeToken,
+    });
+    fetch('https://api.0x.org/swap/allowance-holder/swap', {
+      method: 'POST',
       headers: {
         '0x-api-key': zeroExKey,
         '0x-version': 'v2',
         'Accept': 'application/json',
+        'Content-Type': 'application/json',
       },
+      body: zeroExSwapBody,
       signal: AbortSignal.timeout(15000),
     }).then(async (upstream) => {
       const origin = req.headers.origin || '';
@@ -339,6 +361,7 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
         buyAmount: z.buyAmount || '0',
         sellAmount: z.sellAmount || amount,
         minBuyAmount: z.minBuyAmount || '0',
+        fees: z.fees,
       };
       res.writeHead(200, headers);
       res.end(JSON.stringify(mapped));

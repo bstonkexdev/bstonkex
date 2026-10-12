@@ -159,7 +159,7 @@ export function createEvmAdapter(config: EvmChainConfig): ChainAdapter {
       if (!proxyUrl) {
         return unavailableQuote(`Backend proxy not configured. Set VITE_WS_URL to enable EVM quotes for ${chainId}.`);
       }
-      const url = `${proxyUrl}?chainId=${oneInchChainId}&src=${srcToken}&dst=${dstToken}&amount=${amountIn}`;
+      const url = `${proxyUrl}?chainId=${oneInchChainId}&src=${srcToken}&dst=${dstToken}&amount=${amountIn}&taker=${walletAddress}`;
 
       const res = await fetch(url, {
         headers: { 'Accept': 'application/json' },
