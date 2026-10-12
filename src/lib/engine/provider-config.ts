@@ -85,12 +85,13 @@ export function isRouterAuthenticated(_chainId: ChainId): boolean {
 /**
  * Get the backend base URL derived from VITE_WS_URL.
  * Example: wss://api.example.com/ws → https://api.example.com
- * Returns null if VITE_WS_URL is not configured or the derived URL is invalid.
+ * Falls back to the production Railway backend if VITE_WS_URL is not set.
  */
+const FALLBACK_WS_URL = 'wss://bstonkex-production-ec26.up.railway.app/ws';
+
 export function getBackendBaseUrl(): string | null {
   try {
-    const wsUrl = (import.meta as any).env?.VITE_WS_URL;
-    if (!wsUrl || typeof wsUrl !== 'string') return null;
+    const wsUrl = (import.meta as any).env?.VITE_WS_URL || FALLBACK_WS_URL;
     // Derive HTTP(S) base from WS(S) URL
     const httpUrl = wsUrl.replace(/\/ws$/, '').replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
     // Validate it's a proper HTTP(S) URL
