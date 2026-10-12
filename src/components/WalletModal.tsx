@@ -38,7 +38,7 @@ export default function WalletModal() {
           {/* Chain mode tabs */}
           <div className="tabs" style={{ marginBottom: 10 }}>
             <button className="tab" onClick={() => setWalletModal('evm')}
-              style={!isSolanaMode ? { borderColor: 'var(--cyan)', color: 'var(--cyan)', background: 'rgba(0,204,255,0.06)', zIndex: 1 } : undefined}>
+              style={!isSolanaMode ? { borderColor: 'var(--cyan)', color: 'var(--cyan)', background: 'var(--cyan-bg)', zIndex: 1 } : undefined}>
               EVM CHAINS
             </button>
             <button className="tab" onClick={() => setWalletModal('solana')}
@@ -100,7 +100,7 @@ export default function WalletModal() {
             marginTop: 10, padding: '6px 0', borderTop: '1px solid var(--border)',
             fontSize: 8, color: 'var(--text-muted)', letterSpacing: '0.05em', lineHeight: 1.6,
           }}>
-            BSTONKEX is non-custodial. Your keys never leave your wallet.
+            Cupcak8 Swap is non-custodial. Your keys never leave your wallet.
           </div>
         </div>
       </div>

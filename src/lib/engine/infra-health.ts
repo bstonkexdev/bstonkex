@@ -1,4 +1,4 @@
-// BSTONKEX Infrastructure Health — Production health monitoring for all components
+// Cupcak8 Swap Infrastructure Health — Production health monitoring for all components
 // Tracks: RPC, WebSocket, indexer, cache, market pipeline, quote service, execution
 
 import type { ChainId } from '../config';

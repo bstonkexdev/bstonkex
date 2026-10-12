@@ -1,4 +1,4 @@
-// BSTONKEX Credential Store — secure credential management via Gitlawb
+// Cupcak8 Swap Credential Store — secure credential management via Gitlawb
 // Credentials are NEVER exposed in plain text after storage.
 // Only masked versions are returned for display.
 
@@ -49,8 +49,9 @@ export async function saveCredential(key: string, value: string, label: string, 
       await credCollection.create({ key, value, label, category, updatedAt: new Date().toISOString() });
     }
   } catch { /* non-critical */ }
-  // Also try env vars
-  try { (import.meta as any).env[`VITE_${key}`] = value; } catch { /* expected — env is read-only */ }
+  // SECURITY (Step 5): Do NOT attempt to set VITE_ env vars — they are read-only
+  // and would expose credentials in the client bundle. Credentials live in
+  // Gitlawb (owner-only) and the in-memory cache only.
   emit();
 }
 

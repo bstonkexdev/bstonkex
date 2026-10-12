@@ -1,4 +1,4 @@
-// BSTONKEX — Pixel Exchange Core centerpiece animation
+// Cupcak8 Swap — Pixel Exchange Core centerpiece animation
 // A futuristic stock-exchange machine / market processor visualization
 import { useState, useEffect, useRef } from 'react';
 import { CHAINS, CONFIGURED_CHAINS } from '../../lib/config';
@@ -46,18 +46,18 @@ export default function ExchangeCore({ events, activeMarkets }: Props) {
       const cy = h / 2;
 
       // Background
-      ctx.fillStyle = '#040810';
+      ctx.fillStyle = '#0B0E14';
       ctx.fillRect(0, 0, w, h);
 
       // Grid
-      ctx.strokeStyle = 'rgba(22,40,72,0.12)';
+      ctx.strokeStyle = 'rgba(35,45,63,0.2)';
       ctx.lineWidth = 0.5;
       for (let gx = 0; gx < w; gx += 24) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke(); }
       for (let gy = 0; gy < h; gy += 24) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke(); }
 
       // Outer ring
       const outerR = Math.min(w, h) * 0.38;
-      ctx.strokeStyle = 'rgba(0,204,255,0.15)';
+      ctx.strokeStyle = 'var(--cyan-bg)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
@@ -67,7 +67,7 @@ export default function ExchangeCore({ events, activeMarkets }: Props) {
       for (let i = 0; i < 4; i++) {
         const angle = t * 0.3 + (i * Math.PI / 2);
         const segLen = Math.PI * 0.15;
-        ctx.strokeStyle = `rgba(0,204,255,${0.3 + Math.sin(t * 2 + i) * 0.15})`;
+        ctx.strokeStyle = `rgba(0,136,255,${0.3 + Math.sin(t * 2 + i) * 0.15})`;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(cx, cy, outerR, angle, angle + segLen);
@@ -76,7 +76,7 @@ export default function ExchangeCore({ events, activeMarkets }: Props) {
 
       // Inner ring
       const innerR = outerR * 0.65;
-      ctx.strokeStyle = 'rgba(0,255,136,0.1)';
+      ctx.strokeStyle = 'var(--lime-bg)';
       ctx.lineWidth = 0.5;
       ctx.beginPath();
       ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
@@ -86,7 +86,7 @@ export default function ExchangeCore({ events, activeMarkets }: Props) {
       for (let i = 0; i < 3; i++) {
         const angle = -t * 0.5 + (i * Math.PI * 2 / 3);
         const segLen = Math.PI * 0.2;
-        ctx.strokeStyle = `rgba(0,255,136,${0.25 + Math.sin(t * 1.5 + i) * 0.1})`;
+        ctx.strokeStyle = `rgba(0,230,118,${0.25 + Math.sin(t * 1.5 + i) * 0.1})`;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.arc(cx, cy, innerR, angle, angle + segLen);
@@ -96,14 +96,14 @@ export default function ExchangeCore({ events, activeMarkets }: Props) {
       // Core glow
       const coreR = 28 + Math.sin(t * 2) * 3;
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 2);
-      grad.addColorStop(0, 'rgba(0,204,255,0.15)');
-      grad.addColorStop(0.5, 'rgba(0,204,255,0.04)');
+      grad.addColorStop(0, 'var(--cyan-bg)');
+      grad.addColorStop(0.5, 'var(--cyan-bg)');
       grad.addColorStop(1, 'transparent');
       ctx.fillStyle = grad;
       ctx.fillRect(cx - coreR * 2, cy - coreR * 2, coreR * 4, coreR * 4);
 
       // Core dot
-      ctx.fillStyle = '#00ccff';
+      ctx.fillStyle = '#0088FF';
       ctx.beginPath();
       ctx.arc(cx, cy, 4, 0, Math.PI * 2);
       ctx.fill();
@@ -156,7 +156,7 @@ export default function ExchangeCore({ events, activeMarkets }: Props) {
             const px = cx + (nx - cx) * pulse;
             const py = cy + (ny - cy) * pulse;
 
-            ctx.fillStyle = isBuy ? `rgba(0,255,136,${0.6 * (1 - pulse)})` : `rgba(255,48,96,${0.6 * (1 - pulse)})`;
+            ctx.fillStyle = isBuy ? `rgba(0,230,118,${0.6 * (1 - pulse)})` : `rgba(255,82,82,${0.6 * (1 - pulse)})`;
             ctx.beginPath();
             ctx.arc(px, py, 2 + pulse * 2, 0, Math.PI * 2);
             ctx.fill();
@@ -168,7 +168,7 @@ export default function ExchangeCore({ events, activeMarkets }: Props) {
       for (let i = 0; i < 3; i++) {
         const ly = cy - 20 + i * 20;
         const lx = ((t * 40 + i * 80) % (w + 40)) - 20;
-        ctx.strokeStyle = 'rgba(0,204,255,0.06)';
+        ctx.strokeStyle = 'var(--cyan-bg)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(lx - 15, ly);
@@ -177,7 +177,7 @@ export default function ExchangeCore({ events, activeMarkets }: Props) {
       }
 
       // Market count at center
-      ctx.fillStyle = 'rgba(0,204,255,0.5)';
+      ctx.fillStyle = 'var(--cyan-dim)';
       ctx.font = '800 11px JetBrains Mono, monospace';
       ctx.textAlign = 'center';
       ctx.fillText(`${activeMarkets} MARKETS`, cx, cy + 18);

@@ -1,4 +1,4 @@
-// BSTONKEX Infrastructure Dashboard — Real-time status of all production components
+// Cupcak8 Swap Infrastructure Dashboard — Real-time status of all production components
 import { useState, useEffect } from 'react';
 import { getComponents, getInfraStats, onInfraChange, statusColor, statusLabel, type InfraComponent, type ComponentStatus } from '../../lib/engine/infra-state';
 import { executeDeployAction } from '../../lib/engine/deploy-actions';

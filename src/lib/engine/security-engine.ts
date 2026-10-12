@@ -1,4 +1,4 @@
-// BSTONKEX Security Engine — Centralized trade validation & security checks
+// Cupcak8 Swap Security Engine — Centralized trade validation & security checks
 // Non-authoritative: frontend validation only. Authoritative state from blockchain/backend.
 import type { ChainId } from '../config';
 import { CHAINS, PLATFORM_FEE_PCT } from '../config';
@@ -171,7 +171,7 @@ export function checkFee(platformFeePct: number): SecurityCheck {
     id: 'fee', check: 'FEE',
     status: match ? 'pass' : 'warning',
     severity: match ? 'info' : 'medium',
-    message: `BSTONKEX: ${platformFeePct.toFixed(2)}%`,
+    message: `Cupcak8 Swap: ${platformFeePct.toFixed(2)}%`,
     source: 'config', timestamp: Date.now(),
   };
 }

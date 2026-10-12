@@ -1,4 +1,4 @@
-// BSTONKEX Portfolio Analytics — Trading performance, allocation, fee analytics
+// Cupcak8 Swap Portfolio Analytics — Trading performance, allocation, fee analytics
 import type { ChainId } from '../config';
 import { getWalletTrades, type TrackedTrade } from './tx-tracker';
 import { getTradeHistory, type TradeRecord } from './pnl-engine';
@@ -53,20 +53,20 @@ export async function getTradingPerformance(wallet: string): Promise<TradingPerf
 // ── Fee Analytics ────────────────────────────────────────────
 
 export interface FeeAnalytics {
-  bstonkexFees: number;
+  cupcak8Fees: number;
   dexFees: number;
   networkFees: number;
   totalFees: number;
 }
 
 export async function getFeeAnalytics(wallet: string): Promise<FeeAnalytics> {
-  // BSTONKEX fee = 0.40% of all trade volume
+  // Cupcak8 Swap fee = 0.40% of all trade volume
   const trades = await getTradeHistory(wallet);
   const totalVolume = trades.reduce((s, t) => s + t.valueUsd, 0);
-  const bstonkexFees = totalVolume * 0.004;
+  const cupcak8Fees = totalVolume * 0.004;
   // DEX and network fees are estimated per-trade from quote data
   // For now, these come from the fee_engine collection or are estimated
-  return { bstonkexFees, dexFees: 0, networkFees: 0, totalFees: bstonkexFees };
+  return { cupcak8Fees, dexFees: 0, networkFees: 0, totalFees: cupcak8Fees };
 }
 
 // ── Allocation ───────────────────────────────────────────────

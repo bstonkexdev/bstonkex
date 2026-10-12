@@ -1,4 +1,4 @@
-// BSTONKEX API Gateway — Clean internal API between engines and frontend
+// Cupcak8 Swap API Gateway — Clean internal API between engines and frontend
 // All frontend data requests go through this layer.
 // Backed by cache + engine data + pipeline events.
 

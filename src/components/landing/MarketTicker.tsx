@@ -1,4 +1,4 @@
-// BSTONKEX — Continuously scrolling market ticker
+// Cupcak8 Swap — Continuously scrolling market ticker
 import { useState, useEffect, useRef } from 'react';
 import { CHAINS, formatUsd, formatPct } from '../../lib/config';
 import type { ChainId } from '../../lib/config';

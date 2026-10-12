@@ -1,4 +1,4 @@
-// BSTONKEX Search Engine — type detection, cross-chain search, command palette
+// Cupcak8 Swap Search Engine — type detection, cross-chain search, command palette
 import { DEXSCREENER_API, type ChainId, CHAINS, CONFIGURED_CHAINS, shortenAddress } from '../config';
 import { searchTokens, type SearchResult } from '../market';
 import { cacheGetOrCompute, CACHE_KEYS, TTL } from './cache';
@@ -135,7 +135,7 @@ export async function unifiedSearch(query: string): Promise<{
 
 // ── Recent Searches (local storage) ──────────────────────────
 
-const RECENT_KEY = 'bstonkex_recent_searches';
+const RECENT_KEY = 'cupcak8_recent_searches';
 const MAX_RECENT = 10;
 
 export function getRecentSearches(): string[] {

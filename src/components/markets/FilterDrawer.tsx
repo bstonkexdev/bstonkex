@@ -1,5 +1,7 @@
+// Cupcak8 Swap — Filter Drawer
+// Slide-out filter panel with warm cream background, pink apply button
 import { useState } from 'react';
-import { CHAINS, CONFIGURED_CHAINS } from '../../lib/config';
+import { CONFIGURED_CHAINS } from '../../lib/config';
 import type { ChainId } from '../../lib/config';
 import ChainIcon from '../ChainIcon';
 
@@ -39,7 +41,6 @@ interface Props {
 
 export default function FilterDrawer({ open, onClose, filters, onApply }: Props) {
   const [local, setLocal] = useState(filters);
-
   if (!open) return null;
 
   const toggleChain = (id: ChainId) => {
@@ -50,8 +51,7 @@ export default function FilterDrawer({ open, onClose, filters, onApply }: Props)
   };
 
   const activeCount = [
-    local.chains.length > 0,
-    !!local.minMcap, !!local.maxMcap, !!local.minLiquidity,
+    local.chains.length > 0, !!local.minMcap, !!local.maxMcap, !!local.minLiquidity,
     !!local.minVolume, !!local.maxAge, !!local.minHolders,
     local.riskLevel && local.riskLevel !== 'Any',
     local.securityLevel && local.securityLevel !== 'Any',
@@ -60,142 +60,182 @@ export default function FilterDrawer({ open, onClose, filters, onApply }: Props)
   ].filter(Boolean).length;
 
   return (
-    <div className="filter-drawer-overlay" onClick={onClose}>
-      <div className="filter-drawer" onClick={e => e.stopPropagation()}>
-        <div className="filter-drawer-header">
-          <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: '0.1em' }}>FILTERS</span>
-          {activeCount > 0 && <span style={{ fontSize: 8, color: 'var(--cyan)' }}>{activeCount} ACTIVE</span>}
+    <>
+      <div onClick={onClose} style={{
+        position: 'fixed', inset: 0, zIndex: 900,
+        background: 'rgba(61,43,31,0.25)', backdropFilter: 'blur(2px)',
+      }} />
+      <div style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 901,
+        width: 340, maxWidth: '90vw', background: 'var(--bg-surface)',
+        borderLeft: '1px solid var(--border)', boxShadow: '-4px 0 20px rgba(61,43,31,0.08)',
+        display: 'flex', flexDirection: 'column',
+        animation: 'slideInRight 0.2s ease-out',
+      }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '16px 20px', borderBottom: '1px solid var(--border)',
+        }}>
+          <span style={{ fontWeight: 800, fontSize: 13, color: 'var(--text-bright)', letterSpacing: '0.06em' }}>
+            ⚙ Filters
+          </span>
+          {activeCount > 0 && (
+            <span style={{
+              background: 'var(--green-bg)', color: '#E8547C',
+              padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700,
+            }}>{activeCount}</span>
+          )}
           <div style={{ flex: 1 }} />
-          <button className="btn btn-sm" onClick={onClose} style={{ fontSize: 8 }}>✕</button>
+          <button onClick={onClose} style={{
+            background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)', padding: '4px 10px',
+            cursor: 'pointer', fontSize: 12, color: 'var(--text-dim)',
+          }}>✕</button>
         </div>
 
-        <div className="filter-drawer-body">
-          {/* Chains */}
-          <FilterSection label="CHAIN">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {CONFIGURED_CHAINS.map(c => (
-                <button key={c.id}
-                  className={`filter-chip ${local.chains.includes(c.id as ChainId) ? 'active' : ''}`}
-                  onClick={() => toggleChain(c.id as ChainId)}
-                  style={{ borderColor: c.color, color: local.chains.includes(c.id as ChainId) ? c.color : undefined, display: 'inline-flex', alignItems: 'center', gap: 3 }}
-                >
-                  <ChainIcon chainId={c.id as ChainId} size={10} />{c.shortName}
-                </button>
-              ))}
+        {/* Body */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
+          <Section label="Network">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {CONFIGURED_CHAINS.map(c => {
+                const active = local.chains.includes(c.id as ChainId);
+                return (
+                  <button key={c.id} onClick={() => toggleChain(c.id as ChainId)} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '5px 12px', fontSize: 11, fontWeight: 700,
+                    background: active ? 'var(--green-bg)' : 'var(--bg-elevated)',
+                    border: `1px solid ${active ? '#E8547C' : 'var(--border)'}`,
+                    borderRadius: 16, cursor: 'pointer',
+                    color: active ? '#E8547C' : 'var(--text-dim)',
+                    transition: 'all 0.12s',
+                  }}>
+                    <ChainIcon chainId={c.id as ChainId} size={10} />{c.shortName}
+                  </button>
+                );
+              })}
             </div>
-          </FilterSection>
+          </Section>
 
-          {/* Market Cap */}
-          <FilterSection label="MARKET CAP">
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input className="filter-input" placeholder="Min" type="number" value={local.minMcap}
-                onChange={e => setLocal(f => ({ ...f, minMcap: e.target.value }))} />
-              <input className="filter-input" placeholder="Max" type="number" value={local.maxMcap}
-                onChange={e => setLocal(f => ({ ...f, maxMcap: e.target.value }))} />
+          <Section label="Market Cap">
+            <div style={{ display: 'flex', gap: 8 }}>
+              <FilterInput placeholder="Min" value={local.minMcap} onChange={v => setLocal(f => ({ ...f, minMcap: v }))} />
+              <FilterInput placeholder="Max" value={local.maxMcap} onChange={v => setLocal(f => ({ ...f, maxMcap: v }))} />
             </div>
-          </FilterSection>
+          </Section>
 
-          {/* Liquidity */}
-          <FilterSection label="LIQUIDITY">
-            <input className="filter-input" placeholder="Min liquidity" type="number" value={local.minLiquidity}
-              onChange={e => setLocal(f => ({ ...f, minLiquidity: e.target.value }))} />
-          </FilterSection>
+          <Section label="Min Liquidity">
+            <FilterInput placeholder="Min liquidity ($)" value={local.minLiquidity} onChange={v => setLocal(f => ({ ...f, minLiquidity: v }))} />
+          </Section>
 
-          {/* Volume */}
-          <FilterSection label="24H VOLUME">
-            <input className="filter-input" placeholder="Min volume" type="number" value={local.minVolume}
-              onChange={e => setLocal(f => ({ ...f, minVolume: e.target.value }))} />
-          </FilterSection>
+          <Section label="24H Volume">
+            <FilterInput placeholder="Min volume ($)" value={local.minVolume} onChange={v => setLocal(f => ({ ...f, minVolume: v }))} />
+          </Section>
 
-          {/* Age */}
-          <FilterSection label="MAX AGE">
-            <div style={{ display: 'flex', gap: 4 }}>
+          <Section label="Max Age">
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {AGE_OPTIONS.map(a => (
-                <button key={a} className={`filter-chip ${local.maxAge === a ? 'active' : ''}`}
-                  onClick={() => setLocal(f => ({ ...f, maxAge: f.maxAge === a ? '' : a }))}>
-                  {a}
-                </button>
+                <Chip key={a} active={local.maxAge === a}
+                  onClick={() => setLocal(f => ({ ...f, maxAge: f.maxAge === a ? '' : a }))}>{a}</Chip>
               ))}
             </div>
-          </FilterSection>
+          </Section>
 
-          {/* Holders */}
-          <FilterSection label="MIN HOLDERS">
-            <input className="filter-input" placeholder="Min holders" type="number" value={local.minHolders}
-              onChange={e => setLocal(f => ({ ...f, minHolders: e.target.value }))} />
-          </FilterSection>
-
-          {/* Risk */}
-          <FilterSection label="RISK LEVEL">
-            <div style={{ display: 'flex', gap: 4 }}>
+          <Section label="Risk Level">
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {RISK_OPTIONS.map(r => (
-                <button key={r} className={`filter-chip ${local.riskLevel === r ? 'active' : ''}`}
-                  onClick={() => setLocal(f => ({ ...f, riskLevel: r }))}>
-                  {r}
-                </button>
+                <Chip key={r} active={local.riskLevel === r}
+                  onClick={() => setLocal(f => ({ ...f, riskLevel: r }))}>{r}</Chip>
               ))}
             </div>
-          </FilterSection>
+          </Section>
 
-          {/* Security */}
-          <FilterSection label="SECURITY">
-            <div style={{ display: 'flex', gap: 4 }}>
-              {SECURITY_OPTIONS.map(s => (
-                <button key={s} className={`filter-chip ${local.securityLevel === s ? 'active' : ''}`}
-                  onClick={() => setLocal(f => ({ ...f, securityLevel: s }))}>
-                  {s}
-                </button>
-              ))}
-            </div>
-          </FilterSection>
-
-          {/* Buy Pressure */}
-          <FilterSection label="BUY PRESSURE">
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <Section label="Buy Pressure">
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {BUY_PRESSURE.map(b => (
-                <button key={b} className={`filter-chip ${local.buyPressure === b ? 'active' : ''}`}
-                  onClick={() => setLocal(f => ({ ...f, buyPressure: b }))}>
-                  {b}
-                </button>
+                <Chip key={b} active={local.buyPressure === b}
+                  onClick={() => setLocal(f => ({ ...f, buyPressure: b }))}>{b}</Chip>
               ))}
             </div>
-          </FilterSection>
+          </Section>
 
-          {/* Smart Money */}
-          <FilterSection label="SMART MONEY">
-            <div style={{ display: 'flex', gap: 4 }}>
+          <Section label="Smart Money">
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {SMART_MONEY.map(s => (
-                <button key={s} className={`filter-chip ${local.smartMoney === s ? 'active' : ''}`}
-                  onClick={() => setLocal(f => ({ ...f, smartMoney: s }))}>
-                  {s}
-                </button>
+                <Chip key={s} active={local.smartMoney === s}
+                  onClick={() => setLocal(f => ({ ...f, smartMoney: s }))}>{s}</Chip>
               ))}
             </div>
-          </FilterSection>
+          </Section>
         </div>
 
-        <div className="filter-drawer-footer">
-          <button className="btn btn-sm" onClick={() => { setLocal(DEFAULT_FILTERS); onApply(DEFAULT_FILTERS); }}
-            style={{ fontSize: 8 }}>
-            RESET ALL
-          </button>
+        {/* Footer */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '14px 20px', borderTop: '1px solid var(--border)',
+          background: 'var(--bg-elevated)',
+        }}>
+          <button onClick={() => { setLocal(DEFAULT_FILTERS); onApply(DEFAULT_FILTERS); }} style={{
+            padding: '8px 16px', background: 'transparent',
+            border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+            color: 'var(--text-dim)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+          }}>Reset</button>
           <div style={{ flex: 1 }} />
-          <button className="btn btn-sm btn-cyan" onClick={() => { onApply(local); onClose(); }}
-            style={{ fontSize: 8 }}>
-            APPLY FILTERS
-          </button>
+          <button onClick={() => { onApply(local); onClose(); }} style={{
+            padding: '10px 24px', background: '#E8547C', border: 'none',
+            borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12, fontWeight: 700,
+            cursor: 'pointer', transition: 'background 0.12s',
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = '#D14068'}
+            onMouseLeave={e => e.currentTarget.style.background = '#E8547C'}
+          >Apply Filters</button>
         </div>
       </div>
+
+      <style>{`
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+      `}</style>
+    </>
+  );
+}
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{
+        fontSize: 10, fontWeight: 700, color: 'var(--text-muted)',
+        letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8,
+      }}>{label}</div>
+      {children}
     </div>
   );
 }
 
-function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <div className="filter-section">
-      <div className="filter-section-label">{label}</div>
-      {children}
-    </div>
+    <button onClick={onClick} style={{
+      padding: '5px 14px', fontSize: 11, fontWeight: 600,
+      background: active ? 'var(--green-bg)' : 'var(--bg-elevated)',
+      border: `1px solid ${active ? '#E8547C' : 'var(--border)'}`,
+      borderRadius: 16, cursor: 'pointer',
+      color: active ? '#E8547C' : 'var(--text-dim)',
+      transition: 'all 0.12s',
+    }}>{children}</button>
+  );
+}
+
+function FilterInput({ placeholder, value, onChange }: { placeholder: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <input type="number" placeholder={placeholder} value={value}
+      onChange={e => onChange(e.target.value)} style={{
+        width: '100%', padding: '7px 12px', fontSize: 12,
+        border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+        background: 'var(--bg-elevated)', color: 'var(--text-bright)',
+        outline: 'none', boxSizing: 'border-box',
+      }}
+      onFocus={e => e.currentTarget.style.borderColor = '#E8547C'}
+      onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+    />
   );
 }
 

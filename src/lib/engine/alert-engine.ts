@@ -1,4 +1,4 @@
-// BSTONKEX Alert Engine — User alerts via Gitlawb (owner visibility)
+// Cupcak8 Swap Alert Engine — User alerts via Gitlawb (owner visibility)
 // Condition matching, dedup, notification dispatch
 import type { ChainId } from '../config';
 import { gitlawb } from '../gitlawb';

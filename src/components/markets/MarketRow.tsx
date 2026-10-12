@@ -1,4 +1,5 @@
-import { CHAINS, formatUsd, formatPct, formatNum, shortenAddress } from '../../lib/config';
+// Cupcak8 Swap — Individual Market Row (standalone, used by MarketTable inline)
+import { CHAINS, formatUsd, formatPct, formatNum } from '../../lib/config';
 import { formatAge } from '../../lib/market-discovery';
 import type { MarketToken } from '../../lib/market-discovery';
 import type { ChainId } from '../../lib/config';
@@ -15,124 +16,60 @@ interface Props {
 
 export default function MarketRow({ token: t, onClick, isWatched, onToggleWatch, onQuickBuy }: Props) {
   const chain = CHAINS[t.chainId];
-  const isUp24h = t.priceChange24h != null && t.priceChange24h >= 0;
-  const isUp1m = t.priceChange5m != null && t.priceChange5m >= 0;
 
   return (
-    <tr className="market-row" onClick={onClick}>
-      {/* Watch */}
-      <td className="col-watch">
-        <button className="watch-btn" onClick={e => { e.stopPropagation(); onToggleWatch(); }}>
+    <tr onClick={onClick} style={{
+      cursor: 'pointer', borderBottom: '1px solid var(--border)',
+      transition: 'background 0.1s',
+    }}
+      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+    >
+      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+        <button onClick={e => { e.stopPropagation(); onToggleWatch(); }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: isWatched ? 'var(--yellow)' : 'var(--text-muted)', padding: 0 }}>
           {isWatched ? '★' : '☆'}
         </button>
       </td>
-
-      {/* PAIR / AGE */}
-      <td className="col-pair">
-        <div className="pair-cell">
-          <span className="pair-led" data-fresh={t.dataFreshness} />
-          {t.icon && (
-            <img src={t.icon} alt="" className="pair-icon" onError={e => (e.currentTarget.style.display = 'none')} />
-          )}
-          <div className="pair-info">
-            <div className="pair-symbol">
-              {t.symbol}
-              <ChainIcon chainId={t.chainId as ChainId} size={10} style={{ marginLeft: 2, marginRight: 1 }} />
-              <span className="pair-chain" style={{ color: chain?.color }}>{chain?.shortName}</span>
+      <td style={{ padding: '8px 8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {t.icon && <img src={t.icon} alt="" width={24} height={24} style={{ borderRadius: '50%', objectFit: 'cover' }} onError={e => (e.currentTarget.style.display = 'none')} />}
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 12, color: 'var(--text-bright)' }}>
+              {t.symbol} <ChainIcon chainId={t.chainId as ChainId} size={10} />
+              <span style={{ fontSize: 9, color: chain?.color, marginLeft: 3 }}>{chain?.shortName}</span>
             </div>
-            <div className="pair-name">{t.name}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{t.name}</div>
           </div>
-          <span className="pair-age">{formatAge(t.ageMs)}</span>
+          <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 'auto' }}>{formatAge(t.ageMs)}</span>
         </div>
       </td>
-
-      {/* PRICE */}
-      <td className="col-right col-price">{formatUsd(t.price)}</td>
-
-      {/* MC */}
-      <td className="col-right">{formatUsd(t.marketCap)}</td>
-
-      {/* LIQ / INIT */}
-      <td className="col-right col-hide-sm">{formatUsd(t.liquidity)}</td>
-
-      {/* RISK */}
-      <td className="col-center col-hide-sm">
-        <RiskBadge liquidity={t.liquidity} dataFreshness={t.dataFreshness} />
+      <td style={{ padding: '8px 8px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-bright)' }}>
+        {formatUsd(t.price)}
       </td>
-
-      {/* SMART */}
-      <td className="col-center col-hide-md">
-        <span className="smart-badge">
-          {t.buySellRatio24h != null && t.buySellRatio24h > 1.5 ? '●' : '—'}
-        </span>
+      <td style={{ padding: '8px 8px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
+        {formatUsd(t.marketCap)}
       </td>
-
-      {/* 24H VOL */}
-      <td className="col-right">{formatUsd(t.volume24h)}</td>
-
-      {/* 24H ACT */}
-      <td className="col-right col-hide-sm">
-        <div className="activity-cell">
-          <span className="act-buy">{formatNum(t.buys24h)}</span>
-          <span className="act-sep">/</span>
-          <span className="act-sell">{formatNum(t.sells24h)}</span>
-        </div>
+      <td style={{ padding: '8px 8px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
+        {formatUsd(t.liquidity)}
       </td>
-
-      {/* HOLDERS */}
-      <td className="col-right col-hide-md">
-        {t.txns24h != null ? formatNum(t.txns24h) : '—'}
+      <td style={{ padding: '8px 8px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
+        {formatUsd(t.volume24h)}
       </td>
-
-      {/* 1M% */}
-      <td className="col-right col-hide-sm" style={{ color: pctColor(t.priceChange5m), fontWeight: 700 }}>
-        {formatPct(t.priceChange5m)}
-      </td>
-
-      {/* 24H% */}
-      <td className="col-right" style={{ color: pctColor(t.priceChange24h), fontWeight: 700 }}>
+      <td style={{ padding: '8px 8px', textAlign: 'right', fontWeight: 700, color: pctColor(t.priceChange24h) }}>
         {formatPct(t.priceChange24h)}
       </td>
-
-      {/* TOP10 */}
-      <td className="col-center col-hide-md">
-        <span className="top10-badge">
-          {t.marketCap != null && t.marketCap > 1000000 ? '▲' : '—'}
-        </span>
-      </td>
-
-      {/* SEC */}
-      <td className="col-center col-hide-lg">
-        <SecBadge freshness={t.dataFreshness} liquidity={t.liquidity} />
-      </td>
-
-      {/* QUICK BUY */}
-      <td className="col-action">
-        <button className="quick-buy-btn" onClick={e => { e.stopPropagation(); onQuickBuy(); }}>
-          BUY
-        </button>
+      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+        <button onClick={e => { e.stopPropagation(); onQuickBuy(); }} style={{
+          padding: '5px 12px', background: '#E8547C', border: 'none',
+          borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer',
+        }}>Trade</button>
       </td>
     </tr>
   );
 }
 
-function RiskBadge({ liquidity, dataFreshness }: { liquidity: number | null; dataFreshness: string }) {
-  if (liquidity == null || liquidity < 1000) return <span className="risk-badge risk-high">HIGH</span>;
-  if (liquidity < 10000) return <span className="risk-badge risk-med">MED</span>;
-  return <span className="risk-badge risk-low">LOW</span>;
-}
-
-function SecBadge({ freshness, liquidity }: { freshness: string; liquidity: number | null }) {
-  const good = freshness === 'live' && liquidity != null && liquidity > 10000;
-  const warn = freshness === 'recent' || (liquidity != null && liquidity > 1000);
-  return (
-    <span className={`sec-badge ${good ? 'sec-good' : warn ? 'sec-warn' : 'sec-danger'}`}>
-      {good ? '✓' : warn ? '!' : '✕'}
-    </span>
-  );
-}
-
 export function pctColor(v: number | null): string {
   if (v == null) return 'var(--text-dim)';
-  return v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--text-dim)';
+  return v > 0 ? 'var(--lime-dim)' : v < 0 ? 'var(--red)' : 'var(--text-dim)';
 }

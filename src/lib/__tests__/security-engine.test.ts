@@ -1,4 +1,4 @@
-// BSTONKEX Security Engine Tests — deterministic validation
+// Cupcak8 Swap Security Engine Tests — deterministic validation
 import { describe, it, expect } from 'vitest';
 import {
   checkWallet, checkNetwork, checkBalance, checkQuote,

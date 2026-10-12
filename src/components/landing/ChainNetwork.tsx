@@ -1,4 +1,4 @@
-// BSTONKEX — Pixel network map visualization
+// Cupcak8 Swap — Pixel network map visualization
 import { useRef, useEffect } from 'react';
 import { CONFIGURED_CHAINS } from '../../lib/config';
 
@@ -38,31 +38,31 @@ export default function ChainNetwork({ chainStatuses }: Props) {
       const cx = w / 2;
       const cy = h / 2;
 
-      ctx.fillStyle = '#040810';
+      ctx.fillStyle = '#0B0E14';
       ctx.fillRect(0, 0, w, h);
 
       // Grid
-      ctx.strokeStyle = 'rgba(22,40,72,0.08)';
+      ctx.strokeStyle = 'rgba(35,45,63,0.2)';
       ctx.lineWidth = 0.5;
       for (let gx = 0; gx < w; gx += 20) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke(); }
       for (let gy = 0; gy < h; gy += 20) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke(); }
 
-      // Center BSTONKEX node
+      // Center Cupcak8 Swap node
       const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 30);
-      coreGrad.addColorStop(0, 'rgba(0,204,255,0.2)');
+      coreGrad.addColorStop(0, 'var(--cyan-bg)');
       coreGrad.addColorStop(1, 'transparent');
       ctx.fillStyle = coreGrad;
       ctx.fillRect(cx - 30, cy - 30, 60, 60);
 
-      ctx.fillStyle = '#00ccff';
+      ctx.fillStyle = '#0088FF';
       ctx.beginPath();
       ctx.arc(cx, cy, 6, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = 'rgba(0,204,255,0.6)';
-      ctx.font = '800 8px JetBrains Mono, monospace';
+      ctx.fillStyle = '#E8547C';
+      ctx.font = '800 7px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('BSTONKEX', cx, cy - 14);
+      ctx.fillText('Cupcak8', cx, cy - 14);
 
       // Chain nodes
       const chains = CONFIGURED_CHAINS;
@@ -74,7 +74,7 @@ export default function ChainNetwork({ chainStatuses }: Props) {
         const ny = cy + Math.sin(angle) * radius;
 
         const status = chainStatuses[chain.id] || 'offline';
-        const statusColor = status === 'live' ? '#00ff88' : status === 'delayed' ? '#ffaa00' : '#ff3060';
+        const statusColor = status === 'live' ? '#00E676' : status === 'delayed' ? '#FFD700' : '#FF5252';
 
         // Connection line
         ctx.strokeStyle = `${statusColor}30`;
@@ -104,7 +104,7 @@ export default function ChainNetwork({ chainStatuses }: Props) {
         ctx.fill();
 
         // Node inner
-        ctx.fillStyle = '#040810';
+        ctx.fillStyle = '#0B0E14';
         ctx.beginPath();
         ctx.arc(nx, ny, 5, 0, Math.PI * 2);
         ctx.fill();

@@ -1,6 +1,6 @@
-// BSTONKEX — Mini sparkline (real data only, no fakes)
-// Currently a placeholder that shows available price change data as a visual indicator.
-// A real sparkline requires historical OHLCV data per token, which is not available
+// Cupcak8 Swap — Mini sparkline (real data only, no fakes)
+// Shows available price change data as compact bars.
+// A real sparkline requires historical OHLCV data per token, not available
 // from the DexScreener discovery endpoint. This shows a compact bar instead.
 
 import type { MarketToken } from '../../lib/market-discovery';
@@ -43,7 +43,7 @@ export default function MiniSparkline({ token }: Props) {
       {changes.map((c, i) => {
         if (c == null) return <div key={i} style={{ flex: 1, height: 1, background: 'var(--border)' }} />;
         const normalized = (Math.abs(c) / maxAbs) * 14;
-        const color = c >= 0 ? 'var(--green)' : 'var(--red)';
+        const color = c >= 0 ? 'var(--lime)' : 'var(--red)';
         return (
           <div key={i} style={{
             flex: 1,

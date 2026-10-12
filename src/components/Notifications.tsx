@@ -67,7 +67,7 @@ function NotificationItem({ notification: n }: { notification: TxNotification })
     failed: 'var(--red)',
     approval: 'var(--cyan)',
     market: 'var(--cyan)',
-    whale: '#00d4ff',
+    whale: 'var(--blue)',
     alert: 'var(--amber)',
     info: 'var(--text-dim)',
   };

@@ -1,7 +1,7 @@
-// BSTONKEX Fee Engine Tests — deterministic, no mocks
+// Cupcak8 Swap Fee Engine Tests — deterministic, no mocks
 import { describe, it, expect } from 'vitest';
 import { calculateFees, getReferralTier } from '../engine/fee-engine';
-import { PLATFORM_FEE_PCT, REFERRAL_TIERS, MIN_CLAIM_AMOUNT } from '../config';
+import { PLATFORM_FEE_PCT, MIN_CLAIM_AMOUNT } from '../config';
 
 describe('Fee Engine', () => {
   describe('calculateFees', () => {

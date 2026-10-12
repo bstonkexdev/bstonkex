@@ -13,6 +13,9 @@ interface Props {
   hideZeroBalances: boolean;
   onToggleHideZero: () => void;
   onTrade: (t: TradeToken) => void;
+  viewChain?: ChainId | 'all';
+  searchQuery?: string;
+  onSearchChange?: (q: string) => void;
 }
 
 interface FlatPosition {
@@ -22,12 +25,14 @@ interface FlatPosition {
   change24h: number | null;
 }
 
-export default function PositionsTable({ allPortfolios, activeChain, positions, hideZeroBalances, onToggleHideZero, onTrade }: Props) {
+export default function PositionsTable({ allPortfolios, activeChain, positions, hideZeroBalances, onToggleHideZero, onTrade, viewChain = 'all', searchQuery, onSearchChange }: Props) {
   const [showAllChains, setShowAllChains] = useState(true);
 
   // Flatten all positions from portfolio data
   const flat: FlatPosition[] = [];
-  const chains = showAllChains ? allPortfolios : allPortfolios.filter(c => c.chainId === activeChain);
+  const chains = viewChain !== 'all'
+    ? allPortfolios.filter(c => c.chainId === viewChain)
+    : showAllChains ? allPortfolios : allPortfolios.filter(c => c.chainId === activeChain);
 
   for (const c of chains) {
     // Native asset
@@ -86,8 +91,8 @@ export default function PositionsTable({ allPortfolios, activeChain, positions, 
           <tr>
             <th>TOKEN</th><th>CHAIN</th><th className="right">BALANCE</th>
             <th className="right">PRICE</th><th className="right">VALUE</th>
-            <th className="right">AVG ENTRY</th><th className="right">P&L</th>
-            <th className="right">P&L %</th><th></th>
+            <th className="right">24H</th><th className="right">P&L</th>
+            <th className="right">ALLOC</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -98,7 +103,7 @@ export default function PositionsTable({ allPortfolios, activeChain, positions, 
           )}
           {flat.map((p, i) => {
             const chain = CHAINS[p.chainId];
-            const pnlColor = (p.unrealizedPnl ?? 0) >= 0 ? 'var(--green)' : 'var(--red)';
+            const pnlColor = (p.unrealizedPnl ?? 0) >= 0 ? 'var(--lime-dim)' : 'var(--red)';
             return (
               <tr key={`${p.chainId}-${p.address}-${i}`}>
                 <td>
@@ -113,10 +118,16 @@ export default function PositionsTable({ allPortfolios, activeChain, positions, 
                 </td>
                 <td className="right" style={{ fontWeight: 700 }}>{p.balance.toFixed(4)}</td>
                 <td className="right">{p.priceUsd != null ? formatUsd(p.priceUsd) : 'PRICE UNAVAILABLE'}</td>
-                <td className="right" style={{ fontWeight: 800, color: 'var(--text-bright)' }}>{p.valueUsd != null ? formatUsd(p.valueUsd) : '—'}</td>
-                <td className="right">{p.avgEntry != null ? formatUsd(p.avgEntry) : '—'}</td>
-                <td className="right" style={{ color: pnlColor, fontWeight: 700 }}>{p.unrealizedPnl != null ? formatUsd(p.unrealizedPnl) : '—'}</td>
-                <td className="right" style={{ color: pnlColor }}>{p.unrealizedPct != null ? formatPct(p.unrealizedPct) : '—'}</td>
+                <td className="right" style={{ fontWeight: 800 }}>{p.valueUsd != null ? formatUsd(p.valueUsd) : '—'}</td>
+                <td className="right" style={{ color: pnlColor, fontWeight: 700 }}>
+                  {p.unrealizedPnl != null ? formatUsd(p.unrealizedPnl) : '—'}
+                </td>
+                <td className="right">
+                  {p.unrealizedPct != null ? formatPct(p.unrealizedPct) : '—'}
+                </td>
+                <td className="right" style={{ color: 'var(--text-dim)' }}>
+                  {p.valueUsd != null && totalValue > 0 ? `${((p.valueUsd / totalValue) * 100).toFixed(1)}%` : '—'}
+                </td>
                 <td>
                   <button className="btn btn-sm btn-green" style={{ fontSize: 7, padding: '2px 5px' }}
                     onClick={() => onTrade({ chainId: p.chainId, address: p.address, name: p.name, symbol: p.symbol })}>
@@ -148,7 +159,7 @@ export default function PositionsTable({ allPortfolios, activeChain, positions, 
               <div style={{ display: 'flex', gap: 8, fontSize: 8, color: 'var(--text-dim)' }}>
                 <span>{p.balance.toFixed(4)} @ {formatUsd(p.priceUsd)}</span>
                 {p.unrealizedPnl != null && (
-                  <span style={{ color: p.unrealizedPnl >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}>
+                  <span style={{ color: p.unrealizedPnl >= 0 ? 'var(--lime-dim)' : 'var(--red)', fontWeight: 700 }}>
                     {formatUsd(p.unrealizedPnl)} ({formatPct(p.unrealizedPct)})
                   </span>
                 )}

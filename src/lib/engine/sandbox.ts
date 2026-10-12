@@ -1,4 +1,4 @@
-// BSTONKEX Sandbox Detection — shared across all engine modules
+// Cupcak8 Swap Sandbox Detection — shared across all engine modules
 // In the preview sandbox, external network calls are blocked and return 403.
 // All modules that make fetch() calls to external APIs should check this first.
 

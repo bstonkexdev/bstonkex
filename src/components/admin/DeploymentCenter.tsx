@@ -1,4 +1,4 @@
-// BSTONKEX Admin Deployment Center — protected admin-only deployment interface
+// Cupcak8 Swap Admin Deployment Center — protected admin-only deployment interface
 // Requires authorized admin wallet. Shows ACCESS DENIED for unauthorized wallets.
 import { useState, useCallback } from 'react';
 import { useApp } from '../../lib/context';
@@ -9,8 +9,11 @@ import DeployWorkflow from './DeployWorkflow';
 import DeploymentLogPanel from './DeploymentLog';
 import RobinhoodPanel from './RobinhoodPanel';
 import PipelineMonitor from './PipelineMonitor';
+import { IndexerMonitor } from './IndexerMonitor';
+import LaunchpadVerificationPanel from './LaunchpadVerificationPanel';
+import LaunchpadPipelinePanel from './LaunchpadPipelinePanel';
 
-type AdminTab = 'infra' | 'deploy' | 'credentials' | 'robinhood' | 'pipeline' | 'log';
+type AdminTab = 'infra' | 'deploy' | 'credentials' | 'robinhood' | 'pipeline' | 'indexer' | 'verification' | 'launchpad-stage3' | 'log';
 
 export default function DeploymentCenter() {
   const { wallet, connect, setPage } = useApp();
@@ -56,7 +59,7 @@ export default function DeploymentCenter() {
         </div>
         <div style={{
           padding: '8px 16px', borderRadius: 4,
-          background: 'rgba(255,48,96,0.08)', border: '1px solid rgba(255,48,96,0.2)',
+          background: 'var(--red-bg)', border: '1px solid var(--red-bg)',
           fontSize: 9, color: 'var(--text)', textAlign: 'center', maxWidth: 400,
         }}>
           {auth.reason}
@@ -85,6 +88,9 @@ export default function DeploymentCenter() {
     { id: 'credentials', label: 'CREDENTIALS', icon: '🔑' },
     { id: 'robinhood', label: 'ROBINHOOD', icon: '◉' },
     { id: 'pipeline', label: 'PIPELINE', icon: '◉' },
+    { id: 'indexer', label: 'INDEXER', icon: '⛓' },
+    { id: 'verification', label: 'VERIFY LAUNCHES', icon: '✓' },
+    { id: 'launchpad-stage3', label: 'STAGE 3 PIPELINE', icon: '◈' },
     { id: 'log', label: 'LOGS', icon: '☰' },
   ];
 
@@ -102,7 +108,7 @@ export default function DeploymentCenter() {
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{
             fontSize: 7, fontWeight: 700, padding: '2px 6px', borderRadius: 3,
-            background: 'rgba(0,255,100,0.12)', color: 'var(--green)',
+            background: 'var(--lime-bg)', color: 'var(--green)',
           }}>
             ✓ AUTHORIZED
           </span>
@@ -147,6 +153,9 @@ export default function DeploymentCenter() {
         {activeTab === 'credentials' && <CredentialPanel />}
         {activeTab === 'robinhood' && <RobinhoodPanel />}
         {activeTab === 'pipeline' && <PipelineMonitor />}
+        {activeTab === 'indexer' && <IndexerMonitor />}
+        {activeTab === 'verification' && <LaunchpadVerificationPanel />}
+        {activeTab === 'launchpad-stage3' && <LaunchpadPipelinePanel />}
         {activeTab === 'log' && <DeploymentLogPanel />}
       </div>
     </div>

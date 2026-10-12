@@ -1,4 +1,4 @@
-// BSTONKEX Chain Readiness — Per-chain production checklist
+// Cupcak8 Swap Chain Readiness — Per-chain production checklist
 // Gates BUY/SELL on all infrastructure checks passing
 import type { ChainId } from '../config';
 import { getChainAdapter } from './chain-registry';

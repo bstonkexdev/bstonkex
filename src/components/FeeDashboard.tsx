@@ -34,14 +34,14 @@ export default function FeeDashboard() {
       <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
         {/* Fee explanation */}
         <div className="panel" style={{ marginBottom: 10 }}>
-          <div className="panel-header"><span className="led" /> BSTONKEX PLATFORM FEE</div>
+          <div className="panel-header"><span className="led" /> CUPCAK8 SWAP PLATFORM FEE</div>
           <div style={{ padding: 8 }}>
             <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--cyan)', marginBottom: 6 }}>
               {(PLATFORM_FEE_PCT * 100).toFixed(2)}%
             </div>
             <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.7 }}>
-              BSTONKEX charges {(PLATFORM_FEE_PCT * 100).toFixed(2)}% on each trade. This is separate from DEX fees, network fees, and price impact.
-              A portion is allocated to referral rewards; the remainder supports BSTONKEX infrastructure.
+              Cupcak8 Swap charges {(PLATFORM_FEE_PCT * 100).toFixed(2)}% on each trade. This is separate from DEX fees, network fees, and price impact.
+              A portion is allocated to referral rewards; the remainder supports Cupcak8 Swap infrastructure.
             </div>
           </div>
         </div>
@@ -82,7 +82,7 @@ export default function FeeDashboard() {
           {!loading && filtered.length > 0 && (
             <div style={{ overflowX: 'auto' }}>
               <table className="data-table">
-                <thead><tr><th>DATE</th><th>TRADE</th><th>CHAIN</th><th className="right">VALUE</th><th className="right">BSTONKEX</th><th className="right">DEX</th><th className="right">NETWORK</th><th>TX</th></tr></thead>
+                <thead><tr><th>DATE</th><th>TRADE</th><th>CHAIN</th><th className="right">VALUE</th><th className="right">CUPCAK8 SWAP</th><th className="right">DEX</th><th className="right">NETWORK</th><th>TX</th></tr></thead>
                 <tbody>
                   {filtered.slice(0, 100).map((r, i) => {
                     const chain = CHAINS[r.chainId as ChainId];

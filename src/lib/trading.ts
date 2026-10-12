@@ -1,4 +1,4 @@
-// BSTONKEX Trading Engine — Production: DexRouter, quote expiry, readiness gate
+// Cupcak8 Swap Trading Engine — Production: DexRouter, quote expiry, readiness gate
 import { PLATFORM_FEE_PCT, CHAINS, type ChainId } from './config';
 import { getUnifiedQuote, type QuoteRequest } from './engine/quote-engine';
 import { executeTrade as engineExecuteTrade, confirmTradeSubmission, getTradeTxData, type TradeExecution } from './engine/trade-engine';

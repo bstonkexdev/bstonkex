@@ -1,4 +1,4 @@
-// BSTONKEX Runtime Validation — Performs ACTUAL infrastructure checks against real endpoints.
+// Cupcak8 Swap Runtime Validation — Performs ACTUAL infrastructure checks against real endpoints.
 // No mocks. No fixtures. Real RPC calls, real API calls, real network requests.
 // Reports genuine PASS/FAIL/NOT_VERIFIED with exact blockers.
 
@@ -259,7 +259,7 @@ function validateFees(): RuntimeCheck {
   const expected = 0.40;
   if (Math.abs(feePct - expected) < 0.001) {
     return mkCheck('global:fees', 'Fees', 'Platform Fee', 'PASS',
-      `BSTONKEX Fee = ${feePct.toFixed(2)}% · DEX/Network fees = actual from quote · No hidden fees`);
+      `Cupcak8 Swap Fee = ${feePct.toFixed(2)}% · DEX/Network fees = actual from quote · No hidden fees`);
   }
   return mkCheck('global:fees', 'Fees', 'Platform Fee', 'FAIL',
     `Expected ${expected}% but got ${feePct}%`);
@@ -269,7 +269,7 @@ function validateFees(): RuntimeCheck {
 
 function validateReferral(): RuntimeCheck {
   return mkCheck('global:referral', 'Referral', 'Accounting', 'NOT_VERIFIED',
-    'Reward = % of BSTONKEX platform fee (not trade principal) · Min claim $10 · 30-day rolling volume',
+    'Reward = % of Cupcak8 Swap platform fee (not trade principal) · Min claim $10 · 30-day rolling volume',
     { blocker: 'Requires real trades with referral attribution to verify runtime accounting' });
 }
 
@@ -350,7 +350,7 @@ export function verdictColor(v: Verdict): string {
 }
 
 export function formatFinalReport(report: FinalReadinessReport): string {
-  let out = 'BSTONKEX PRODUCTION RUNTIME VERIFICATION\n';
+  let out = 'Cupcak8 Swap PRODUCTION RUNTIME VERIFICATION\n';
   out += '═'.repeat(50) + '\n';
   out += `Generated: ${new Date(report.generatedAt).toISOString()}\n`;
   out += `Overall: ${report.overallStatus}\n\n`;

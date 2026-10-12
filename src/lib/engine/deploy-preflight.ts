@@ -1,4 +1,4 @@
-// BSTONKEX Deployment Preflight — checks all requirements before deployment
+// Cupcak8 Swap Deployment Preflight — checks all requirements before deployment
 import type { ChainId } from '../config';
 import { CHAINS, CONFIGURED_CHAINS } from '../config';
 import { isSandboxed } from './sandbox';

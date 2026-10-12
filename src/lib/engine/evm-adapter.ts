@@ -1,4 +1,4 @@
-// BSTONKEX EVM Chain Adapter — shared logic for BNB, Base, Robinhood
+// Cupcak8 Swap EVM Chain Adapter — shared logic for BNB, Base, Robinhood
 import { PLATFORM_FEE_PCT, type ChainId } from '../config';
 import { cacheGetOrCompute, cacheInvalidate, CACHE_KEYS, TTL } from './cache';
 import type { ChainAdapter, SwapParams, SwapQuote, UnsignedTx, GasEstimate, TxStatus, TokenMetadata, RouteStep } from './types';
@@ -31,25 +31,37 @@ export function createEvmAdapter(config: EvmChainConfig): ChainAdapter {
   const getRpc = () => rpcUrls[rpcIndex % rpcUrls.length];
 
   async function rpcCall(method: string, params: any[] = []): Promise<any> {
-    const url = getRpc();
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
-      });
-    } catch (e) {
-      rpcIndex = (rpcIndex + 1) % rpcUrls.length;
-      throw new Error(`RPC ${method} unreachable: network error`);
+    const numUrls = rpcUrls.length;
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < numUrls; attempt++) {
+      const url = rpcUrls[(rpcIndex + attempt) % numUrls];
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
+          signal: AbortSignal.timeout(12000),
+        });
+        if (!res.ok) {
+          lastError = new Error(`RPC ${method} failed: ${res.status} from ${url}`);
+          rpcIndex = (rpcIndex + attempt + 1) % numUrls;
+          continue;
+        }
+        const data = await res.json();
+        if (data.error) {
+          lastError = new Error(data.error.message || 'RPC error');
+          rpcIndex = (rpcIndex + attempt + 1) % numUrls;
+          continue;
+        }
+        return data.result;
+      } catch (err: any) {
+        lastError = err;
+        rpcIndex = (rpcIndex + attempt + 1) % numUrls;
+        continue;
+      }
     }
-    if (!res.ok) {
-      rpcIndex = (rpcIndex + 1) % rpcUrls.length;
-      throw new Error(`RPC ${method} failed: ${res.status}`);
-    }
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message || 'RPC error');
-    return data.result;
+    throw lastError || new Error(`All RPC endpoints failed for ${method}`);
   }
 
   async function getNativeBalance(wallet: string): Promise<string> {
@@ -128,15 +140,26 @@ export function createEvmAdapter(config: EvmChainConfig): ChainAdapter {
   async function getSwapQuote(params: SwapParams): Promise<SwapQuote> {
     const { tokenIn, tokenOut, amountIn, slippageBps, walletAddress } = params;
 
-    // Try 1inch API first
+    // EVM quotes MUST go through the backend proxy (API key stays server-side).
+    // Direct browser calls to api.1inch.dev are NOT allowed.
     try {
       const srcToken = tokenIn === 'native' ? wrappedNative : tokenIn;
       const dstToken = tokenOut === 'native' ? wrappedNative : tokenOut;
-      const url = `${ONEINCH_API}/${oneInchChainId}/quote?src=${srcToken}&dst=${dstToken}&amount=${amountIn}&slippageBps=${slippageBps}&from=${walletAddress}`;
+
+      const { getQuoteProxyUrl } = await import('./provider-config');
+      const proxyUrl = getQuoteProxyUrl();
+      if (!proxyUrl) {
+        return unavailableQuote(`Backend proxy not configured. Set VITE_WS_URL to enable EVM quotes for ${chainId}.`);
+      }
+      const url = `${proxyUrl}?chainId=${oneInchChainId}&src=${srcToken}&dst=${dstToken}&amount=${amountIn}`;
 
       const res = await fetch(url, {
-        headers: { 'Authorization': 'Bearer ', 'Accept': 'application/json' },
+        headers: { 'Accept': 'application/json' },
       });
+
+      if (res.status === 401) {
+        return unavailableQuote('1inch API key required. Set ONEINCH_API_KEY in backend environment.');
+      }
 
       if (res.ok) {
         const data = await res.json();
@@ -223,14 +246,15 @@ export function createEvmAdapter(config: EvmChainConfig): ChainAdapter {
       }
     }
 
-    // Build swap via 1inch
+    // Build swap via 1inch (keyless public tier — authenticated tier requires backend proxy)
     try {
       const srcToken = tokenIn === 'native' ? wrappedNative : tokenIn;
       const dstToken = tokenOut === 'native' ? wrappedNative : tokenOut;
       const url = `${ONEINCH_API}/${oneInchChainId}/swap?src=${srcToken}&dst=${dstToken}&amount=${amountIn}&slippage=${slippageBps / 100}&from=${walletAddress}&destReceiver=${walletAddress}`;
 
+      // SECURITY (Step 5): No API key in browser. Use keyless headers only.
       const res = await fetch(url, {
-        headers: { 'Authorization': 'Bearer ', 'Accept': 'application/json' },
+        headers: { 'Accept': 'application/json' },
       });
 
       if (res.ok) {

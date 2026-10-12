@@ -1,4 +1,4 @@
-// BSTONKEX Admin Preflight Panel — runs all pre-deployment checks
+// Cupcak8 Swap Admin Preflight Panel — runs all pre-deployment checks
 import { useState, useEffect } from 'react';
 import { runPreflight, statusColor, statusIcon, type PreflightReport, type PreflightCheck, type CheckCategory } from '../../lib/engine/deploy-preflight';
 
@@ -43,7 +43,7 @@ export default function PreflightPanel({ onResult }: { onResult?: (canDeploy: bo
         {report && (
           <span style={{
             fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 3,
-            background: report.canDeploy ? 'rgba(0,255,100,0.15)' : 'rgba(255,60,60,0.15)',
+            background: report.canDeploy ? 'var(--lime-bg)' : 'var(--red-bg)',
             color: report.canDeploy ? 'var(--green)' : 'var(--red)',
           }}>
             {report.canDeploy ? 'ALL CHECKS PASS' : `${report.blockers.length} BLOCKER${report.blockers.length !== 1 ? 'S' : ''}`}
@@ -65,7 +65,7 @@ export default function PreflightPanel({ onResult }: { onResult?: (canDeploy: bo
       {report && report.blockers.length > 0 && (
         <div style={{
           padding: 8, borderRadius: 4,
-          background: 'rgba(255,60,60,0.08)', border: '1px solid rgba(255,60,60,0.2)',
+          background: 'var(--red-bg)', border: '1px solid var(--red-bg)',
         }}>
           <div style={{ fontSize: 8, fontWeight: 900, color: 'var(--red)', marginBottom: 4, letterSpacing: '0.1em' }}>
             BLOCKERS

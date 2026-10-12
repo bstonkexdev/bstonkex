@@ -1,4 +1,4 @@
-// BSTONKEX Market Discovery Engine — multi-chain token discovery, sorting, filtering
+// Cupcak8 Swap Market Discovery Engine — multi-chain token discovery, sorting, filtering
 import { DEXSCREENER_API, type ChainId, CHAINS } from './config';
 import { cacheGetOrCompute, CACHE_KEYS, TTL } from './engine/cache';
 import { isSandboxed } from './engine/sandbox';
@@ -33,6 +33,9 @@ export interface MarketToken {
   pairCreatedAt: number | null;
   icon: string | null;
   url: string | null;
+  // Launchpad attribution
+  launchpadId?: string;     // e.g. 'o1-exchange', 'pumpfun'
+  launchpadName?: string;   // e.g. 'O1 EXCHANGE', 'PUMP.FUN'
   // Computed
   ageMs: number;
   buySellRatio24h: number | null;
@@ -122,7 +125,7 @@ function toMarketToken(raw: any): MarketToken | null {
     url: raw.url || null,
     ageMs,
     buySellRatio24h: ratio,
-    tradability: liq && liq > 1000 ? 'tradable' : liq ? 'no_liquidity' : 'data_only',
+    tradability: liq && liq > 1000 ? 'data_only' : liq ? 'no_liquidity' : 'data_only',
     dataFreshness: freshness,
   };
 }
@@ -200,10 +203,74 @@ async function fetchBroadMarket(): Promise<MarketToken[]> {
   }, TTL.DISCOVERY);
 }
 
-/** Get discovery results for a category. */
+/** Get discovery results for a category. Merges internal token index + DexScreener enrichment. */
 export async function getDiscovery(category: DiscoveryCategory): Promise<MarketToken[]> {
   if (category === 'watchlist') return [];
-  const tokens = await fetchBroadMarket();
+
+  // Lazy trigger: request a bounded discovery refresh (rate-limited, lock-protected, non-blocking).
+  // This fires when user visits market pages — NOT a background loop.
+  import('./engine/discovery/refresh-controller')
+    .then(m => m.requestRefresh())
+    .catch(() => {});
+
+  // 1. Get DexScreener tokens (market data enrichment — still provides price/volume)
+  const dexTokens = await fetchBroadMarket();
+
+  // 2. Get internal index tokens (discovery pipeline — includes tokens DexScreener hasn't indexed)
+  let indexTokens: MarketToken[] = [];
+  try {
+    const { listIndexedTokens } = await import('./engine/token-index');
+    const indexed = await listIndexedTokens({ limit: 200 });
+    const seen = new Set(dexTokens.map(t => `${t.chainId}:${t.address.toLowerCase()}`));
+
+    indexTokens = indexed
+      .filter(r => !seen.has(`${r.chainId}:${r.address.toLowerCase()}`))
+      .map(r => {
+        // Step 8: Tradability requires BOTH directions verified + liquidity.
+        // - data_only: no market data, or only one direction verified
+        // - no_liquidity: has price but liquidity < threshold
+        // - tradable: both buy AND sell verified + liquidity-qualified
+        const liq = r.liquidity;
+        const bothOk = (r as any).routeBothVerified === true;
+        let tradability: MarketToken['tradability'];
+        if (r.marketDataStatus !== 'enriched') {
+          tradability = 'data_only';
+        } else if (bothOk && liq !== null && liq >= 1000) {
+          tradability = 'tradable'; // Both directions verified + liquidity
+        } else if (liq !== null && liq >= 1000) {
+          tradability = 'data_only'; // Liquidity-qualified but NOT both-directions verified
+        } else if (liq !== null && liq > 0) {
+          tradability = 'no_liquidity';
+        } else {
+          tradability = 'data_only';
+        }
+
+        return {
+          chainId: r.chainId,
+          address: r.address,
+          name: r.name || 'Unknown',
+          symbol: r.symbol || '???',
+          price: r.price,
+          priceChange5m: null, priceChange1h: null, priceChange6h: null, priceChange24h: null,
+          volume5m: null, volume1h: null, volume6h: null, volume24h: r.volume24h,
+          liquidity: r.liquidity,
+          marketCap: r.marketCap,
+          fdv: null,
+          buys5m: null, sells5m: null, buys1h: null, sells1h: null, buys24h: null, sells24h: null,
+          pairAddress: '', dexId: r.discoverySource,
+          pairCreatedAt: r.launchTimestamp,
+          icon: r.icon, url: null,
+          launchpadId: r.launchpadId, launchpadName: r.launchpadName,
+          ageMs: Date.now() - r.launchTimestamp,
+          buySellRatio24h: null,
+          tradability,
+          dataFreshness: (r.lastEnrichedAt && Date.now() - r.lastEnrichedAt < 300000) ? 'live' : 'recent',
+        } as MarketToken;
+      });
+  } catch { /* token index unavailable — DexScreener only */ }
+
+  // 3. Merge (index tokens + DexScreener tokens, no duplicates)
+  const tokens = [...indexTokens, ...dexTokens];
 
   switch (category) {
     case 'trending':

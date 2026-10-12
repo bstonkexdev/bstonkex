@@ -73,8 +73,8 @@ export default function TransactionHistory({ wallet }: { wallet: string | null }
                 <td>
                   <span style={{
                     fontSize: 8, fontWeight: 800, padding: '1px 4px',
-                    border: `1px solid ${t.side === 'buy' ? 'var(--green)' : 'var(--red)'}`,
-                    color: t.side === 'buy' ? 'var(--green)' : 'var(--red)',
+                    border: `1px solid ${t.side === 'buy' ? 'var(--lime-dim)' : 'var(--red)'}`,
+                    color: t.side === 'buy' ? 'var(--lime-dim)' : 'var(--red)',
                   }}>{t.side.toUpperCase()}</span>
                 </td>
                 <td className="font-bold" style={{ color: 'var(--text-bright)', fontSize: 10 }}>{t.tokenSymbol}</td>
@@ -83,13 +83,13 @@ export default function TransactionHistory({ wallet }: { wallet: string | null }
                 <td>
                   <span style={{
                     fontSize: 7, fontWeight: 800, padding: '1px 4px',
-                    border: `1px solid ${t.status === 'confirmed' ? 'var(--green)' : t.status === 'pending' ? 'var(--amber)' : 'var(--red)'}`,
-                    color: t.status === 'confirmed' ? 'var(--green)' : t.status === 'pending' ? 'var(--amber)' : 'var(--red)',
+                    border: `1px solid ${t.status === 'confirmed' ? 'var(--lime-dim)' : t.status === 'pending' ? 'var(--yellow-dim)' : 'var(--red)'}`,
+                    color: t.status === 'confirmed' ? 'var(--lime-dim)' : t.status === 'pending' ? 'var(--yellow-dim)' : 'var(--red)',
                   }}>{t.status.toUpperCase()}</span>
                 </td>
                 <td>
                   <a href={explorerTxUrl(t.chainId, t.txHash)} target="_blank" rel="noopener"
-                    style={{ fontSize: 8, color: 'var(--cyan)', textDecoration: 'underline' }}>
+                    style={{ fontSize: 8, color: '#E8547C', textDecoration: 'underline' }}>
                     {shortenAddress(t.txHash, 4)}
                   </a>
                 </td>
@@ -107,7 +107,7 @@ export default function TransactionHistory({ wallet }: { wallet: string | null }
             <div key={`m-${t.id}`} style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 8, fontWeight: 800, color: t.side === 'buy' ? 'var(--green)' : 'var(--red)' }}>{t.side.toUpperCase()}</span>
+                  <span style={{ fontSize: 8, fontWeight: 800, color: t.side === 'buy' ? 'var(--lime-dim)' : 'var(--red)' }}>{t.side.toUpperCase()}</span>
                   <span style={{ fontWeight: 800, fontSize: 10, color: 'var(--text-bright)' }}>{t.tokenSymbol}</span>
                   <ChainIcon chainId={t.chainId as ChainId} size={11} />
                   <span className="badge" style={{ borderColor: chain?.color, color: chain?.color, fontSize: 7 }}>{chain?.shortName}</span>
@@ -118,9 +118,9 @@ export default function TransactionHistory({ wallet }: { wallet: string | null }
                 <span style={{ fontWeight: 700 }}>${t.amountUsd.toFixed(2)}</span>
                 <span style={{
                   fontWeight: 700,
-                  color: t.status === 'confirmed' ? 'var(--green)' : t.status === 'pending' ? 'var(--amber)' : 'var(--red)',
+                  color: t.status === 'confirmed' ? 'var(--lime-dim)' : t.status === 'pending' ? 'var(--yellow-dim)' : 'var(--red)',
                 }}>{t.status.toUpperCase()}</span>
-                <a href={explorerTxUrl(t.chainId, t.txHash)} target="_blank" rel="noopener" style={{ color: 'var(--cyan)' }}>
+                <a href={explorerTxUrl(t.chainId, t.txHash)} target="_blank" rel="noopener" style={{ color: '#E8547C' }}>
                   {shortenAddress(t.txHash, 4)} ↗
                 </a>
               </div>

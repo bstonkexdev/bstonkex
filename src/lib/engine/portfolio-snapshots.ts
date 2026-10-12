@@ -1,4 +1,4 @@
-// BSTONKEX Portfolio Snapshots — Historical portfolio value tracking via Gitlawb
+// Cupcak8 Swap Portfolio Snapshots — Historical portfolio value tracking via Gitlawb
 import { gitlawb } from '../gitlawb';
 
 // ── Collection ───────────────────────────────────────────────

@@ -1,4 +1,4 @@
-// BSTONKEX Market Stream — Unified real-time market event bus
+// Cupcak8 Swap Market Stream — Unified real-time market event bus
 // Polls DexScreener for real data. Emits price/trade/volume events.
 // Connects to WebSocket when available. Dedup by event ID. Sequence tracking.
 
@@ -200,6 +200,36 @@ async function pollMarketData(): Promise<void> {
     consecutiveFailures++;
     streamState = consecutiveFailures >= MAX_FAILURES_BEFORE_OFFLINE ? 'disconnected' : 'degraded';
   }
+}
+
+// ── Indexer Event Integration ───────────────────────────────
+
+// Listen for events from the direct blockchain indexer (dispatched via CustomEvent)
+if (typeof window !== 'undefined') {
+  window.addEventListener('cupcak8:indexer-event', ((e: CustomEvent) => {
+    const { channel, data } = e.detail;
+    if (!channel || !data) return;
+
+    // Parse channel format: market:{chain}:{poolId} or trades:{chain}:{poolId}
+    const parts = channel.split(':');
+    if (parts.length < 3) return;
+
+    const [prefix, chainId, poolId] = parts;
+
+    if (prefix === 'market' && data.type === 'price') {
+      // Emit as a market stream event so the frontend picks it up
+      emit({
+        id: data.id || `idx:${chainId}:${poolId}:${Date.now()}`,
+        type: 'price',
+        chainId: chainId as ChainId,
+        tokenAddress: poolId,
+        tokenSymbol: data.tokenSymbol || '',
+        timestamp: data.timestamp || Date.now(),
+        sequence: ++sequence,
+        data: data.data || data,
+      });
+    }
+  }) as EventListener);
 }
 
 // ── WebSocket Integration ────────────────────────────────────

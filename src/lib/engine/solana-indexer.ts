@@ -1,4 +1,4 @@
-// BSTONKEX Solana Trade Indexer — Detects real DEX trades on Solana
+// Cupcak8 Swap Solana Trade Indexer — Detects real DEX trades on Solana
 // Uses getSignaturesForAddress + getParsedTransaction to find Jupiter/Raydium swaps.
 import { getRpcUrl } from './rpc-manager';
 import { addLog, makeLog, updateComponent } from './infra-state';

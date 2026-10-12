@@ -1,4 +1,4 @@
-// BSTONKEX — Compact tabbed market section
+// Cupcak8 Swap — Compact tabbed market section
 import { useState } from 'react';
 import { CHAINS, formatUsd, formatPct } from '../../lib/config';
 import type { ChainId } from '../../lib/config';

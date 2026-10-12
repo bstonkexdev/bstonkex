@@ -1,3 +1,4 @@
+// Cupcak8 Swap — Trading Performance Dashboard
 import { useState, useEffect } from 'react';
 import { formatUsd, formatPct } from '../../lib/config';
 import { getTradingPerformance, getFeeAnalytics, type TradingPerformance as PerfType, type FeeAnalytics } from '../../lib/engine/portfolio-analytics';
@@ -16,63 +17,110 @@ export default function TradingPerformance({ wallet }: { wallet: string | null }
   }, [wallet]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Trading Stats */}
-      <div className="panel" style={{ padding: 8 }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.1em', marginBottom: 8 }}>
-          TRADING PERFORMANCE
-        </div>
+      <div style={{
+        border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+        padding: 14, background: 'var(--bg-surface)',
+      }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700, color: 'var(--text-bright)',
+          letterSpacing: '0.04em', marginBottom: 10,
+        }}>Trading Performance</div>
         {perf && perf.totalTrades > 0 ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6 }}>
-            <div className="stat-box"><span className="stat-label">TOTAL TRADES</span><span className="stat-value">{perf.totalTrades}</span></div>
-            <div className="stat-box"><span className="stat-label">BUYS</span><span className="stat-value" style={{ color: 'var(--green)' }}>{perf.buyCount}</span></div>
-            <div className="stat-box"><span className="stat-label">SELLS</span><span className="stat-value" style={{ color: 'var(--red)' }}>{perf.sellCount}</span></div>
-            <div className="stat-box"><span className="stat-label">WIN RATE</span><span className="stat-value">{perf.winRate != null ? formatPct(perf.winRate) : 'N/A'}</span></div>
-            <div className="stat-box"><span className="stat-label">AVG TRADE</span><span className="stat-value">{formatUsd(perf.avgTradeValue)}</span></div>
-            <div className="stat-box"><span className="stat-label">VOLUME</span><span className="stat-value">{formatUsd(perf.totalVolume)}</span></div>
-            <div className="stat-box"><span className="stat-label">REALIZED P&L</span><span className="stat-value" style={{ color: perf.realizedPnl >= 0 ? 'var(--green)' : 'var(--red)' }}>{formatUsd(perf.realizedPnl)}</span></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
+            <PerfCard label="Total Trades" value={String(perf.totalTrades)} />
+            <PerfCard label="Buys" value={String(perf.buyCount)} color="var(--lime-dim)" />
+            <PerfCard label="Sells" value={String(perf.sellCount)} color="var(--red)" />
+            <PerfCard label="Win Rate" value={perf.winRate != null ? formatPct(perf.winRate) : 'N/A'} />
+            <PerfCard label="Avg Trade" value={formatUsd(perf.avgTradeValue)} />
+            <PerfCard label="Volume" value={formatUsd(perf.totalVolume)} />
+            <PerfCard label="Realized P&L"
+              value={formatUsd(perf.realizedPnl)}
+              color={perf.realizedPnl >= 0 ? 'var(--lime-dim)' : 'var(--red)'}
+            />
             {perf.bestTrade && (
-              <div className="stat-box"><span className="stat-label">BEST TRADE</span><span className="stat-value" style={{ color: 'var(--green)' }}>{perf.bestTrade.token} {formatUsd(perf.bestTrade.pnl)}</span></div>
+              <PerfCard label="Best Trade"
+                value={`${perf.bestTrade.token} ${formatUsd(perf.bestTrade.pnl)}`}
+                color="var(--lime-dim)"
+              />
             )}
             {perf.worstTrade && (
-              <div className="stat-box"><span className="stat-label">WORST TRADE</span><span className="stat-value" style={{ color: 'var(--red)' }}>{perf.worstTrade.token} {formatUsd(perf.worstTrade.pnl)}</span></div>
+              <PerfCard label="Worst Trade"
+                value={`${perf.worstTrade.token} ${formatUsd(perf.worstTrade.pnl)}`}
+                color="var(--red)"
+              />
             )}
           </div>
         ) : (
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', padding: 16, textAlign: 'center' }}>
-            NO TRADING DATA — Execute trades to see performance metrics
+          <div style={{
+            padding: 20, textAlign: 'center', fontSize: 11, color: 'var(--text-dim)',
+          }}>
+            No trading data yet — execute trades to see performance metrics.
           </div>
         )}
       </div>
 
       {/* Fee Analytics */}
-      <div className="panel" style={{ padding: 8 }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.1em', marginBottom: 8 }}>FEES PAID</div>
+      <div style={{
+        border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+        padding: 14, background: 'var(--bg-surface)',
+      }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700, color: 'var(--text-bright)',
+          letterSpacing: '0.04em', marginBottom: 10,
+        }}>Fees Paid</div>
         {fees && fees.totalFees > 0 ? (
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <div className="stat-box"><span className="stat-label">BSTONKEX FEES</span><span className="stat-value">{formatUsd(fees.bstonkexFees)}</span></div>
-            <div className="stat-box"><span className="stat-label">DEX FEES</span><span className="stat-value">{fees.dexFees > 0 ? formatUsd(fees.dexFees) : 'NOT AVAILABLE'}</span></div>
-            <div className="stat-box"><span className="stat-label">NETWORK FEES</span><span className="stat-value">{fees.networkFees > 0 ? formatUsd(fees.networkFees) : 'NOT AVAILABLE'}</span></div>
-            <div className="stat-box"><span className="stat-label">TOTAL</span><span className="stat-value">{formatUsd(fees.totalFees)}</span></div>
+            <PerfCard label="Cupcak8 Swap Fees" value={formatUsd(fees.cupcak8Fees)} />
+            <PerfCard label="DEX Fees" value={fees.dexFees > 0 ? formatUsd(fees.dexFees) : '—'} />
+            <PerfCard label="Network Fees" value={fees.networkFees > 0 ? formatUsd(fees.networkFees) : '—'} />
+            <PerfCard label="Total Fees" value={formatUsd(fees.totalFees)} />
           </div>
         ) : (
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', padding: 8 }}>NO FEE DATA</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: 10 }}>No fee data available.</div>
         )}
       </div>
 
       {/* Referral Earnings */}
-      <div className="panel" style={{ padding: 8 }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.1em', marginBottom: 8 }}>REFERRAL EARNINGS</div>
+      <div style={{
+        border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+        padding: 14, background: 'var(--bg-surface)',
+      }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700, color: 'var(--text-bright)',
+          letterSpacing: '0.04em', marginBottom: 10,
+        }}>Referral Earnings</div>
         {refSummary ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 6 }}>
-            <div className="stat-box"><span className="stat-label">TIER</span><span className="stat-value" style={{ color: 'var(--cyan)' }}>{refSummary.tier}</span></div>
-            <div className="stat-box"><span className="stat-label">30D VOLUME</span><span className="stat-value">{formatUsd(refSummary.rolling30dVolume)}</span></div>
-            <div className="stat-box"><span className="stat-label">EARNINGS</span><span className="stat-value" style={{ color: 'var(--green)' }}>{formatUsd(refSummary.claimable)}</span></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+            <PerfCard label="Tier" value={String(refSummary.tier)} color="var(--cyan)" />
+            <PerfCard label="30D Volume" value={formatUsd(refSummary.rolling30dVolume)} />
+            <PerfCard label="Earnings" value={formatUsd(refSummary.claimable)} color="var(--lime-dim)" />
           </div>
         ) : (
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', padding: 8 }}>Connect wallet to see referral stats</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: 10 }}>
+            Connect wallet to view referral stats.
+          </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PerfCard({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div style={{
+      border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+      padding: '8px 10px', background: 'var(--bg-elevated)',
+    }}>
+      <div style={{
+        fontSize: 9, fontWeight: 600, color: 'var(--text-muted)',
+        marginBottom: 3, letterSpacing: '0.04em',
+      }}>{label}</div>
+      <div style={{
+        fontSize: 13, fontWeight: 800, fontFamily: 'var(--font-mono)',
+        color: color || 'var(--text-bright)',
+      }}>{value}</div>
     </div>
   );
 }

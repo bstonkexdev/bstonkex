@@ -1,4 +1,4 @@
-// BSTONKEX Infrastructure State — Central registry for all production components
+// Cupcak8 Swap Infrastructure State — Central registry for all production components
 // Tracks status, version, dependencies, deploy/verify actions, logs per component.
 
 export type ComponentStatus =

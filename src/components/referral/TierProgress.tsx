@@ -1,3 +1,4 @@
+// Cupcak8 Swap — Tier Progress Bar
 import { REFERRAL_TIERS, formatUsd } from '../../lib/config';
 import type { ReferralTier } from '../../lib/config';
 
@@ -14,51 +15,45 @@ export default function TierProgress({ currentTier, nextTier, rollingVolume30d }
     : 100;
 
   return (
-    <div style={{ padding: 8 }}>
+    <div>
       {/* Tier milestones */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
         {REFERRAL_TIERS.map((t, i) => {
           const isActive = i <= currentIdx;
           const isCurrent = t.name === currentTier.name;
           return (
             <div key={t.name} style={{ textAlign: 'center', flex: 1 }}>
               <div style={{
-                fontSize: 8, fontWeight: 800, letterSpacing: '0.05em',
-                color: isCurrent ? 'var(--amber)' : isActive ? 'var(--green)' : 'var(--text-dim)',
+                fontSize: 9, fontWeight: 800, letterSpacing: '0.05em',
+                color: isCurrent ? '#E8547C' : isActive ? 'var(--lime-dim)' : 'var(--text-dim)',
               }}>{t.name}</div>
-              <div style={{ fontSize: 7, color: 'var(--text-muted)' }}>{t.sharePct}%</div>
+              <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{t.sharePct}%</div>
             </div>
           );
         })}
       </div>
       {/* Progress bar */}
-      <div style={{ height: 8, background: 'var(--border)', position: 'relative', overflow: 'hidden', margin: '4px 0' }}>
-        {/* Milestones */}
-        {REFERRAL_TIERS.map((t, i) => {
+      <div className="ref-tier-bar">
+        {REFERRAL_TIERS.map((t) => {
           const pos = nextTier
             ? ((t.minVolume - currentTier.minVolume) / (nextTier.minVolume - currentTier.minVolume)) * 100
             : 100;
           return (
-            <div key={t.name} style={{
-              position: 'absolute', left: `${Math.min(100, pos)}%`, top: 0, bottom: 0,
-              width: 1, background: 'var(--border-bright)', zIndex: 1,
-            }} />
+            <div key={t.name} className="ref-tier-milestone" style={{ left: `${Math.min(100, pos)}%` }} />
           );
         })}
-        {/* Fill */}
-        <div style={{
-          width: `${Math.min(100, progressPct)}%`, height: '100%',
-          background: currentTier.sharePct >= 30 ? 'var(--amber)' : 'var(--cyan)',
-          transition: 'width 0.5s',
+        <div className="ref-tier-fill" style={{
+          width: `${Math.min(100, progressPct)}%`,
+          background: 'linear-gradient(90deg, #E8547C, var(--lavender))',
         }} />
       </div>
       {/* Info */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--text-dim)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)' }}>
         <span>{formatUsd(rollingVolume30d)} QUALIFIED</span>
         {nextTier ? (
           <span>{formatUsd(nextTier.minVolume - rollingVolume30d)} TO {nextTier.name}</span>
         ) : (
-          <span style={{ color: 'var(--amber)' }}>MAX TIER REACHED</span>
+          <span style={{ color: 'var(--yellow-dim)' }}>MAX TIER REACHED</span>
         )}
       </div>
     </div>

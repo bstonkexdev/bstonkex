@@ -41,7 +41,7 @@ export function LiquidityPanel({ token }: { token: TokenData }) {
         <div className="info-row"><span className="info-label">MCAP / LIQ</span><span className="info-value">{(token.marketCap / token.liquidity).toFixed(2)}</span></div>
       )}
       {lowLiq && (
-        <div style={{ padding: 6, fontSize: 8, fontWeight: 700, border: '1px solid var(--amber)', background: 'rgba(255,170,0,0.04)', color: 'var(--amber)', marginTop: 4 }}>
+        <div style={{ padding: 6, fontSize: 8, fontWeight: 700, border: '1px solid var(--amber)', background: 'var(--lime-bg)', color: 'var(--amber)', marginTop: 4 }}>
           LOW LIQUIDITY — Large trades may experience significant price impact.
         </div>
       )}

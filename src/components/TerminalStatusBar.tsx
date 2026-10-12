@@ -1,4 +1,4 @@
-// BSTONKEX Terminal Status Bar — Bottom bar showing connection state, data freshness, latency
+// Cupcak8 Swap Terminal Status Bar — Bottom bar showing connection state, data freshness, latency
 import { useState, useEffect } from 'react';
 import { getHealthReport, onHealthUpdate, statusColor, statusIcon, type InfraHealthReport } from '../lib/engine/infra-health';
 import { getPipelineState, onPipelineState, type PipelineState } from '../lib/engine/pipeline-orchestrator';
@@ -27,7 +27,7 @@ export default function TerminalStatusBar() {
     <div style={{
       position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 150,
       height: 22, display: 'flex', alignItems: 'center', gap: 12, padding: '0 12px',
-      background: 'var(--bg-panel, #0a0a0f)', borderTop: '1px solid var(--border)',
+      background: 'var(--bg-panel, var(--bg-deep))', borderTop: '1px solid var(--border)',
       fontSize: 7, color: 'var(--text-dim)', letterSpacing: '0.06em', fontWeight: 600,
     }}>
       {/* Pipeline status */}

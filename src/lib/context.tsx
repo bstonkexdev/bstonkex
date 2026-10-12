@@ -1,16 +1,26 @@
-// BSTONKEX App Context — global state for wallet, chain, navigation, confirmations
+// Cupcak8 Swap App Context — global state for wallet, chain, navigation, confirmations
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { ChainId } from './config';
 import type { WalletState } from './wallet';
 import { checkExistingConnection, connectEvm, connectSolana, disconnectWallet, onEvmAccountsChanged, onEvmChainChanged, onSolanaDisconnect, onSolanaAccountChanged, switchNetwork, refreshBalance } from './wallet';
 
-export type Page = 'landing' | 'markets' | 'trade' | 'portfolio' | 'watchlist' | 'referrals' | 'fees' | 'activity' | 'admin';
+export type Page = 'landing' | 'markets' | 'trade' | 'token' | 'portfolio' | 'watchlist' | 'referrals' | 'reward' | 'fees' | 'activity' | 'admin' | 'launchpad' | 'settings';
 
 export interface TradeToken {
   chainId: ChainId;
+  /** On-chain contract used for market data / execution. Empty for reference-only assets. */
   address: string;
   name: string;
   symbol: string;
+  /**
+   * Canonical CoinGecko asset id (e.g. "bitcoin") — set for major/reference assets.
+   * This is an asset identifier, NOT a contract address.
+   */
+  coingeckoId?: string | null;
+  /** Verified on-chain execution contract for the selected chain (wrapped/canonical token), null = reference only. */
+  routeAddress?: string | null;
+  /** Symbol of the on-chain execution representation (e.g. BTCB, WETH, WSOL). */
+  routeSymbol?: string | null;
 }
 
 export interface ConfirmState {
@@ -44,6 +54,7 @@ interface AppState {
   setPage: (p: Page) => void;
   tradeToken: TradeToken | null;
   setTradeToken: (t: TradeToken | null) => void;
+  setTradeTokenOnly: (t: TradeToken | null) => void;
   wallet: WalletState;
   connect: (type: 'evm' | 'solana') => Promise<void>;
   disconnect: () => Promise<void>;
@@ -88,6 +99,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Check existing connection on mount
   useEffect(() => { checkExistingConnection().then(setWallet).catch(() => {}); }, []);
+
+  // Register discovery pipeline on mount (does NOT start background loops).
+  // Discovery runs on-demand via refresh-controller when user visits market pages.
+  useEffect(() => {
+    import('./engine/discovery/init').then(m => m.initDiscoveryPipeline()).catch(() => {});
+  }, []);
 
   // Listen for wallet account / chain changes
   useEffect(() => {
@@ -188,17 +205,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setWallet(prev => ({ ...prev, balance: bal }));
   }, [wallet, activeChain]);
 
-  const goToTrade = useCallback((token: TradeToken) => {
+  const goToTrade = useCallback((token: TradeToken | null) => {
+    if (!token) { setTradeToken(null); return; }
     setTradeToken(token);
-    setPage('trade');
+    setPage('token');
     setActiveChain(token.chainId);
   }, []);
 
   const value: AppState = {
     page,
-    setPage: (p: Page) => { setPage(p); if (p !== 'trade') setTradeToken(null); },
+    setPage: (p: Page) => { setPage(p); if (p !== 'trade' && p !== 'token') setTradeToken(null); },
     tradeToken,
     setTradeToken: goToTrade,
+    setTradeTokenOnly: setTradeToken,
     wallet, connect, disconnect, switchChain, refreshWalletBalance, walletError,
     activeChain, setActiveChain,
     searchOpen, setSearchOpen,

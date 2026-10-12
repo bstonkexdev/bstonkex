@@ -1,4 +1,4 @@
-// BSTONKEX System Health — Monitors all services
+// Cupcak8 Swap System Health — Monitors all services
 import { getAllAdapters } from './chain-registry';
 import { cacheGetOrCompute, cacheStats, CACHE_KEYS, TTL } from './cache';
 import { isSandboxed } from './sandbox';
@@ -52,7 +52,7 @@ export async function getSystemHealth(): Promise<HealthStatus[]> {
       const [dex, gecko, jup] = await Promise.allSettled([
         checkUrl('DexScreener API', 'https://api.dexscreener.com/latest/dex/search?q=PEPE'),
         checkUrl('GeckoTerminal API', 'https://api.geckoterminal.com/api/v2/networks'),
-        checkUrl('Jupiter (Solana)', 'https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000000&slippageBps=50'),
+        checkUrl('Jupiter (Solana)', 'https://lite-api.jup.ag/swap/v1/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000000&slippageBps=50'),
       ]);
       if (dex.status === 'fulfilled') results.push(dex.value);
       if (gecko.status === 'fulfilled') results.push(gecko.value);

@@ -1,234 +1,180 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { useApp, type Page } from '../lib/context';
-import { CHAINS, CONFIGURED_CHAINS } from '../lib/config';
+// Cupcak8 — Trading Terminal Header
+// Mobile: Mascot · Brand · MENU | Desktop: Mascot · Brand · Nav links · MENU
+import { useState } from 'react';
+import { useApp } from '../lib/context';
+import { getAuthStatus } from '../lib/engine/admin-auth';
+import { CONFIGURED_CHAINS } from '../lib/config';
 import type { ChainId } from '../lib/config';
-import { isAdminWallet } from '../lib/engine/admin-auth';
-import WalletPanel from './WalletPanel';
-import Notifications from './Notifications';
-import ConnectionStatus from './ConnectionStatus';
 import ChainIcon from './ChainIcon';
+import MascotLogo from './MascotLogo';
 
-const NAV_ITEMS: { page: Page; label: string; icon: string }[] = [
-  { page: 'landing', label: 'HOME', icon: '⌂' },
-  { page: 'markets', label: 'MARKETS', icon: '◈' },
-  { page: 'trade', label: 'TRADE', icon: '⇄' },
-  { page: 'activity', label: 'ACTIVITY', icon: '⚡' },
-  { page: 'portfolio', label: 'PORTFOLIO', icon: '⬡' },
-  { page: 'watchlist', label: 'WATCHLIST', icon: '★' },
-  { page: 'referrals', label: 'REFERRALS', icon: '⎘' },
-  { page: 'fees', label: 'FEES', icon: '⟐' },
+type Page = 'landing' | 'markets' | 'trade' | 'token' | 'portfolio' | 'watchlist' | 'referrals' | 'reward' | 'fees' | 'activity' | 'admin' | 'launchpad' | 'settings';
+
+interface NavItem {
+  id: Page;
+  label: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'markets', label: 'Market' },
+  { id: 'trade', label: 'Trade' },
+  { id: 'portfolio', label: 'Portfolio' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'settings', label: 'Settings' },
 ];
 
 export default function Header() {
-  const { page, setPage, wallet, activeChain, setActiveChain, setSearchOpen, menuOpen, setMenuOpen, walletError } = useApp();
+  const { page, setPage, wallet, activeChain, setActiveChain, notifications, setWalletModal } = useApp();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const unread = notifications.filter(n => !n.read).length;
+  const isAdmin = wallet.address && getAuthStatus(wallet.address).authorized;
 
-  const activeChainConfig = CHAINS[activeChain];
-  const wrongNetwork = wallet.connected && wallet.chainId && wallet.chainId !== activeChain;
-  const isAdmin = wallet.connected && wallet.address && isAdminWallet(wallet.address);
+  const DRAWER_ITEMS = [
+    { id: 'landing' as const, label: 'Home', icon: '⌂' },
+    { id: 'markets' as const, label: 'Market', icon: '◈' },
+    { id: 'trade' as const, label: 'Trade', icon: '⇄' },
+    { id: 'portfolio' as const, label: 'Assets / Portfolio', icon: '⬡' },
+    { id: 'referrals' as const, label: 'Referral & Cashback', icon: '★' },
+    { id: 'activity' as const, label: 'Activity', icon: '◉' },
+    { id: 'watchlist' as const, label: 'Watchlist', icon: '♡' },
+    { id: 'settings' as const, label: 'Info & Settings', icon: '⚙' },
+    ...(isAdmin ? [{ id: 'admin' as const, label: 'Admin', icon: '🛡' }] : []),
+  ];
 
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const closeMenu = useCallback(() => setMenuOpen(false), [setMenuOpen]);
-
-  // Close menu on ESC
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closeMenu(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [menuOpen, closeMenu]);
-
-  // Close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) closeMenu();
-    };
-    // Delay so the opening click doesn't immediately close it
-    const timer = setTimeout(() => document.addEventListener('mousedown', handler), 50);
-    return () => { clearTimeout(timer); document.removeEventListener('mousedown', handler); };
-  }, [menuOpen, closeMenu]);
-
-  const navigate = (p: Page) => { setPage(p); closeMenu(); };
+  const navigateTo = (id: typeof page) => { setPage(id); setDrawerOpen(false); };
 
   return (
-    <header className="header">
-      {/* Logo */}
-      <div className="header-logo" onClick={() => setPage('landing')}>
-        BSTONKEX
-      </div>
+    <>
+      <header className="header">
+        {/* Mascot */}
+        <div onClick={() => setPage('landing')} style={{ cursor: 'pointer', flexShrink: 0, lineHeight: 0 }}>
+          <MascotLogo size={32} color="#E8547C" />
+        </div>
 
-      <div style={{ width: 1, height: 20, background: 'var(--border)', marginLeft: 4, marginRight: 2 }} className="desktop-only" />
+        {/* Brand name */}
+        <div onClick={() => setPage('landing')} className="header-logo" style={{ minWidth: 0 }}>
+          <span style={{
+            fontFamily: 'var(--font-pixel)', fontSize: 12, color: '#E8547C',
+            letterSpacing: '0.04em', lineHeight: 1, whiteSpace: 'nowrap',
+          }}>Cupcak8 Swap</span>
+        </div>
 
-      {/* Desktop Navigation */}
-      <nav className="header-nav desktop-only">
-        {NAV_ITEMS.map(item => (
-          <button key={item.page}
-            className={`header-nav-item ${page === item.page ? 'active' : ''}`}
-            onClick={() => setPage(item.page)}>
-            {item.label}
-          </button>
-        ))}
-      </nav>
+        {/* Spacer — pushes MENU to the right on mobile when nav is hidden */}
+        <div className="header-spacer" />
 
-      <div style={{ flex: 1 }} />
+        {/* Desktop nav — hidden on mobile via .header-nav CSS */}
+        <nav className="header-nav">
+          {NAV_ITEMS.map(item => {
+            const active = page === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => navigateTo(item.id)}
+                style={{
+                  padding: '6px 12px', fontSize: 12, fontWeight: active ? 700 : 500,
+                  fontFamily: 'var(--font-mono)', letterSpacing: '0.03em',
+                  background: active ? 'rgba(232,84,124,0.1)' : 'transparent',
+                  border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                  color: active ? '#E8547C' : 'var(--text-dim)',
+                  transition: 'color 0.15s, background 0.15s',
+                  whiteSpace: 'nowrap',
+                }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--text-bright)'; }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-dim)'; }}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
 
-      {/* Search — independent from menu */}
-      <button className="btn btn-sm" onClick={() => setSearchOpen(true)}
-        style={{ minWidth: 0, padding: '4px 8px' }}>
-        <SearchIcon /> <span className="desktop-only" style={{ marginLeft: 4 }}>Search</span>
-      </button>
-
-      {/* Chain Selector */}
-      <div className="chain-pills desktop-only">
-        {CONFIGURED_CHAINS.map(chain => {
-          const isWalletOnChain = wallet.connected && wallet.chainId === chain.id;
-          return (
-            <button key={chain.id}
-              className={`chain-pill ${activeChain === chain.id ? 'active' : ''}`}
-              onClick={() => setActiveChain(chain.id)}
-              style={{
-                ...(activeChain === chain.id ? { borderColor: chain.color, color: chain.color, textShadow: `0 0 6px ${chain.color}44` } : {}),
-                position: 'relative', display: 'flex', alignItems: 'center', gap: 3,
-              }}>
-              <ChainIcon chainId={chain.id as ChainId} size={12} />
-              {chain.shortName}
-              {isWalletOnChain && (
-                <span style={{
-                  width: 4, height: 4, borderRadius: '50%',
-                  background: 'var(--green)', display: 'inline-block',
-                }} />
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      <div style={{ width: 1, height: 20, background: 'var(--border)' }} className="desktop-only" />
-
-      {/* Network mismatch indicator in header */}
-      {wrongNetwork && (
-        <span className="desktop-only" style={{
-          fontSize: 7, fontWeight: 800, color: 'var(--amber)',
-          padding: '2px 6px', border: '1px solid var(--amber)',
-          marginRight: 6, letterSpacing: '0.05em',
-        }}>
-          WRONG NET
-        </span>
-      )}
-
-      {/* Connection status */}
-      <ConnectionStatus />
-
-      {/* Notifications bell */}
-      <Notifications />
-
-      {/* Wallet Panel */}
-      <WalletPanel />
-
-      {/* Menu Button (hamburger) — opens nav drawer, NOT search */}
-      <div ref={menuRef} style={{ position: 'relative' }}>
-        <button className="btn btn-sm" onClick={() => setMenuOpen(!menuOpen)}
-          style={{ minWidth: 0, padding: '4px 6px' }}>
-          <MenuIcon />
+        {/* MENU button */}
+        <button
+          aria-label="Open menu"
+          onClick={() => setDrawerOpen(true)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 36, height: 36, flexShrink: 0,
+            background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+            color: 'var(--text-bright)', transition: 'border-color 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8547C'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+        >
+          {/* Hamburger icon — three lines */}
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <rect x="2" y="3" width="12" height="1.5" rx="0.75" />
+            <rect x="2" y="7.25" width="12" height="1.5" rx="0.75" />
+            <rect x="2" y="11.5" width="12" height="1.5" rx="0.75" />
+          </svg>
         </button>
+      </header>
 
-        {/* Menu Drawer / Dropdown */}
-        {menuOpen && (
-          <div style={{
-            position: 'absolute', top: '100%', right: 0, marginTop: 4,
-            width: 220, zIndex: 150,
-            background: 'var(--bg-secondary)', border: '1px solid var(--border-bright)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-          }}>
-            {/* Navigation items */}
-            <div style={{ padding: '6px 0' }}>
-              {NAV_ITEMS.map(item => (
-                <button key={item.page} onClick={() => navigate(item.page)} style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  width: '100%', padding: '8px 14px',
-                  background: page === item.page ? 'var(--bg-hover)' : 'transparent',
-                  border: 'none', cursor: 'pointer', textAlign: 'left',
-                  color: page === item.page ? 'var(--text-bright)' : 'var(--text)',
-                  fontSize: 10, fontWeight: 600, letterSpacing: '0.06em',
-                }}>
-                  <span style={{ fontSize: 12, width: 18, textAlign: 'center' }}>{item.icon}</span>
+      {/* Drawer Menu */}
+      {drawerOpen && (
+        <>
+          <div className="drawer-overlay" onClick={() => setDrawerOpen(false)} />
+          <div className="drawer-panel" onClick={e => e.stopPropagation()}>
+            <div className="drawer-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <MascotLogo size={20} color="#E8547C" />
+                <span style={{ fontFamily: 'var(--font-pixel)', fontSize: 9, color: '#E8547C' }}>Cupcak8 Swap</span>
+              </div>
+              <button className="drawer-close" onClick={() => setDrawerOpen(false)}>✕</button>
+            </div>
+            <div className="drawer-nav">
+              {DRAWER_ITEMS.map(item => (
+                <button key={item.id}
+                  className={`drawer-item ${page === item.id ? 'active' : ''}`}
+                  onClick={() => navigateTo(item.id)}>
+                  <span className="drawer-item-icon">{item.icon}</span>
                   {item.label}
                 </button>
               ))}
-            </div>
-
-            {/* Divider */}
-            <div style={{ height: 1, background: 'var(--border)', margin: '0 10px' }} />
-
-            {/* Search shortcut in menu */}
-            <button onClick={() => { setSearchOpen(true); closeMenu(); }} style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              width: '100%', padding: '8px 14px',
-              background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
-              color: 'var(--text-dim)', fontSize: 10, fontWeight: 600, letterSpacing: '0.06em',
-            }}>
-              <span style={{ fontSize: 12, width: 18, textAlign: 'center' }}>⌕</span>
-              SEARCH
-            </button>
-
-            {/* Admin section — only for authorized wallet */}
-            {isAdmin && (
-              <>
-                <div style={{ height: 1, background: 'var(--border)', margin: '0 10px' }} />
-                <div style={{ padding: '6px 0' }}>
-                  <button onClick={() => navigate('admin')} style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    width: '100%', padding: '8px 14px',
-                    background: page === 'admin' ? 'var(--bg-hover)' : 'transparent',
-                    border: 'none', cursor: 'pointer', textAlign: 'left',
-                    color: page === 'admin' ? 'var(--cyan)' : 'var(--cyan)',
-                    fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
-                  }}>
-                    <span style={{ fontSize: 12, width: 18, textAlign: 'center' }}>⚙</span>
-                    ADMIN
-                    <span style={{
-                      marginLeft: 'auto', fontSize: 7,
-                      padding: '1px 4px', background: 'rgba(0,204,255,0.15)',
-                      color: 'var(--cyan)',
-                    }}>
-                      DEPLOY
-                    </span>
+              <div className="drawer-divider" />
+              <div style={{ padding: '8px 16px', fontSize: 10, fontWeight: 700,
+                color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>
+                ACTIVE CHAIN</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 16px 12px' }}>
+                {CONFIGURED_CHAINS.map(chain => (
+                  <button key={chain.id}
+                    className={`chain-pill ${activeChain === chain.id ? 'active' : ''}`}
+                    onClick={() => setActiveChain(chain.id as ChainId)} style={{ fontSize: 10 }}>
+                    <ChainIcon chainId={chain.id as ChainId} size={12} />
+                    {chain.shortName}
                   </button>
-                </div>
-              </>
-            )}
+                ))}
+              </div>
+            </div>
+            <div className="drawer-footer">
+              {wallet.connected ? (
+                <button onClick={() => navigateTo('portfolio')}
+                  style={{ width: '100%', padding: '12px 16px',
+                    background: 'rgba(232,84,124,0.08)', border: '1px solid #E8547C',
+                    borderRadius: 'var(--radius)', cursor: 'pointer',
+                    color: '#E8547C', fontSize: 13, fontWeight: 700,
+                    fontFamily: 'var(--font-mono)', textAlign: 'center',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%',
+                    background: '#4ADE80', boxShadow: '0 0 6px rgba(74,222,128,0.4)' }} />
+                  {wallet.address?.slice(0, 6)}...{wallet.address?.slice(-4)}
+                </button>
+              ) : (
+                <button onClick={() => { setWalletModal('evm'); setDrawerOpen(false); }}
+                  style={{ width: '100%', padding: '14px 16px',
+                    background: '#E8547C', border: 'none',
+                    borderRadius: 'var(--radius)', cursor: 'pointer',
+                    color: '#fff', fontSize: 14, fontWeight: 800,
+                    fontFamily: 'var(--font-mono)', textAlign: 'center',
+                    letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  Connect Wallet
+                </button>
+              )}
+            </div>
           </div>
-        )}
-      </div>
-
-      {/* Error toast */}
-      {walletError && (
-        <div style={{
-          position: 'fixed', top: 50, left: '50%', transform: 'translateX(-50%)',
-          background: 'var(--red-bg)', border: '2px solid var(--red)',
-          padding: '6px 14px', fontSize: 10, zIndex: 200, color: 'var(--red)',
-          fontWeight: 700, letterSpacing: '0.05em',
-        }}>
-          {walletError}
-        </div>
+        </>
       )}
-    </header>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-      <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}
-
-function MenuIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-      <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-    </svg>
+    </>
   );
 }

@@ -1,4 +1,4 @@
-// BSTONKEX — Exchange status bar with actual system state
+// Cupcak8 Swap — Exchange status bar with actual system state
 import type { ChainReadiness } from '../../lib/engine/chain-readiness';
 import type { HealthStatus } from '../../lib/engine/types';
 

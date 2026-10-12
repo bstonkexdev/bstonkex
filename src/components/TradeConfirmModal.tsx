@@ -59,7 +59,7 @@ export default function TradeConfirmModal() {
             <PixelDivider />
 
             <div className="confirm-row">
-              <span className="label">BSTONKEX FEE</span>
+              <span className="label">CUPCAK8 SWAP FEE</span>
               <span className="value">${platformFee}</span>
             </div>
             <div className="confirm-row">
@@ -132,7 +132,7 @@ export default function TradeConfirmModal() {
           {isExtremeImpact && !highImpactAck && (
             <div style={{
               marginTop: 6, padding: 8, fontSize: 9, fontWeight: 700,
-              border: '1px solid var(--red)', background: 'rgba(255,48,96,0.08)',
+              border: '1px solid var(--red)', background: 'var(--red-bg)',
               color: 'var(--red)', letterSpacing: '0.05em',
             }}>
               <div style={{ marginBottom: 4 }}>⚠ EXTREME PRICE IMPACT ({priceImpact.toFixed(2)}%)</div>
@@ -150,7 +150,7 @@ export default function TradeConfirmModal() {
           {isHighImpact && !isExtremeImpact && (
             <div style={{
               marginTop: 6, padding: 6, fontSize: 8, fontWeight: 700,
-              border: '1px solid var(--amber)', background: 'rgba(255,170,0,0.04)',
+              border: '1px solid var(--amber)', background: 'var(--lime-bg)',
               color: 'var(--amber)', letterSpacing: '0.05em',
             }}>
               ⚠ HIGH PRICE IMPACT ({priceImpact.toFixed(2)}%) — You may receive less than expected
@@ -175,7 +175,7 @@ export default function TradeConfirmModal() {
               onClick={() => {
                 setConfirmState(null);
                 setHighImpactAck(false);
-                window.dispatchEvent(new CustomEvent('bstonkex-confirm-trade'));
+                window.dispatchEvent(new CustomEvent('cupcak8-confirm-trade'));
               }}>
               {isExtremeImpact && !highImpactAck ? 'ACKNOWLEDGE IMPACT' : 'CONFIRM TRADE'}
             </button>

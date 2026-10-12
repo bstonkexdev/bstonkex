@@ -1,4 +1,4 @@
-// BSTONKEX RPC Manager — Multi-chain RPC health, failover, rate limiting
+// Cupcak8 Swap RPC Manager — Multi-chain RPC health, failover, rate limiting
 import type { ChainId } from '../config';
 import { CHAINS } from '../config';
 import { getCredential } from './credential-store';

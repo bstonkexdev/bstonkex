@@ -1,4 +1,4 @@
-// BSTONKEX Engine — Shared types for the multi-chain backend
+// Cupcak8 Swap Engine — Shared types for the multi-chain backend
 import type { ChainId } from '../config';
 
 // ── Chain Adapter Interface ──────────────────────────────────

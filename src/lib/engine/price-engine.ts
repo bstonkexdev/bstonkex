@@ -1,4 +1,4 @@
-// BSTONKEX Price Engine — Real-time price management from blockchain data
+// Cupcak8 Swap Price Engine — Real-time price management from blockchain data
 import type { ChainId } from '../config';
 import { CHAINS } from '../config';
 import { getChainAdapter, getAllAdapters } from './chain-registry';

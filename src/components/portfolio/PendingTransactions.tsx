@@ -1,3 +1,4 @@
+// Cupcak8 Swap — Pending Transactions (live tracking)
 import { useState, useEffect } from 'react';
 import { CHAINS, explorerTxUrl, shortenAddress } from '../../lib/config';
 import type { ChainId } from '../../lib/config';
@@ -8,15 +9,12 @@ export default function PendingTransactions() {
   const [trades, setTrades] = useState<TradeExecution[]>([]);
 
   useEffect(() => {
-    // Load initial active trades
     setTrades(getActiveTrades().filter(t => t.status !== 'confirmed' && t.status !== 'failed'));
 
-    // Listen for updates
     const unsub = onTradeUpdate((trade) => {
       setTrades(prev => {
         const exists = prev.findIndex(t => t.id === trade.id);
         if (trade.status === 'confirmed' || trade.status === 'failed') {
-          // Remove after a brief display
           setTimeout(() => setTrades(p => p.filter(t => t.id !== trade.id)), 5000);
         }
         if (exists >= 0) {
@@ -36,45 +34,75 @@ export default function PendingTransactions() {
   if (trades.length === 0) return null;
 
   return (
-    <div className="panel" style={{ padding: 0 }}>
-      <div className="panel-header"><span className="led led-amber led-blink" /> PENDING TRANSACTIONS</div>
-      <div style={{ overflowX: 'auto' }}>
-        <table className="data-table compact">
-          <thead><tr><th>ACTION</th><th>TOKEN</th><th>CHAIN</th><th className="right">AMOUNT</th><th>STATUS</th><th>TX</th></tr></thead>
-          <tbody>
-            {trades.map(t => {
-              const chain = CHAINS[t.chainId];
-              const elapsed = Math.floor((Date.now() - t.startedAt) / 1000);
-              return (
-                <tr key={t.id}>
-                  <td>
+    <div style={{
+      borderBottom: '1px solid var(--border)',
+      background: 'var(--yellow-bg)',
+    }}>
+      <div style={{
+        padding: '10px 20px', fontSize: 11, fontWeight: 700,
+        color: 'var(--yellow-dim)', display: 'flex', alignItems: 'center', gap: 6,
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--bg-elevated)',
+      }}>
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: 'var(--yellow)', animation: 'pulse-dot 1.5s ease-in-out infinite',
+        }} />
+        Pending Transactions
+      </div>
+      <div style={{ overflowX: 'auto', padding: '8px 20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {trades.map(t => {
+            const chain = CHAINS[t.chainId];
+            const elapsed = Math.floor((Date.now() - t.startedAt) / 1000);
+            return (
+              <div key={t.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '8px 12px', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)', background: 'var(--bg-surface)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 800, padding: '2px 8px',
+                    border: `1px solid ${t.side === 'buy' ? '#E8547C' : 'var(--red)'}`,
+                    borderRadius: 'var(--radius-sm)',
+                    color: t.side === 'buy' ? '#E8547C' : 'var(--red)',
+                  }}>{t.side.toUpperCase()}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-bright)' }}>{t.tokenSymbol}</span>
+                  <ChainIcon chainId={t.chainId as ChainId} size={12} />
+                  <span style={{ fontSize: 10, color: chain?.color || 'var(--text-muted)', fontWeight: 600 }}>
+                    {chain?.shortName}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--text-bright)' }}>
+                    ${t.amountUsd.toFixed(2)}
+                  </span>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, color: 'var(--yellow-dim)',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
                     <span style={{
-                      fontSize: 8, fontWeight: 800, padding: '1px 4px',
-                      border: `1px solid ${t.side === 'buy' ? 'var(--green)' : 'var(--red)'}`,
-                      color: t.side === 'buy' ? 'var(--green)' : 'var(--red)',
-                    }}>{t.side.toUpperCase()}</span>
-                  </td>
-                  <td className="font-bold" style={{ color: 'var(--text-bright)' }}>{t.tokenSymbol}</td>
-                  <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><ChainIcon chainId={t.chainId as ChainId} size={11} /><span className="badge" style={{ borderColor: chain?.color, color: chain?.color, fontSize: 7 }}>{chain?.shortName}</span></span></td>
-                  <td className="right">${t.amountUsd.toFixed(2)}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span className="led-sm led-amber led-blink" />
-                      <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--amber)' }}>{formatStatus(t.status)}</span>
-                      <span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{elapsed}s</span>
-                    </div>
-                  </td>
-                  <td>
-                    {t.hash ? (
-                      <a href={explorerTxUrl(t.chainId, t.hash)} target="_blank" rel="noopener"
-                        style={{ fontSize: 8, color: 'var(--cyan)' }}>{shortenAddress(t.hash, 4)}</a>
-                    ) : <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>—</span>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                      width: 5, height: 5, borderRadius: '50%',
+                      background: 'var(--yellow)', animation: 'pulse-dot 1.5s ease-in-out infinite',
+                    }} />
+                    {formatStatus(t.status)} · {elapsed}s
+                  </span>
+                  {t.hash && (
+                    <a href={explorerTxUrl(t.chainId, t.hash)} target="_blank" rel="noopener"
+                      style={{
+                        fontSize: 10, fontWeight: 700, color: '#E8547C',
+                        textDecoration: 'none', padding: '2px 8px',
+                        background: 'var(--green-bg)', borderRadius: 'var(--radius-sm)',
+                      }}>
+                      {shortenAddress(t.hash, 4)} ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -82,15 +110,15 @@ export default function PendingTransactions() {
 
 function formatStatus(s: TradeExecution['status']): string {
   switch (s) {
-    case 'preparing': return 'PREPARING';
-    case 'awaiting_approval': return 'APPROVAL NEEDED';
-    case 'approving': return 'APPROVING';
-    case 'awaiting_signature': return 'SIGN IN WALLET';
-    case 'signing': return 'SIGNING';
-    case 'submitting': return 'SUBMITTING';
-    case 'pending': return 'PENDING';
-    case 'confirmed': return 'CONFIRMED';
-    case 'failed': return 'FAILED';
-    default: return s.toUpperCase();
+    case 'preparing': return 'Preparing';
+    case 'awaiting_approval': return 'Approval Needed';
+    case 'approving': return 'Approving';
+    case 'awaiting_signature': return 'Sign in Wallet';
+    case 'signing': return 'Signing';
+    case 'submitting': return 'Submitting';
+    case 'pending': return 'Pending';
+    case 'confirmed': return 'Confirmed';
+    case 'failed': return 'Failed';
+    default: return s.charAt(0).toUpperCase() + s.slice(1);
   }
 }

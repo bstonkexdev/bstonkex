@@ -1,4 +1,4 @@
-// BSTONKEX EVM Event Indexer — Detects real on-chain Swap/Transfer/PairCreated events
+// Cupcak8 Swap EVM Event Indexer — Detects real on-chain Swap/Transfer/PairCreated events
 // Uses eth_getLogs to index DEX events from BNB, Base, and Robinhood chains.
 import type { ChainId } from '../config';
 import { getRpcUrl } from './rpc-manager';

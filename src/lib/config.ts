@@ -1,4 +1,4 @@
-// BSTONKEX Configuration
+// Cupcak8 Swap Configuration
 
 export type ChainId = 'bsc' | 'solana' | 'base' | 'robinhood';
 
@@ -17,6 +17,11 @@ export interface ChainConfig {
   configured: boolean; // false = show NOT CONFIGURED
 }
 
+// ── Robinhood RPC: public endpoint (Alchemy key stays server-side) ──
+function getRobinhoodRpcUrl(): string {
+  return 'https://rpc.mainnet.chain.robinhood.com';
+}
+
 export const CHAINS: Record<ChainId, ChainConfig> = {
   bsc: {
     id: 'bsc',
@@ -27,7 +32,7 @@ export const CHAINS: Record<ChainId, ChainConfig> = {
     explorerName: 'BscScan',
     dexScreenerId: 'bsc',
     color: '#f0b90b',
-    rpcUrl: 'https://bsc-dataseed1.binance.org',
+    rpcUrl: 'https://rpc.ankr.com/bsc',
     chainIdHex: '0x38',
     isEvm: true,
     configured: true,
@@ -41,7 +46,7 @@ export const CHAINS: Record<ChainId, ChainConfig> = {
     explorerName: 'Solscan',
     dexScreenerId: 'solana',
     color: '#00ffa3',
-    rpcUrl: 'https://api.mainnet-beta.solana.com',
+    rpcUrl: 'https://rpc.ankr.com/solana',
     isEvm: false,
     configured: true,
   },
@@ -54,7 +59,7 @@ export const CHAINS: Record<ChainId, ChainConfig> = {
     explorerName: 'BaseScan',
     dexScreenerId: 'base',
     color: '#0052ff',
-    rpcUrl: 'https://mainnet.base.org',
+    rpcUrl: 'https://rpc.ankr.com/base',
     chainIdHex: '0x2105',
     isEvm: true,
     configured: true,
@@ -68,17 +73,17 @@ export const CHAINS: Record<ChainId, ChainConfig> = {
     explorerName: 'Robinhood Explorer',
     dexScreenerId: 'robinhood',
     color: '#00c805',
-    rpcUrl: 'https://rpc.ankr.com/robinhood',
+    rpcUrl: getRobinhoodRpcUrl(),
     chainIdHex: '0x1237', // 4663 in hex
     isEvm: true,
-    configured: true, // Now configured as first-class EVM chain
+    configured: true,
   },
 };
 
 export const ALL_CHAINS = Object.values(CHAINS);
 export const CONFIGURED_CHAINS = ALL_CHAINS.filter(c => c.configured);
 
-// BSTONKEX Platform Fee
+// Cupcak8 Swap Platform Fee
 export const PLATFORM_FEE_BPS = 40; // 0.40% = 40 basis points
 export const PLATFORM_FEE_PCT = PLATFORM_FEE_BPS / 10000;
 
@@ -100,13 +105,29 @@ export const REFERRAL_TIERS: ReferralTier[] = [
 export const MIN_CLAIM_AMOUNT = 10; // $10 minimum claim
 export const REFERRAL_ROLLING_DAYS = 30;
 
+// Cashback Tiers — monthly UTC cycle, applied to eligible platform fees
+export interface CashbackTier {
+  name: string;
+  minVolume: number;
+  maxVolume: number | null;
+  ratePct: number; // % of eligible platform fee returned as cashback
+}
+
+export const CASHBACK_TIERS: CashbackTier[] = [
+  { name: 'Novice',   minVolume: 0,         maxVolume: 999.99,      ratePct: 5 },
+  { name: 'Advanced', minVolume: 1000,      maxVolume: 9999.99,     ratePct: 7.5 },
+  { name: 'Pro',      minVolume: 10000,     maxVolume: 99999.99,    ratePct: 10 },
+  { name: 'Elite',    minVolume: 100000,    maxVolume: 999999.99,   ratePct: 12.5 },
+  { name: 'Legend',   minVolume: 1000000,   maxVolume: null,        ratePct: 15 },
+];
+
 // API Endpoints
 export const DEXSCREENER_API = 'https://api.dexscreener.com';
 export const GECKOTERMINAL_API = 'https://api.geckoterminal.com/api/v2';
-export const JUPITER_API = 'https://quote-api.jup.ag/v6';
+export const JUPITER_API = 'https://lite-api.jup.ag/swap/v1';
 
-// BSTONKEX App Config
-export const APP_NAME = 'BSTONKEX';
+// Cupcak8 Swap App Config
+export const APP_NAME = 'Cupcak8 Swap';
 export const APP_TAGLINE = 'Multi-Chain Trading Terminal';
 
 // Format helpers

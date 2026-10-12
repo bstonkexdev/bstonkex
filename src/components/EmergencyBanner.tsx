@@ -34,7 +34,7 @@ export default function EmergencyBanner() {
 
   return (
     <div style={{
-      background: 'var(--red-bg, rgba(255,48,96,0.12))',
+      background: 'var(--red-bg, var(--red-bg))',
       borderBottom: '1px solid var(--red)',
       padding: '6px 12px',
       display: 'flex', alignItems: 'center', gap: 8,

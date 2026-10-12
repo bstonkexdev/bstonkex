@@ -1,4 +1,4 @@
-// BSTONKEX Deploy Workflow — One-click deploy all with step-by-step progress
+// Cupcak8 Swap Deploy Workflow — One-click deploy all with step-by-step progress
 import { useState } from 'react';
 import { deployAll, type DeployStep } from '../../lib/engine/deploy-actions';
 
@@ -35,7 +35,7 @@ export default function DeployWorkflow() {
         disabled={running}
         style={{
           padding: '10px 16px', borderRadius: 6,
-          border: '2px solid var(--cyan)', background: running ? 'var(--border)' : 'rgba(0,221,255,0.15)',
+          border: '2px solid var(--cyan)', background: running ? 'var(--border)' : 'var(--cyan-bg)',
           color: running ? 'var(--text-muted)' : 'var(--cyan)',
           fontSize: 10, fontWeight: 900, cursor: running ? 'default' : 'pointer',
           letterSpacing: '0.1em', textAlign: 'center',

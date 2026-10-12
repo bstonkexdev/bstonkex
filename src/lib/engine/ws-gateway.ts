@@ -1,4 +1,4 @@
-// BSTONKEX WS Gateway — WebSocket channel management for frontend subscriptions
+// Cupcak8 Swap WS Gateway — WebSocket channel management for frontend subscriptions
 // Subscribes to engine events, broadcasts to frontend channels
 // Channels: market:*, token:*, activity:*, portfolio:*, health:*
 

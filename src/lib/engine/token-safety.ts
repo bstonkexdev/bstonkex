@@ -1,4 +1,4 @@
-// BSTONKEX Token Safety — Pre-trade risk assessment
+// Cupcak8 Swap Token Safety — Pre-trade risk assessment
 import type { ChainId } from '../config';
 import { getChainAdapter } from './chain-registry';
 import { cacheGetOrCompute, CACHE_KEYS, TTL } from './cache';

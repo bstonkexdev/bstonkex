@@ -1,4 +1,4 @@
-// BSTONKEX Chain Validation — Multi-chain real-world production validation
+// Cupcak8 Swap Chain Validation — Multi-chain real-world production validation
 // Performs real RPC, market data, token discovery, wallet, quote validation per chain.
 // Never fabricates results. Reports NOT_VERIFIED or BLOCKED when unable to test.
 
@@ -148,7 +148,7 @@ async function validateQuote(chainId: ChainId): Promise<ChainValidationCheck> {
     // Jupiter for Solana
     const start = Date.now();
     try {
-      const res = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000000&slippageBps=50`, { signal: AbortSignal.timeout(8000) });
+      const res = await fetch(`https://lite-api.jup.ag/swap/v1/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000000&slippageBps=50`, { signal: AbortSignal.timeout(8000) });
       if (!res.ok) return { name: 'Quote', status: 'FAIL', detail: `Jupiter ${res.status}`, latencyMs: Date.now() - start };
       const data = await res.json();
       if (data.error) return { name: 'Quote', status: 'FAIL', detail: `Jupiter: ${data.error}`, latencyMs: Date.now() - start };
@@ -264,7 +264,7 @@ export async function validateAllChains(): Promise<ChainValidationResult[]> {
 
 /** Get validation summary string. */
 export function formatValidationSummary(results: ChainValidationResult[]): string {
-  let out = 'BSTONKEX MULTI-CHAIN VALIDATION REPORT\n';
+  let out = 'Cupcak8 Swap MULTI-CHAIN VALIDATION REPORT\n';
   out += '═'.repeat(50) + '\n\n';
 
   for (const r of results) {

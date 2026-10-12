@@ -1,4 +1,4 @@
-// BSTONKEX Admin Deploy Button — honest one-click deployment workflow
+// Cupcak8 Swap Admin Deploy Button — honest one-click deployment workflow
 // Shows DEPLOY only when all auto-verifiable checks pass.
 // Shows EXTERNAL ACTION REQUIRED with exact blockers otherwise.
 // Never simulates deployment — actual infrastructure required.
@@ -41,7 +41,7 @@ export default function DeployButton({ canDeploy, blockers }: { canDeploy: boole
       if (window.ethereum) {
         try {
           // Sign a message to prove wallet ownership
-          const msg = `BSTONKEX Deployment Authorization\nVersion: ${record.version}\nTimestamp: ${record.timestamp}\nWallet: ${wallet.address}`;
+          const msg = `Cupcak8 Swap Deployment Authorization\nVersion: ${record.version}\nTimestamp: ${record.timestamp}\nWallet: ${wallet.address}`;
           await (window.ethereum as any).request({
             method: 'personal_sign',
             params: [msg, wallet.address],
@@ -165,7 +165,7 @@ export default function DeployButton({ canDeploy, blockers }: { canDeploy: boole
     return (
       <div style={{
         padding: 12, borderRadius: 6, border: '1px solid var(--amber)',
-        background: 'rgba(255,180,0,0.08)',
+        background: 'var(--yellow-bg)',
       }}>
         <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--amber)', marginBottom: 8 }}>
           ⚠ CONFIRM DEPLOYMENT
@@ -195,7 +195,7 @@ export default function DeployButton({ canDeploy, blockers }: { canDeploy: boole
     return (
       <div style={{
         padding: 12, borderRadius: 6, border: '1px solid var(--cyan)',
-        background: 'rgba(0,200,255,0.08)',
+        background: 'var(--cyan-bg)',
       }}>
         <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--cyan)', marginBottom: 8 }}>
           {step === 'signing' && '✎ AWAITING WALLET SIGNATURE...'}
@@ -215,7 +215,7 @@ export default function DeployButton({ canDeploy, blockers }: { canDeploy: boole
     return (
       <div style={{
         padding: 12, borderRadius: 6, border: '1px solid var(--green)',
-        background: 'rgba(0,255,100,0.08)',
+        background: 'var(--yellow-bg)',
       }}>
         <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--green)', marginBottom: 6 }}>
           ✓ DEPLOYMENT SUCCESSFUL
@@ -240,7 +240,7 @@ export default function DeployButton({ canDeploy, blockers }: { canDeploy: boole
     return (
       <div style={{
         padding: 12, borderRadius: 6, border: '1px solid var(--amber)',
-        background: 'rgba(255,180,0,0.08)',
+        background: 'var(--yellow-bg)',
       }}>
         <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--amber)', marginBottom: 4 }}>
           ⊘ EXTERNAL ACTION REQUIRED
@@ -274,7 +274,7 @@ export default function DeployButton({ canDeploy, blockers }: { canDeploy: boole
     return (
       <div style={{
         padding: 12, borderRadius: 6, border: '1px solid var(--red)',
-        background: 'rgba(255,60,60,0.08)',
+        background: 'var(--red-bg)',
       }}>
         <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--red)', marginBottom: 4 }}>
           ✗ DEPLOYMENT FAILED
@@ -307,7 +307,7 @@ export default function DeployButton({ canDeploy, blockers }: { canDeploy: boole
       {hasExternalBlockers && (
         <div style={{
           padding: 8, borderRadius: 4,
-          background: 'rgba(255,60,60,0.06)', border: '1px solid rgba(255,60,60,0.15)',
+          background: 'var(--red-bg)', border: '1px solid var(--red-bg)',
         }}>
           <div style={{ fontSize: 8, fontWeight: 700, color: 'var(--red)', marginBottom: 4 }}>
             ⊘ EXTERNAL ACTION REQUIRED

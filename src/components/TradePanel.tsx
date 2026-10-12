@@ -15,6 +15,8 @@ interface Props {
   tokenAddress: string;
   tokenSymbol: string;
   tokenPrice: number | null;
+  /** Preselects BUY or SELL when opened from the mobile trade bar. */
+  initialSide?: TradeSide;
 }
 
 const PCT_BUTTONS = [25, 50, 75, 100];
@@ -22,9 +24,9 @@ const QUICK_PRESETS = [10, 50, 100, 500]; // USD
 const SLIPPAGE_OPTIONS = [0.1, 0.5, 1, 3];
 const HIGH_IMPACT_THRESHOLD = 5; // percent
 
-export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice }: Props) {
+export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice, initialSide }: Props) {
   const { wallet, activeChain, connect, confirmState, setConfirmState, addNotification, setWalletModal } = useApp();
-  const [side, setSide] = useState<TradeSide>('buy');
+  const [side, setSide] = useState<TradeSide>(initialSide ?? 'buy');
   const [amount, setAmount] = useState('');
   const [slippage, setSlippage] = useState(0.5);
   const [customSlippage, setCustomSlippage] = useState('');
@@ -368,8 +370,8 @@ export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice }: Pr
   // Listen for confirm event from modal
   useEffect(() => {
     const handler = () => performTrade();
-    window.addEventListener('bstonkex-confirm-trade', handler);
-    return () => window.removeEventListener('bstonkex-confirm-trade', handler);
+    window.addEventListener('cupcak8-confirm-trade', handler);
+    return () => window.removeEventListener('cupcak8-confirm-trade', handler);
   }, [performTrade]);
 
   const estimatedTokens = quote?.available && tokenPrice
@@ -407,7 +409,7 @@ export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice }: Pr
         {safetyReport && safetyReport.warnings.length > 0 && (
           <div style={{
             padding: 6, fontSize: 8, fontWeight: 700, lineHeight: 1.5,
-            border: '1px solid var(--amber)', background: 'rgba(255,170,0,0.04)',
+            border: '1px solid var(--amber)', background: 'var(--lime-bg)',
             color: 'var(--amber)', letterSpacing: '0.05em',
           }}>
             {safetyReport.warnings.map((w, i) => (
@@ -432,7 +434,7 @@ export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice }: Pr
             {wallet.chainId && wallet.chainId !== activeChain && (
               <div style={{
                 padding: 8, textAlign: 'center',
-                border: '1px solid var(--amber)', background: 'rgba(255,170,0,0.04)',
+                border: '1px solid var(--amber)', background: 'var(--lime-bg)',
               }}>
                 <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--amber)', marginBottom: 4 }}>
                   WRONG NETWORK
@@ -514,7 +516,7 @@ export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice }: Pr
                   </span>
                 </div>
                 <PixelDivider />
-                <div className="info-row"><span className="info-label">BSTONKEX 0.40%</span><span className="info-value">${quote.platformFee}</span></div>
+                <div className="info-row"><span className="info-label">Cupcak8 Swap 0.40%</span><span className="info-value">${quote.platformFee}</span></div>
                 <div className="info-row"><span className="info-label">DEX FEE</span><span className="info-value">${quote.dexFeeUsd.toFixed(4)}</span></div>
                 <div className="info-row"><span className="info-label">NETWORK</span><span className="info-value">~${quote.networkFeeUsd.toFixed(4)}</span></div>
                 <div className="info-row">
@@ -601,7 +603,7 @@ export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice }: Pr
             {quote && !quote.available && quote.error && (
               <div style={{
                 padding: 8, fontSize: 9, fontWeight: 700,
-                border: '1px solid var(--amber-dim)', background: 'rgba(255,170,0,0.04)',
+                border: '1px solid var(--amber-dim)', background: 'var(--lime-bg)',
                 color: 'var(--amber)', letterSpacing: '0.05em',
               }}>
                 {quote.error}
@@ -615,7 +617,7 @@ export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice }: Pr
             {showHighImpact && quote?.available && (
               <div style={{
                 padding: 8, border: '1px solid var(--red)',
-                background: 'rgba(255,48,96,0.06)', color: 'var(--red)',
+                background: 'var(--red-bg)', color: 'var(--red)',
               }}>
                 <div style={{ fontSize: 10, fontWeight: 800, marginBottom: 4 }}>⚠ HIGH PRICE IMPACT</div>
                 <div style={{ fontSize: 8, lineHeight: 1.5, color: 'var(--text-dim)' }}>

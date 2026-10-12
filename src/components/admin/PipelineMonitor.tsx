@@ -1,4 +1,4 @@
-// BSTONKEX Admin Pipeline Monitor — Engine states, data flow, event throughput
+// Cupcak8 Swap Admin Pipeline Monitor — Engine states, data flow, event throughput
 import { useState, useEffect } from 'react';
 import { getPipelineState, onPipelineState, type PipelineState } from '../../lib/engine/pipeline-orchestrator';
 import { getWsGatewayStats } from '../../lib/engine/ws-gateway';

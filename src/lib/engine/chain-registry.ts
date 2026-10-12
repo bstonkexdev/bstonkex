@@ -1,4 +1,4 @@
-// BSTONKEX Chain Registry — maps ChainId to adapter instances
+// Cupcak8 Swap Chain Registry — maps ChainId to adapter instances
 import type { ChainId } from '../config';
 import { CHAINS } from '../config';
 import { createEvmAdapter, type EvmChainConfig } from './evm-adapter';
@@ -10,10 +10,9 @@ const BNB_CONFIG: EvmChainConfig = {
   chainId: 'bsc',
   numericChainId: 56,
   rpcUrls: [
+    'https://rpc.ankr.com/bsc',
     'https://bsc-dataseed1.binance.org',
     'https://bsc-dataseed2.binance.org',
-    'https://bsc-dataseed3.binance.org',
-    'https://rpc.ankr.com/bsc',
   ],
   nativeSymbol: 'BNB',
   nativeDecimals: 18,
@@ -25,9 +24,8 @@ const BASE_CONFIG: EvmChainConfig = {
   chainId: 'base',
   numericChainId: 8453,
   rpcUrls: [
-    'https://mainnet.base.org',
     'https://rpc.ankr.com/base',
-    'https://base.llamarpc.com',
+    'https://mainnet.base.org',
   ],
   nativeSymbol: 'ETH',
   nativeDecimals: 18,
@@ -38,14 +36,12 @@ const BASE_CONFIG: EvmChainConfig = {
 const ROBINHOOD_CONFIG: EvmChainConfig = {
   chainId: 'robinhood',
   numericChainId: 4663,
-  rpcUrls: [
-    'https://rpc.ankr.com/robinhood',
-    'https://robinhood-mainnet.g.alchemy.com/v2/demo',
-  ],
+  rpcUrls: ['https://rpc.mainnet.chain.robinhood.com'],
   nativeSymbol: 'ETH',
   nativeDecimals: 18,
-  oneInchChainId: 4663, // May not be supported by 1inch yet
-  wrappedNative: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f', // Placeholder — needs real address
+  oneInchChainId: 4663,
+  // WETH on Robinhood Chain — per 1inch official Robinhood Chain documentation.
+  wrappedNative: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73',
 };
 
 // ── Singleton Adapter Instances ──────────────────────────────
@@ -77,17 +73,10 @@ function getAdapter(chainId: ChainId): ChainAdapter {
 }
 
 /** Get adapter for configured chains. Returns null if chain not configured.
- *  Robinhood returns null unless an RPC credential override is set (public Ankr endpoint returns 403). */
+ *  Robinhood now uses public RPC as fallback when no Alchemy key is set. */
 export function getChainAdapter(chainId: ChainId): ChainAdapter | null {
   const chain = CHAINS[chainId];
   if (!chain?.configured) return null;
-  // Skip Robinhood unless user has configured an authenticated RPC in credentials
-  if (chainId === 'robinhood') {
-    try {
-      const envKey = (import.meta as any).env?.VITE_RH_RPC_PRIMARY;
-      if (!envKey) return null; // No credential — don't create adapter (will 403)
-    } catch { return null; }
-  }
   try {
     return getAdapter(chainId);
   } catch {

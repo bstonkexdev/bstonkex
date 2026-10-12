@@ -1,4 +1,4 @@
-// BSTONKEX Data Normalizer — Transforms chain-specific data into unified formats
+// Cupcak8 Swap Data Normalizer — Transforms chain-specific data into unified formats
 // EVM logs, Solana transactions → normalized MarketEvent/TradeEvent/CandleEvent
 
 import type { ChainId } from '../config';

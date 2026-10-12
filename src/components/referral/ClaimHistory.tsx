@@ -8,8 +8,11 @@ interface Props {
 export default function ClaimHistory({ claims }: Props) {
   if (claims.length === 0) {
     return (
-      <div style={{ padding: 20, textAlign: 'center', fontSize: 9, color: 'var(--text-dim)' }}>
+      <div style={{ padding: 24, textAlign: 'center', fontSize: 9, color: 'var(--text-dim)' }}>
         NO CLAIM HISTORY
+        <div style={{ fontSize: 8, color: 'var(--text-muted)', marginTop: 4 }}>
+          Claims will appear here once you claim rewards
+        </div>
       </div>
     );
   }
@@ -24,19 +27,19 @@ export default function ClaimHistory({ claims }: Props) {
           {claims.map((c, i) => (
             <tr key={i}>
               <td style={{ fontSize: 9 }}>{new Date(c.date).toLocaleDateString()}</td>
-              <td className="right" style={{ fontSize: 9, fontWeight: 700, color: 'var(--green)' }}>{formatUsd(c.amount)}</td>
+              <td className="right" style={{ fontSize: 9, fontWeight: 700, color: 'var(--lime-dim)' }}>{formatUsd(c.amount)}</td>
               <td style={{ fontSize: 9 }}>{c.asset}</td>
               <td>
                 <span style={{
                   fontSize: 7, fontWeight: 700, padding: '1px 4px',
-                  border: `1px solid ${c.status === 'confirmed' ? 'var(--green)' : c.status === 'pending' ? 'var(--amber)' : 'var(--red)'}`,
-                  color: c.status === 'confirmed' ? 'var(--green)' : c.status === 'pending' ? 'var(--amber)' : 'var(--red)',
+                  border: `1px solid ${c.status === 'confirmed' ? 'var(--lime-dim)' : c.status === 'pending' ? 'var(--yellow)' : 'var(--red)'}`,
+                  color: c.status === 'confirmed' ? 'var(--lime-dim)' : c.status === 'pending' ? 'var(--yellow-dim)' : 'var(--red)',
                 }}>{c.status.toUpperCase()}</span>
               </td>
               <td>
                 {c.txHash ? (
                   <a href={explorerTxUrl('bsc', c.txHash)} target="_blank" rel="noopener"
-                    style={{ fontSize: 7, color: 'var(--cyan)' }}>{shortenAddress(c.txHash, 4)} ↗</a>
+                    style={{ fontSize: 7, color: '#E8547C' }}>{shortenAddress(c.txHash, 4)} ↗</a>
                 ) : <span style={{ fontSize: 7, color: 'var(--text-dim)' }}>—</span>}
               </td>
             </tr>

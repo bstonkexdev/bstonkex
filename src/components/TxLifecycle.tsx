@@ -56,7 +56,7 @@ export default function TxLifecycle({ status, txHash, error, chainId }: Props) {
     <div style={{
       padding: 8,
       border: `1px solid ${isFailed ? 'var(--red)' : isConfirmed ? 'var(--green)' : 'var(--amber)'}`,
-      background: isFailed ? 'rgba(255,48,96,0.04)' : isConfirmed ? 'rgba(0,255,136,0.04)' : 'rgba(255,170,0,0.04)',
+      background: isFailed ? 'var(--red-bg)' : isConfirmed ? 'var(--lime-bg)' : 'var(--lime-bg)',
     }}>
       {/* Header */}
       <div style={{

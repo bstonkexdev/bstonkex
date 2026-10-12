@@ -1,4 +1,4 @@
-// BSTONKEX — DISCOVER → ANALYZE → EXECUTE → TRACK workflow flow
+// Cupcak8 Swap — DISCOVER → ANALYZE → EXECUTE → TRACK workflow flow
 import { useApp } from '../../lib/context';
 
 const STEPS = [

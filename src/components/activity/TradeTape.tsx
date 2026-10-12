@@ -111,8 +111,8 @@ export default function TradeTape() {
                   </span>
                 )}
                 <span style={{ color: 'var(--text-dim)', fontSize: 7, minWidth: 48 }}>{e.wallet === 'NOT INDEXED' ? '—' : shortenAddress(e.wallet, 3)}</span>
-                <span style={{ fontSize: 6, color: e.source === 'bstonkex' ? 'var(--cyan)' : 'var(--text-muted)', fontWeight: 700 }}>
-                  {e.source === 'bstonkex' ? 'BSTONKEX' : e.dex}
+                <span style={{ fontSize: 6, color: e.source === 'cupcak8' ? 'var(--cyan)' : 'var(--text-muted)', fontWeight: 700 }}>
+                  {e.source === 'cupcak8' ? 'Cupcak8' : e.dex}
                 </span>
                 <div style={{ flex: 1 }} />
                 <span style={{ color: 'var(--text-muted)', fontSize: 7, minWidth: 24, textAlign: 'right' }}>{formatRelativeTime(e.timestamp)}</span>
@@ -159,8 +159,8 @@ export default function TradeTape() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 7, color: 'var(--text-dim)' }}>
                   <span>{e.priceUsd != null ? formatUsd(e.priceUsd) : 'N/A'}</span>
                   <span>{e.wallet === 'NOT INDEXED' ? '—' : shortenAddress(e.wallet, 4)}</span>
-                  <span style={{ color: e.source === 'bstonkex' ? 'var(--cyan)' : 'var(--text-muted)', fontWeight: 700 }}>
-                    {e.source === 'bstonkex' ? 'BSTONKEX' : e.dex}
+                  <span style={{ color: e.source === 'cupcak8' ? 'var(--cyan)' : 'var(--text-muted)', fontWeight: 700 }}>
+                    {e.source === 'cupcak8' ? 'Cupcak8' : e.dex}
                   </span>
                   <div style={{ flex: 1 }} />
                   <span style={{ color: 'var(--text-muted)' }}>{formatRelativeTime(e.timestamp)}</span>

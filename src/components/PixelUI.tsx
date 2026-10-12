@@ -1,4 +1,4 @@
-// BSTONKEX Reusable 8-bit UI primitives
+// Cupcak8 Swap Reusable 8-bit UI primitives
 
 /** Animated pixel loading bar */
 export function PixelLoader({ text }: { text?: string }) {
@@ -22,7 +22,7 @@ export function PixelProgress({ value, max = 100, width = 120 }: { value: number
         <div key={i} style={{
           flex: 1, height: 8,
           background: i < filled ? 'var(--cyan)' : 'var(--border)',
-          boxShadow: i < filled ? '0 0 3px rgba(0,204,255,0.3)' : 'none',
+          boxShadow: i < filled ? '0 0 3px var(--cyan-dim)' : 'none',
           transition: 'background 0.2s',
         }} />
       ))}
@@ -40,7 +40,7 @@ export function PixelToast({ message, type = 'info', onClose }: {
     info: { border: 'var(--cyan)', bg: 'var(--cyan-bg)', text: 'var(--cyan)' },
     success: { border: 'var(--green)', bg: 'var(--green-bg)', text: 'var(--green)' },
     error: { border: 'var(--red)', bg: 'var(--red-bg)', text: 'var(--red)' },
-    warning: { border: 'var(--amber)', bg: 'rgba(255,170,0,0.06)', text: 'var(--amber)' },
+    warning: { border: 'var(--amber)', bg: 'var(--lime-bg)', text: 'var(--amber)' },
   }[type];
   return (
     <div style={{

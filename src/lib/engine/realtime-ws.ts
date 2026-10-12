@@ -1,4 +1,4 @@
-// BSTONKEX WebSocket Manager — production-ready WS with auto-reconnect,
+// Cupcak8 Swap WebSocket Manager — production-ready WS with auto-reconnect,
 // heartbeat, subscription management, and connection state tracking.
 // Falls back to polling when WS endpoint is unavailable.
 

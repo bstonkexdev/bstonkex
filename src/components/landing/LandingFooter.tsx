@@ -1,4 +1,4 @@
-// BSTONKEX — Minimal landing footer
+// Cupcak8 Swap — Minimal landing footer
 import { CONFIGURED_CHAINS } from '../../lib/config';
 import { useApp } from '../../lib/context';
 
@@ -31,10 +31,10 @@ export default function LandingFooter() {
             fontSize: 13, fontWeight: 900, color: 'var(--text-bright)',
             letterSpacing: '0.15em', marginBottom: 4,
           }}>
-            BSTONKEX
+            Cupcak8 Swap
           </div>
           <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-            Multi-Chain Digital Asset Exchange<br />
+            Multi-Chain Crypto Trading Terminal<br />
             Non-Custodial · Real-Time · Multi-Chain
           </div>
         </div>
@@ -78,7 +78,7 @@ export default function LandingFooter() {
         flexWrap: 'wrap', gap: 8,
       }}>
         <div style={{ fontSize: 7, color: 'var(--text-muted)' }}>
-          © {new Date().getFullYear()} BSTONKEX — All market data from DexScreener. Not financial advice.
+          © {new Date().getFullYear()} Cupcak8 Swap — All market data from DexScreener. Not financial advice.
         </div>
         <div style={{ fontSize: 7, color: 'var(--text-muted)' }}>
           Risk Disclosure: Trading digital assets involves substantial risk of loss.

@@ -1,4 +1,4 @@
-// BSTONKEX Candle Engine Tests — real candle generation from trades
+// Cupcak8 Swap Candle Engine Tests — real candle generation from trades
 import { describe, it, expect, beforeEach } from 'vitest';
 import { processTrade, getCandles, clearCandles, type TradeEvent } from '../engine/candle-engine';
 

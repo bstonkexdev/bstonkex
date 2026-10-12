@@ -1,4 +1,4 @@
-// BSTONKEX Pipeline Orchestrator — Central coordinator for all engines
+// Cupcak8 Swap Pipeline Orchestrator — Central coordinator for all engines
 // Manages startup order, data flow, health checks, and graceful shutdown.
 // Flow: Blockchain → RPC/WS → Chain Adapter → Normalizer → Cache → EventBus → Terminal
 

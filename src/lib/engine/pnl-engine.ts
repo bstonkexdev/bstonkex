@@ -1,4 +1,4 @@
-// BSTONKEX P&L Engine — Cost basis, realized/unrealized P&L, position tracking
+// Cupcak8 Swap P&L Engine — Cost basis, realized/unrealized P&L, position tracking
 import type { ChainId } from '../config';
 import { gitlawb } from '../gitlawb';
 

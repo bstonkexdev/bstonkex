@@ -1,34 +1,50 @@
-// BSTONKEX Solana Adapter — SPL tokens, Jupiter, native Solana
+// Cupcak8 Swap Solana Adapter — SPL tokens, Jupiter, native Solana
 import { cacheGetOrCompute, CACHE_KEYS, TTL } from './cache';
 import type { ChainAdapter, SwapParams, SwapQuote, UnsignedTx, GasEstimate, TxStatus, TokenMetadata, RouteStep } from './types';
 
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
-const JUPITER_API = 'https://quote-api.jup.ag/v6';
-const SOLANA_RPC = 'https://api.mainnet-beta.solana.com';
+const JUPITER_API = 'https://lite-api.jup.ag/swap/v1';
+const SOLANA_RPC = 'https://rpc.ankr.com/solana';
 const SOL_DECIMALS = 9;
 const SOL_PRICE_FALLBACK = 180;
 
 export function createSolanaAdapter(): ChainAdapter {
   let rpcIndex = 0;
-  const rpcUrls = [SOLANA_RPC, 'https://solana-mainnet.g.alchemy.com/v2/demo', 'https://rpc.ankr.com/solana'];
+  const rpcUrls = ['https://rpc.ankr.com/solana', 'https://api.mainnet-beta.solana.com', 'https://solana-mainnet.g.alchemy.com/v2/demo'];
   const getRpc = () => rpcUrls[rpcIndex % rpcUrls.length];
 
   async function rpcCall(method: string, params: any[] = []): Promise<any> {
-    let res: Response;
-    try {
-      res = await fetch(getRpc(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
-      });
-    } catch {
-      rpcIndex++;
-      throw new Error(`Solana RPC unreachable: network error`);
+    const numUrls = rpcUrls.length;
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < numUrls; attempt++) {
+      const url = rpcUrls[(rpcIndex + attempt) % numUrls];
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
+          signal: AbortSignal.timeout(12000),
+        });
+        if (!res.ok) {
+          lastError = new Error(`Solana RPC ${res.status} from ${url}`);
+          rpcIndex = (rpcIndex + attempt + 1) % numUrls;
+          continue;
+        }
+        const data = await res.json();
+        if (data.error) {
+          lastError = new Error(data.error.message || 'Solana RPC error');
+          // Rate limit or forbidden — try next fallback
+          rpcIndex = (rpcIndex + attempt + 1) % numUrls;
+          continue;
+        }
+        return data.result;
+      } catch (err: any) {
+        lastError = err;
+        rpcIndex = (rpcIndex + attempt + 1) % numUrls;
+        continue;
+      }
     }
-    if (!res.ok) { rpcIndex++; throw new Error(`Solana RPC failed: ${res.status}`); }
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message || 'Solana RPC error');
-    return data.result;
+    throw lastError || new Error('All Solana RPC endpoints failed');
   }
 
   async function getNativeBalance(wallet: string): Promise<string> {

@@ -1,4 +1,4 @@
-// BSTONKEX State Manager — Separated state domains with selective subscriptions
+// Cupcak8 Swap State Manager — Separated state domains with selective subscriptions
 // Prevents unnecessary rerenders: wallet update does NOT rerender Markets page.
 // Domains: market, trade, portfolio, wallet, activity, notification, health
 

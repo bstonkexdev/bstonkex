@@ -1,6 +1,6 @@
-// BSTONKEX Integration Tests — cross-system verification
+// Cupcak8 Swap Integration Tests — cross-system verification
 import { describe, it, expect } from 'vitest';
-import { calculateFees, getReferralTier } from '../engine/fee-engine';
+import { calculateFees } from '../engine/fee-engine';
 import { checkTradeReadiness, checkPriceImpact, checkSpender } from '../engine/security-engine';
 import { processTrade, getCandles, clearCandles } from '../engine/candle-engine';
 import { PLATFORM_FEE_PCT, REFERRAL_TIERS, MIN_CLAIM_AMOUNT, CHAINS, CONFIGURED_CHAINS } from '../config';
@@ -91,8 +91,7 @@ describe('Cross-System Integration', () => {
 
   describe('Chain Configuration', () => {
     it('all configured chains have valid config', () => {
-      for (const chainId of CONFIGURED_CHAINS) {
-        const chain = CHAINS[chainId];
+      for (const chain of CONFIGURED_CHAINS) {
         expect(chain).toBeDefined();
         expect(chain.name).toBeTruthy();
         expect(chain.shortName).toBeTruthy();

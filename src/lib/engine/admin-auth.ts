@@ -1,4 +1,4 @@
-// BSTONKEX Admin Authorization — config-driven admin wallet detection
+// Cupcak8 Swap Admin Authorization — config-driven admin wallet detection
 // No private keys stored. Only authorized wallet ADDRESSES compared at runtime.
 // Admin addresses are loaded from env (VITE_ADMIN_WALLETS) or hardcoded defaults.
 

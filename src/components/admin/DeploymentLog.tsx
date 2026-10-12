@@ -1,4 +1,4 @@
-// BSTONKEX Admin Deployment Log — shows deployment history and current status
+// Cupcak8 Swap Admin Deployment Log — shows deployment history and current status
 import { getDeployments, getCurrentDeployment, statusColor, statusIcon, formatTimestamp, formatDuration, type DeploymentRecord, type DeployStatus } from '../../lib/engine/deploy-log';
 
 export default function DeploymentLogPanel() {

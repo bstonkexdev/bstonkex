@@ -1,4 +1,4 @@
-// BSTONKEX Admin Robinhood RPC Configuration Panel
+// Cupcak8 Swap Admin Robinhood RPC Configuration Panel
 import { useState, useEffect } from 'react';
 import { CHAINS } from '../../lib/config';
 
@@ -113,8 +113,8 @@ export default function RobinhoodPanel() {
       {/* Status */}
       <div style={{
         padding: 8, borderRadius: 4,
-        background: status.rpcReachable ? 'rgba(0,255,100,0.08)' : 'rgba(255,60,60,0.08)',
-        border: `1px solid ${status.rpcReachable ? 'rgba(0,255,100,0.2)' : 'rgba(255,60,60,0.2)'}`,
+        background: status.rpcReachable ? 'var(--yellow-bg)' : 'var(--red-bg)',
+        border: `1px solid ${status.rpcReachable ? 'var(--lime-bg)' : 'var(--red-bg)'}`,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
           <span style={{ color: status.rpcReachable ? 'var(--green)' : 'var(--red)', fontSize: 10 }}>
@@ -163,7 +163,7 @@ export default function RobinhoodPanel() {
           </div>
           <div style={{
             marginTop: 4, padding: 6, borderRadius: 3,
-            background: 'rgba(255,180,0,0.08)', border: '1px solid rgba(255,180,0,0.2)',
+            background: 'var(--yellow-bg)', border: '1px solid var(--yellow-dim)',
             fontSize: 7, color: 'var(--amber)',
           }}>
             ⚠ CREDENTIAL REQUIRED — Cannot verify Robinhood RPC without API key

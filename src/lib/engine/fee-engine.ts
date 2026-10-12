@@ -1,8 +1,12 @@
-// BSTONKEX Fee Engine — Platform fee calculation, referral attribution, treasury accounting
+// Cupcak8 Swap Fee Engine — Platform fee calculation, referral attribution, treasury accounting
+// Hardened: integrates with unified reward-allocation for 50% combined cap enforcement.
 import { PLATFORM_FEE_PCT, REFERRAL_TIERS, MIN_CLAIM_AMOUNT, REFERRAL_ROLLING_DAYS } from '../config';
 import { gitlawb } from '../gitlawb';
+import { processAllocation, requestReferralClaim } from './reward-allocation';
 
 // ── Collections ──────────────────────────────────────────────
+// Fee ledger is now written by the unified allocation module.
+// These are kept for backward-compatible reads and analytics.
 const feeLedger = gitlawb.db.collection<{
   tradeId: string;
   tradeAmountUsd: number;
@@ -21,12 +25,13 @@ const refRewards = gitlawb.db.collection<{
   tradeVolume: number;
   feeGenerated: number;
   reward: number;
-  status: string; // pending | claimable | claimed
+  status: string; // pending | claimable | claim_requested | processing | paid
   createdAt: string;
-}>('ref_rewards');
+}>('ref_rewards', { visibility: 'authenticated' });
 
 const refVolume = gitlawb.db.collection<{
   username: string;
+  referredWallet: string;
   volume: number;
   feeGenerated: number;
   tradeId: string;
@@ -45,7 +50,7 @@ export interface FeeBreakdown {
   referrerUsername: string | null;
 }
 
-/** Calculate the full fee breakdown for a trade. */
+/** Calculate the full fee breakdown for a trade (pure, no side effects). */
 export function calculateFees(tradeValueUsd: number, referrerSharePct = 0): FeeBreakdown {
   const platformFeeUsd = tradeValueUsd * PLATFORM_FEE_PCT;
   const referralRewardUsd = platformFeeUsd * (referrerSharePct / 100);
@@ -54,7 +59,7 @@ export function calculateFees(tradeValueUsd: number, referrerSharePct = 0): FeeB
   return {
     tradeValueUsd,
     platformFeeUsd,
-    platformFeePct: PLATFORM_FEE_PCT * 100, // 0.40
+    platformFeePct: PLATFORM_FEE_PCT * 100,
     referralRewardUsd,
     referralPct: referrerSharePct,
     treasuryAmountUsd,
@@ -70,75 +75,75 @@ export function getReferralTier(volume30d: number) {
   return REFERRAL_TIERS[0];
 }
 
-// ── Fee Attribution ──────────────────────────────────────────
+// ── Fee Attribution (unified allocation path) ────────────────
 
-// Dedup: track processed tradeIds to prevent double rewards (idempotent)
-const processedTrades = new Set<string>();
-
-/** Calculate and record fee allocation after a successful trade. */
+/** Calculate and record fee allocation after a successful trade.
+ *  Uses the unified allocation module for 50% cap enforcement
+ *  and distributed idempotency. */
 export async function calculateFeeAllocation(
   tradeAmountUsd: number,
   referrerUsername: string | null,
   tradeId: string,
+  referredWallet?: string,
+  cashbackRatePct?: number,
 ): Promise<FeeBreakdown> {
-  // Idempotency guard
-  if (processedTrades.has(tradeId)) {
-    return calculateFees(tradeAmountUsd, 0);
-  }
-  processedTrades.add(tradeId);
+  // Look up referrer tier if applicable
   let referrerSharePct = 0;
-
-  // If referrer exists, look up their current tier
   if (referrerUsername) {
     const vol30d = await getRollingVolume(referrerUsername);
     const tier = getReferralTier(vol30d);
     referrerSharePct = tier.sharePct;
   }
 
-  const breakdown = calculateFees(tradeAmountUsd, referrerSharePct);
-  breakdown.referrerUsername = referrerUsername;
+  // Use unified allocation (enforces 50% cap, writes idempotency key)
+  const allocation = await processAllocation({
+    tradeId,
+    tradeAmountUsd,
+    referrerSharePct,
+    cashbackRatePct: cashbackRatePct ?? 0,
+    referrerUsername,
+    traderWallet: referredWallet || '',
+  });
 
-  // Record in fee ledger
-  try {
-    await feeLedger.create({
-      tradeId,
-      tradeAmountUsd,
-      platformFeeUsd: breakdown.platformFeeUsd,
-      referralRewardUsd: breakdown.referralRewardUsd,
-      treasuryAmountUsd: breakdown.treasuryAmountUsd,
-      referrerUsername,
-      chainId: '',
-      timestamp: new Date().toISOString(),
-    });
-  } catch { /* non-critical */ }
-
-  // Record referral reward if applicable
-  if (referrerUsername && breakdown.referralRewardUsd > 0) {
-    await recordReferralReward(
-      referrerUsername,
-      tradeId,
-      tradeAmountUsd,
-      breakdown.platformFeeUsd,
-      breakdown.referralRewardUsd,
-    );
+  // Also record referral volume (for rolling 30-day calculation)
+  if (referrerUsername && allocation.referralRewardFinal > 0) {
+    try {
+      await refVolume.create({
+        username: referrerUsername,
+        referredWallet: referredWallet || '',
+        volume: tradeAmountUsd,
+        feeGenerated: allocation.platformFeeUsd,
+        tradeId,
+        date: new Date().toISOString(),
+      });
+    } catch { /* non-critical */ }
   }
 
-  return breakdown;
+  // Return backward-compatible breakdown
+  return {
+    tradeValueUsd: tradeAmountUsd,
+    platformFeeUsd: allocation.platformFeeUsd,
+    platformFeePct: PLATFORM_FEE_PCT * 100,
+    referralRewardUsd: allocation.referralRewardFinal,
+    referralPct: referrerSharePct,
+    treasuryAmountUsd: allocation.treasuryRetained,
+    referrerUsername,
+  };
 }
 
-/** Record a referral reward entry. */
+/** Record a referral reward entry (legacy path — prefer calculateFeeAllocation). */
 export async function recordReferralReward(
   referrerUsername: string,
   tradeId: string,
   tradeVolume: number,
   feeGenerated: number,
   reward: number,
+  referredWallet?: string,
 ): Promise<void> {
   try {
-    // Add to rewards collection
     await refRewards.create({
       referrerUsername,
-      referredWallet: '',
+      referredWallet: referredWallet || '',
       tradeId,
       tradeVolume,
       feeGenerated,
@@ -147,9 +152,9 @@ export async function recordReferralReward(
       createdAt: new Date().toISOString(),
     });
 
-    // Add to rolling volume log
     await refVolume.create({
       username: referrerUsername,
+      referredWallet: referredWallet || '',
       volume: tradeVolume,
       feeGenerated,
       tradeId,
@@ -253,26 +258,9 @@ export async function getFeeAnalytics(): Promise<FeeAnalytics> {
   }
 }
 
-/** Claim referral rewards. */
-export async function claimRewards(username: string): Promise<{ success: boolean; amount: number; error?: string }> {
-  try {
-    const { records } = await refRewards.list({ limit: 1000 });
-    const claimable = records.filter(
-      r => r.data.referrerUsername === username && r.data.status === 'claimable'
-    );
-    const total = claimable.reduce((sum, r) => sum + r.data.reward, 0);
-
-    if (total < MIN_CLAIM_AMOUNT) {
-      return { success: false, amount: 0, error: `Minimum claim: $${MIN_CLAIM_AMOUNT}` };
-    }
-
-    // Mark as claimed
-    for (const record of claimable) {
-      await refRewards.update(record.id, { status: 'claimed' });
-    }
-
-    return { success: true, amount: total };
-  } catch (e: any) {
-    return { success: false, amount: 0, error: e.message || 'CLAIM FAILED' };
-  }
+/** Claim referral rewards (truthful statuses).
+ *  Uses `claim_requested` instead of `claimed`.
+ *  Does NOT mark as `paid` — no payout processor exists. */
+export async function claimRewards(username: string): Promise<{ success: boolean; amount: number; pending?: boolean; error?: string }> {
+  return requestReferralClaim(username);
 }

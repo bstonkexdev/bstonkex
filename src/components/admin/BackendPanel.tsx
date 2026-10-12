@@ -1,4 +1,4 @@
-// BSTONKEX Admin Backend Deployment Panel
+// Cupcak8 Swap Admin Backend Deployment Panel
 // Shows backend deployment status and provides deployment guidance
 import { useState, useEffect } from 'react';
 
@@ -82,8 +82,8 @@ export default function BackendPanel() {
       {/* Status Overview */}
       <div style={{
         padding: 8, borderRadius: 4,
-        background: status.deployed ? 'rgba(0,255,100,0.08)' : 'rgba(255,60,60,0.08)',
-        border: `1px solid ${status.deployed ? 'rgba(0,255,100,0.2)' : 'rgba(255,60,60,0.2)'}`,
+        background: status.deployed ? 'var(--yellow-bg)' : 'var(--red-bg)',
+        border: `1px solid ${status.deployed ? 'var(--lime-bg)' : 'var(--red-bg)'}`,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
           <span style={{ color: status.deployed ? 'var(--green)' : 'var(--red)', fontSize: 10 }}>
@@ -131,7 +131,7 @@ export default function BackendPanel() {
           ))}
           <div style={{
             marginTop: 4, padding: 6, borderRadius: 3,
-            background: 'rgba(255,180,0,0.08)', border: '1px solid rgba(255,180,0,0.2)',
+            background: 'var(--yellow-bg)', border: '1px solid var(--yellow-dim)',
             fontSize: 7, color: 'var(--amber)',
           }}>
             ⚠ EXTERNAL ACTION REQUIRED — Cannot deploy backend from this frontend environment

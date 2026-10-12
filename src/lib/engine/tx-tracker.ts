@@ -1,4 +1,4 @@
-// BSTONKEX Transaction Tracker — Idempotent, deduped trade tracking
+// Cupcak8 Swap Transaction Tracker — Idempotent, deduped trade tracking
 import type { ChainId } from '../config';
 import { CHAINS, explorerTxUrl } from '../config';
 import { gitlawb } from '../gitlawb';

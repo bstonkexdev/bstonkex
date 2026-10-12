@@ -1,4 +1,4 @@
-// BSTONKEX External Setup Checklist — actionable list of external requirements
+// Cupcak8 Swap External Setup Checklist — actionable list of external requirements
 // Each item shows READY / MISSING / BLOCKED with exact action needed.
 import { useState, useEffect } from 'react';
 
@@ -151,7 +151,7 @@ export default function ExternalChecklist() {
       {missingCount === 0 && blockedCount === 0 && items.length > 0 && (
         <div style={{
           padding: 8, borderRadius: 4,
-          background: 'rgba(0,255,100,0.08)', border: '1px solid rgba(0,255,100,0.2)',
+          background: 'var(--yellow-bg)', border: '1px solid var(--lime-bg)',
           fontSize: 9, fontWeight: 900, color: 'var(--green)',
         }}>
           ✓ ALL EXTERNAL REQUIREMENTS SATISFIED — Ready for deployment
@@ -219,7 +219,7 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
       {expanded && item.status !== 'READY' && (
         <div style={{
           marginLeft: 20, marginTop: 2, padding: 6, borderRadius: 3,
-          background: 'rgba(255,180,0,0.06)', border: '1px solid rgba(255,180,0,0.12)',
+          background: 'var(--lime-bg)', border: '1px solid var(--yellow-bg)',
           fontSize: 7, color: 'var(--amber)', lineHeight: 1.5,
         }}>
           → {item.action}

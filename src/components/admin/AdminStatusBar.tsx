@@ -1,4 +1,4 @@
-// BSTONKEX Admin Status Bar — shows connected admin wallet, auth, network info
+// Cupcak8 Swap Admin Status Bar — shows connected admin wallet, auth, network info
 import type { WalletState } from '../../lib/wallet';
 import { CHAINS } from '../../lib/config';
 
@@ -45,7 +45,7 @@ export default function AdminStatusBar({ wallet }: { wallet: WalletState }) {
         {wrongNetwork && (
           <span style={{
             fontSize: 6, fontWeight: 900, padding: '1px 4px', borderRadius: 2,
-            background: 'rgba(255,180,0,0.12)', color: 'var(--amber)',
+            background: 'var(--yellow-bg)', color: 'var(--amber)',
           }}>
             WRONG NET
           </span>

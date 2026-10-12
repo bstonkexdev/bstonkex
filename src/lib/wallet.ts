@@ -1,4 +1,4 @@
-// BSTONKEX Wallet Connection — EVM (MetaMask/OKX) + Solana (Phantom/Flare)
+// Cupcak8 Swap Wallet Connection — EVM (MetaMask/OKX) + Solana (Phantom/Flare)
 // Enhanced with real balance fetching via chain adapters
 import { CHAINS, type ChainId } from './config';
 import { getChainAdapter } from './engine/chain-registry';
@@ -93,17 +93,20 @@ async function fetchSolanaBalance(address: string): Promise<string | null> {
     }
   } catch { /* fall through */ }
 
-  try {
-    const res = await fetch('https://api.mainnet-beta.solana.com', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getBalance', params: [address] }),
-    });
-    const data = await res.json();
-    if (data.result?.value !== undefined) {
-      return (data.result.value / 1e9).toFixed(6);
-    }
-  } catch { /* ignore */ }
+  for (const rpcUrl of ['https://rpc.ankr.com/solana', 'https://api.mainnet-beta.solana.com']) {
+    try {
+      const res = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getBalance', params: [address] }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const data = await res.json();
+      if (data.result?.value !== undefined) {
+        return (data.result.value / 1e9).toFixed(6);
+      }
+    } catch { continue; }
+  }
   return null;
 }
 
@@ -223,20 +226,21 @@ export function getSolanaWalletName(): string | null {
 
 /** Validate Solana cluster matches expected network. */
 export async function validateSolanaCluster(): Promise<{ cluster: string; valid: boolean }> {
-  try {
-    const res = await fetch('https://api.mainnet-beta.solana.com', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getClusterNodes', params: [] }),
-    });
-    const data = await res.json();
-    if (data.result && Array.isArray(data.result) && data.result.length > 0) {
-      return { cluster: 'mainnet-beta', valid: true };
-    }
-    return { cluster: 'unknown', valid: false };
-  } catch {
-    return { cluster: 'unreachable', valid: false };
+  for (const rpcUrl of ['https://rpc.ankr.com/solana', 'https://api.mainnet-beta.solana.com']) {
+    try {
+      const res = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getClusterNodes', params: [] }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const data = await res.json();
+      if (data.result && Array.isArray(data.result) && data.result.length > 0) {
+        return { cluster: 'mainnet-beta', valid: true };
+      }
+    } catch { continue; }
   }
+  return { cluster: 'unreachable', valid: false };
 }
 
 export function getAvailableWallets(): { evm: boolean; solana: boolean } {

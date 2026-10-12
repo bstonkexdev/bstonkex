@@ -1,4 +1,4 @@
-// BSTONKEX Candle Engine — Real candle generation from trade events
+// Cupcak8 Swap Candle Engine — Real candle generation from trade events
 // No fake candles. Generates from actual market data. Supports live updates.
 
 import type { ChainId } from '../config';

@@ -1,4 +1,4 @@
-// BSTONKEX QA Report — Integration verification results
+// Cupcak8 Swap QA Report — Integration verification results
 // This module documents the QA status of each system component.
 
 export type IssueSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
@@ -207,7 +207,7 @@ export function getQASummary(): { total: number; bySeverity: Record<IssueSeverit
 
 export function formatQAReport(): string {
   const summary = getQASummary();
-  let report = `BSTONKEX QA REPORT\n${'═'.repeat(40)}\n\n`;
+  let report = `Cupcak8 Swap QA REPORT\n${'═'.repeat(40)}\n\n`;
   report += `Total Issues: ${summary.total}\n`;
   report += `CRITICAL: ${summary.bySeverity.CRITICAL} | HIGH: ${summary.bySeverity.HIGH} | MEDIUM: ${summary.bySeverity.MEDIUM} | LOW: ${summary.bySeverity.LOW}\n`;
   report += `FIXED: ${summary.byStatus.FIXED} | KNOWN_LIMITATION: ${summary.byStatus.KNOWN_LIMITATION} | BY_DESIGN: ${summary.byStatus.BY_DESIGN}\n\n`;

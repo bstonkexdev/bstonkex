@@ -8,8 +8,11 @@ interface Props {
 export default function RewardHistory({ history }: Props) {
   if (history.length === 0) {
     return (
-      <div style={{ padding: 20, textAlign: 'center', fontSize: 9, color: 'var(--text-dim)' }}>
+      <div style={{ padding: 24, textAlign: 'center', fontSize: 9, color: 'var(--text-dim)' }}>
         NO REFERRAL REWARDS YET
+        <div style={{ fontSize: 8, color: 'var(--text-muted)', marginTop: 4 }}>
+          Share your referral link to start earning
+        </div>
       </div>
     );
   }
@@ -21,7 +24,6 @@ export default function RewardHistory({ history }: Props) {
           <tr>
             <th>DATE</th>
             <th>WALLET</th>
-            <th>TRADE</th>
             <th className="right">VALUE</th>
             <th className="right">FEE</th>
             <th className="right">REWARD</th>
@@ -32,16 +34,17 @@ export default function RewardHistory({ history }: Props) {
           {history.slice(0, 50).map((r, i) => (
             <tr key={i}>
               <td style={{ fontSize: 9 }}>{new Date(r.date).toLocaleDateString()}</td>
-              <td style={{ fontSize: 9, fontFamily: 'var(--font)' }}>{shortenAddress(r.wallet, 4)}</td>
-              <td style={{ fontSize: 9 }}>TRADE</td>
+              <td style={{ fontSize: 9, fontFamily: 'var(--font)' }}>
+                {r.wallet ? shortenAddress(r.wallet, 4) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+              </td>
               <td className="right" style={{ fontSize: 9 }}>{formatUsd(r.tradeVolume)}</td>
               <td className="right" style={{ fontSize: 9 }}>{formatUsd(r.feeGenerated)}</td>
-              <td className="right" style={{ fontSize: 9, fontWeight: 700, color: 'var(--green)' }}>{formatUsd(r.reward)}</td>
+              <td className="right" style={{ fontSize: 9, fontWeight: 700, color: 'var(--lime-dim)' }}>{formatUsd(r.reward)}</td>
               <td>
                 <span style={{
                   fontSize: 7, fontWeight: 700, padding: '1px 4px',
-                  border: `1px solid ${r.status === 'claimed' ? 'var(--green)' : 'var(--amber)'}`,
-                  color: r.status === 'claimed' ? 'var(--green)' : 'var(--amber)',
+                  border: `1px solid ${r.status === 'claimed' ? 'var(--lime-dim)' : r.status === 'claimable' ? '#E8547C' : 'var(--yellow)'}`,
+                  color: r.status === 'claimed' ? 'var(--lime-dim)' : r.status === 'claimable' ? '#E8547C' : 'var(--yellow-dim)',
                 }}>{r.status.toUpperCase()}</span>
               </td>
             </tr>

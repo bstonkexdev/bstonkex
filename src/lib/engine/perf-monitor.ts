@@ -1,4 +1,4 @@
-// BSTONKEX Performance Monitor — track real bottlenecks, no fake metrics
+// Cupcak8 Swap Performance Monitor — track real bottlenecks, no fake metrics
 
 interface PerfMetric {
   name: string;

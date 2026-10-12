@@ -1,4 +1,4 @@
-// BSTONKEX Security Logger — Centralized security/execution event logging
+// Cupcak8 Swap Security Logger — Centralized security/execution event logging
 // Never logs private keys, seed phrases, or wallet secrets.
 import { gitlawb } from '../gitlawb';
 

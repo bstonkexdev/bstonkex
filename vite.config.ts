@@ -1,8 +1,13 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  // Frontend tests only — backend tests run separately via `npm run test:db` in backend/
+  test: {
+    exclude: ["backend/**", "node_modules/**"],
+  },
   // Security headers for preview/production
   preview: {
     headers: {

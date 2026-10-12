@@ -1,4 +1,4 @@
-// BSTONKEX Quote Engine — Unified quoting across all chains
+// Cupcak8 Swap Quote Engine — Unified quoting across all chains
 import { PLATFORM_FEE_PCT, CHAINS, type ChainId } from '../config';
 import { getChainAdapter } from './chain-registry';
 import { cacheGetOrCompute, CACHE_KEYS, TTL } from './cache';

@@ -1,4 +1,4 @@
-// BSTONKEX Trade Engine — Unified execution with tx-tracker integration
+// Cupcak8 Swap Trade Engine — Unified execution with tx-tracker integration
 import type { ChainId } from '../config';
 import { explorerTxUrl } from '../config';
 import { getChainAdapter } from './chain-registry';

@@ -1,4 +1,4 @@
-// BSTONKEX Infrastructure Health Panel — Real-time health display for all components
+// Cupcak8 Swap Infrastructure Health Panel — Real-time health display for all components
 import { useState, useEffect } from 'react';
 import { getHealthReport, onHealthUpdate, statusColor, statusIcon, statusLabel, type InfraHealthReport, type ComponentHealth, type ChainHealth } from '../lib/engine/infra-health';
 import { CHAINS } from '../lib/config';

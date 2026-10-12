@@ -1,4 +1,4 @@
-// BSTONKEX Credential Panel — Secure API key and RPC configuration
+// Cupcak8 Swap Credential Panel — Secure API key and RPC configuration
 import { useState, useEffect, useCallback } from 'react';
 import { loadCredentials, saveCredential, testCredential, type CredentialEntry } from '../../lib/engine/credential-store';
 
@@ -56,7 +56,7 @@ export default function CredentialPanel() {
             </div>
             <span style={{
               fontSize: 6, fontWeight: 700, padding: '2px 5px', borderRadius: 3,
-              background: cred.category === 'rpc' ? 'rgba(0,221,255,0.1)' : cred.category === 'api' ? 'rgba(0,255,100,0.1)' : 'rgba(255,180,0,0.1)',
+              background: cred.category === 'rpc' ? 'var(--cyan-bg)' : cred.category === 'api' ? 'var(--lime-bg)' : 'var(--lime-bg)',
               color: cred.category === 'rpc' ? 'var(--cyan)' : cred.category === 'api' ? 'var(--green)' : 'var(--amber)',
             }}>
               {cred.category.toUpperCase()}
@@ -67,7 +67,7 @@ export default function CredentialPanel() {
           {cred.lastTested && (
             <div style={{
               fontSize: 7, padding: '4px 6px', borderRadius: 3,
-              background: cred.testResult === 'pass' ? 'rgba(0,255,100,0.08)' : 'rgba(255,48,96,0.08)',
+              background: cred.testResult === 'pass' ? 'var(--yellow-bg)' : 'var(--red-bg)',
               color: cred.testResult === 'pass' ? 'var(--green)' : 'var(--red)',
             }}>
               {cred.testResult === 'pass' ? '✓' : '✗'} {cred.testDetail}
@@ -92,7 +92,7 @@ export default function CredentialPanel() {
               />
               <button onClick={() => handleSave(cred.key, cred.label, cred.category)} style={{
                 padding: '5px 10px', borderRadius: 4, border: '1px solid var(--green)',
-                background: 'rgba(0,255,100,0.1)', color: 'var(--green)',
+                background: 'var(--lime-bg)', color: 'var(--green)',
                 fontSize: 7, fontWeight: 900, cursor: 'pointer',
               }}>SAVE</button>
               <button onClick={() => { setEditing(null); setInputValue(''); }} style={{
@@ -105,7 +105,7 @@ export default function CredentialPanel() {
             <div style={{ display: 'flex', gap: 4 }}>
               <button onClick={() => { setEditing(cred.id); setInputValue(''); }} style={{
                 padding: '4px 8px', borderRadius: 4, border: '1px solid var(--cyan)',
-                background: 'rgba(0,221,255,0.1)', color: 'var(--cyan)',
+                background: 'var(--cyan-bg)', color: 'var(--cyan)',
                 fontSize: 7, fontWeight: 700, cursor: 'pointer',
               }}>
                 {cred.configured ? 'UPDATE' : 'CONFIGURE'}
@@ -113,7 +113,7 @@ export default function CredentialPanel() {
               {cred.configured && (
                 <button onClick={() => handleTest(cred)} disabled={testing === cred.id} style={{
                   padding: '4px 8px', borderRadius: 4, border: '1px solid var(--green)',
-                  background: 'rgba(0,255,100,0.1)', color: testing === cred.id ? 'var(--text-muted)' : 'var(--green)',
+                  background: 'var(--lime-bg)', color: testing === cred.id ? 'var(--text-muted)' : 'var(--green)',
                   fontSize: 7, fontWeight: 700, cursor: testing === cred.id ? 'default' : 'pointer',
                 }}>
                   {testing === cred.id ? 'TESTING...' : 'TEST'}
@@ -126,7 +126,7 @@ export default function CredentialPanel() {
 
       <div style={{
         padding: 8, borderRadius: 4, fontSize: 7, color: 'var(--text-muted)',
-        background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border)', lineHeight: 1.5,
+        background: 'var(--bg-elevated)', border: '1px dashed var(--border)', lineHeight: 1.5,
       }}>
         <span style={{ fontWeight: 900, color: 'var(--amber)' }}>NEVER</span> share API keys or private keys. Credentials are stored in your browser session and transmitted only to their respective services.
       </div>

@@ -1,4 +1,4 @@
-// BSTONKEX Market Pipeline — Upgraded market data pipeline
+// Cupcak8 Swap Market Pipeline — Upgraded market data pipeline
 // Integrates: DexScreener polling + blockchain event streaming + candle generation
 // Flow: Source → Normalize → Cache → EventBus → Frontend
 

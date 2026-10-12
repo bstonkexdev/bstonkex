@@ -1,4 +1,4 @@
-// BSTONKEX Portfolio Engine — Multi-chain wallet portfolio aggregation
+// Cupcak8 Swap Portfolio Engine — Multi-chain wallet portfolio aggregation
 import type { ChainId } from '../config';
 import { CHAINS, CONFIGURED_CHAINS } from '../config';
 import { getChainAdapter, getNativePrices } from './chain-registry';

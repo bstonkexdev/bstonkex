@@ -69,7 +69,7 @@ export default function TradeReceipt({
       {/* Fees */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 9 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: 'var(--text-dim)' }}>BSTONKEX FEE (0.40%)</span>
+          <span style={{ color: 'var(--text-dim)' }}>CUPCAK8 SWAP FEE (0.40%)</span>
           <span>${platformFee}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>

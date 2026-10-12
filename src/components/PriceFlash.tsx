@@ -30,7 +30,7 @@ export default function PriceFlash({ price, prefix = '$', suffix, style, precisi
   }, [price]);
 
   const flashColor = flash === 'up' ? 'var(--green)' : flash === 'down' ? 'var(--red)' : undefined;
-  const bgColor = flash === 'up' ? 'rgba(0,255,136,0.08)' : flash === 'down' ? 'rgba(255,48,96,0.08)' : 'transparent';
+  const bgColor = flash === 'up' ? 'var(--yellow-bg)' : flash === 'down' ? 'var(--red-bg)' : 'transparent';
 
   const formatted = price != null ? `${prefix}${formatPrice(price, precision)}` : 'N/A';
 

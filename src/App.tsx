@@ -1,3 +1,4 @@
+// Cupcak8 Swap — Main Application Shell
 import { useEffect } from 'react';
 import { AppProvider, useApp } from './lib/context';
 import Header from './components/Header';
@@ -14,26 +15,35 @@ import ReferralPage from './components/ReferralPage';
 import WatchlistPage from './components/WatchlistPage';
 import ActivityPage from './components/ActivityPage';
 import FeeDashboard from './components/FeeDashboard';
-import DeploymentCenter from './components/admin/DeploymentCenter';
-import ProductionTerminal from './components/ProductionTerminal';
+import AdminPanel from './components/admin/AdminPanel';
+import LaunchpadPage from './components/LaunchpadPage';
+import TerminalPage from './components/terminal/TerminalPage';
+import SettingsPage from './components/settings/SettingsPage';
+import Notifications from './components/Notifications';
+import BottomNav from './components/BottomNav';
 import { startPricePolling, stopPricePolling } from './lib/engine/price-engine';
 import { startActivityPolling, stopActivityPolling } from './lib/engine/activity-engine';
 import { initWebVitals, trackPageLoad } from './lib/engine/perf-monitor';
 import { initInfraState } from './lib/engine/infra-state';
 import { startRpcMonitoring, stopRpcMonitoring } from './lib/engine/rpc-manager';
+import { initIndexer, stopIndexer } from './lib/engine/indexer/init';
 
 function Router() {
-  const { page } = useApp();
+  const { page, wallet } = useApp();
   switch (page) {
     case 'landing': return <LandingPage />;
     case 'markets': return <MarketsPage />;
-    case 'trade': return <TokenPage />;
+    case 'token': return <TokenPage />;
+    case 'trade': return <TerminalPage />;
     case 'portfolio': return <PortfolioPage />;
     case 'watchlist': return <WatchlistPage />;
     case 'referrals': return <ReferralPage />;
+    case 'reward': return <ReferralPage />;
     case 'fees': return <FeeDashboard />;
     case 'activity': return <ActivityPage />;
-    case 'admin': return <DeploymentCenter />;
+    case 'launchpad': return <MarketsPage />;
+    case 'admin': return <AdminPanel wallet={wallet} />;
+    case 'settings': return <SettingsPage />;
     default: return <LandingPage />;
   }
 }
@@ -46,57 +56,25 @@ function EngineInitializer() {
     startRpcMonitoring(60_000);
     initWebVitals();
     trackPageLoad();
-    return () => { stopPricePolling(); stopActivityPolling(); stopRpcMonitoring(); };
+    initIndexer();
+    return () => { stopPricePolling(); stopActivityPolling(); stopRpcMonitoring(); stopIndexer(); };
   }, []);
   return null;
-}
-
-function MobileNav() {
-  const { page, setPage, notifications } = useApp();
-  const unread = notifications.filter(n => !n.read).length;
-  const items = [
-    { id: 'landing' as const, label: 'Home', icon: '⌂' },
-    { id: 'markets' as const, label: 'Markets', icon: '◈' },
-    { id: 'trade' as const, label: 'Trade', icon: '⇄' },
-    { id: 'activity' as const, label: 'Activity', icon: '⚡' },
-    { id: 'portfolio' as const, label: 'Wallet', icon: '⬡' },
-  ];
-  return (
-    <nav className="mobile-nav">
-      {items.map(item => (
-        <button key={item.id}
-          className={`mobile-nav-item ${page === item.id ? 'active' : ''}`}
-          onClick={() => setPage(item.id)}>
-          <span style={{ fontSize: 16, position: 'relative' }}>
-            {item.icon}
-            {item.id === 'portfolio' && unread > 0 && (
-              <span style={{
-                position: 'absolute', top: -4, right: -4, width: 8, height: 8,
-                borderRadius: '50%', background: 'var(--amber)',
-              }} />
-            )}
-          </span>
-          {item.label}
-        </button>
-      ))}
-    </nav>
-  );
 }
 
 export default function App() {
   return (
     <AppProvider>
-      <ProductionTerminal>
-        <EngineInitializer />
-        <Header />
-        <EmergencyBanner />
-        <Router />
-        <SearchModal />
-        <TradeConfirmModal />
-        <WalletModal />
-        <NetworkMismatch />
-        <MobileNav />
-      </ProductionTerminal>
+      <EngineInitializer />
+      <Header />
+      <Router />
+      <SearchModal />
+      <TradeConfirmModal />
+      <WalletModal />
+      <NetworkMismatch />
+      <EmergencyBanner />
+      <Notifications />
+      <BottomNav />
     </AppProvider>
   );
 }

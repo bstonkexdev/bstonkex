@@ -1,4 +1,4 @@
-// BSTONKEX Market Database — Persistent market data storage via Gitlawb SDK
+// Cupcak8 Swap Market Database — Persistent market data storage via Gitlawb SDK
 // Stores indexed trades, candle history, token registry, pair data.
 
 import { gitlawb } from '../gitlawb';

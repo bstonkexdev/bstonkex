@@ -1,4 +1,4 @@
-// BSTONKEX Activity Engine — Real-time market activity from DexScreener + BSTONKEX trades
+// Cupcak8 Swap Activity Engine — Real-time market activity from DexScreener + Cupcak8 Swap trades
 // No fake data — honest DATA UNAVAILABLE when sources lack
 import { DEXSCREENER_API, type ChainId, CHAINS, shortenAddress } from '../config';
 import { cacheGetOrCompute, CACHE_KEYS, TTL } from './cache';
@@ -24,7 +24,7 @@ export interface MarketEvent {
   txHash: string;
   timestamp: number;
   size: TradeSize;
-  source: 'dexscreener' | 'bstonkex';
+  source: 'dexscreener' | 'cupcak8';
 }
 
 export interface WhaleEvent extends MarketEvent {
@@ -199,14 +199,14 @@ export function trackIndexedTrade(params: {
     txHash: params.txHash,
     timestamp: Date.now(),
     size: classifyTradeSize(params.amountUsd),
-    source: 'bstonkex',
+    source: 'cupcak8',
   };
   emit(event);
 }
 
-// ── BSTONKEX Trade Tracking ──────────────────────────────────
+// ── Cupcak8 Swap Trade Tracking ──────────────────────────────────
 
-/** Emit a BSTONKEX-executed trade into the activity feed. */
+/** Emit a Cupcak8 Swap-executed trade into the activity feed. */
 export function trackBstonkexTrade(params: {
   chainId: ChainId; tokenSymbol: string; tokenAddress: string;
   side: 'buy' | 'sell'; amountUsd: number; priceUsd: number;
@@ -227,7 +227,7 @@ export function trackBstonkexTrade(params: {
     txHash: params.txHash,
     timestamp: Date.now(),
     size: classifyTradeSize(params.amountUsd),
-    source: 'bstonkex',
+    source: 'cupcak8',
   };
   emit(event);
 }

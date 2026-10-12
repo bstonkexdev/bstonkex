@@ -1,4 +1,4 @@
-// BSTONKEX Component Card — Per-infrastructure-component status, deploy, verify, logs
+// Cupcak8 Swap Component Card — Per-infrastructure-component status, deploy, verify, logs
 import { useState } from 'react';
 import { statusColor, statusLabel, type InfraComponent, type ComponentStatus } from '../../lib/engine/infra-state';
 
@@ -85,8 +85,8 @@ export default function ComponentCard({ component: c, actionResult, onDeploy, on
           {actionResult && (
             <div style={{
               padding: '6px 8px', borderRadius: 4, fontSize: 7, lineHeight: 1.5,
-              background: actionResult.success ? 'rgba(0,255,100,0.08)' : 'rgba(255,48,96,0.08)',
-              border: `1px solid ${actionResult.success ? 'rgba(0,255,100,0.2)' : 'rgba(255,48,96,0.2)'}`,
+              background: actionResult.success ? 'var(--yellow-bg)' : 'var(--red-bg)',
+              border: `1px solid ${actionResult.success ? 'var(--lime-bg)' : 'var(--red-bg)'}`,
               color: actionResult.success ? 'var(--green)' : 'var(--red)',
             }}>
               {actionResult.detail}
@@ -114,7 +114,7 @@ export default function ComponentCard({ component: c, actionResult, onDeploy, on
                 disabled={isRunning}
                 style={{
                   padding: '5px 10px', borderRadius: 4, border: '1px solid var(--cyan)',
-                  background: isRunning ? 'var(--border)' : 'rgba(0,221,255,0.1)',
+                  background: isRunning ? 'var(--border)' : 'var(--cyan-bg)',
                   color: isRunning ? 'var(--text-muted)' : 'var(--cyan)',
                   fontSize: 7, fontWeight: 900, cursor: isRunning ? 'default' : 'pointer',
                   letterSpacing: '0.05em',
@@ -129,7 +129,7 @@ export default function ComponentCard({ component: c, actionResult, onDeploy, on
                 disabled={isRunning}
                 style={{
                   padding: '5px 10px', borderRadius: 4, border: '1px solid var(--green)',
-                  background: isRunning ? 'var(--border)' : 'rgba(0,255,100,0.1)',
+                  background: isRunning ? 'var(--border)' : 'var(--lime-bg)',
                   color: isRunning ? 'var(--text-muted)' : 'var(--green)',
                   fontSize: 7, fontWeight: 900, cursor: isRunning ? 'default' : 'pointer',
                   letterSpacing: '0.05em',

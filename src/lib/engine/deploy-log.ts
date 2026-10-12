@@ -1,4 +1,4 @@
-// BSTONKEX Deployment Log — tracks deployment history and status
+// Cupcak8 Swap Deployment Log — tracks deployment history and status
 import type { ChainId } from '../config';
 
 export type DeployStatus = 
@@ -64,7 +64,7 @@ export function startDeployment(
     timestamp: Date.now(),
     adminWallet,
     network,
-    deploymentId: `bstonkex-${version}-${Date.now()}`,
+    deploymentId: `cupcak8-${version}-${Date.now()}`,
     status: 'PREPARING',
     services,
   };

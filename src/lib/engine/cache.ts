@@ -1,4 +1,4 @@
-// BSTONKEX Cache — TTL-based in-memory cache with stale-while-revalidate
+// Cupcak8 Swap Cache — TTL-based in-memory cache with stale-while-revalidate
 
 interface CacheEntry<T> {
   data: T;

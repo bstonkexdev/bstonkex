@@ -1,4 +1,4 @@
-// BSTONKEX Admin Environment Configuration Panel
+// Cupcak8 Swap Admin Environment Configuration Panel
 // Shows environment variable status without exposing actual values
 import { useState } from 'react';
 
@@ -48,7 +48,7 @@ export default function EnvironmentPanel() {
 
       <div style={{
         padding: 6, borderRadius: 3, fontSize: 7, color: 'var(--amber)',
-        background: 'rgba(255,180,0,0.08)', border: '1px solid rgba(255,180,0,0.2)',
+        background: 'var(--yellow-bg)', border: '1px solid var(--yellow-dim)',
       }}>
         ⚠ Secrets are NEVER displayed after configuration. Set via .env file or deployment platform.
       </div>

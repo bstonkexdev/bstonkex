@@ -1,4 +1,4 @@
-// BSTONKEX Production Terminal — Root terminal component
+// Cupcak8 Swap Production Terminal — Root terminal component
 // Initializes pipeline, manages connection state, routes data to child components
 import { useEffect, useState } from 'react';
 import { startPipeline, stopPipeline, getPipelineState, onPipelineState, type PipelineState } from '../lib/engine/pipeline-orchestrator';

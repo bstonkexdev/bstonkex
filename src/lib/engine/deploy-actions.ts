@@ -1,4 +1,4 @@
-// BSTONKEX Deploy Actions — Real deployment/verification actions for each infrastructure component
+// Cupcak8 Swap Deploy Actions — Real deployment/verification actions for each infrastructure component
 import { updateComponent, addLog, makeLog } from './infra-state';
 import { checkChainRpc, checkAllChains } from './rpc-manager';
 import { startEvmIndexer, stopEvmIndexer, isIndexerRunning, getIndexerStats } from './evm-indexer';

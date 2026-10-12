@@ -1,4 +1,4 @@
-// BSTONKEX Market Data Engine — Real blockchain data via DexScreener + GeckoTerminal
+// Cupcak8 Swap Market Data Engine — Real blockchain data via DexScreener + GeckoTerminal
 // Enhanced with price engine integration and cache layer
 import { DEXSCREENER_API, GECKOTERMINAL_API, type ChainId, CHAINS } from './config';
 import { cacheGetOrCompute, CACHE_KEYS, TTL } from './engine/cache';
@@ -14,12 +14,14 @@ export interface TokenData {
   marketCap: number | null;
   fdv: number | null;
   liquidity: number | null;
+  volume1h: number | null;
   volume24h: number | null;
   buys24h: number | null;
   sells24h: number | null;
   txns24h: number | null;
   pairAddress: string | null;
   dexId: string | null;
+  pairCreatedAt: number | null;
   url: string | null;
   icon: string | null;
   websites: string[];
@@ -92,12 +94,14 @@ function parseToken(raw: any): TokenData | null {
     marketCap: raw.marketCap ?? raw.fdv ?? null,
     fdv: raw.fdv ?? null,
     liquidity: raw.liquidity?.usd ?? null,
+    volume1h: raw.volume?.h1 ?? null,
     volume24h: raw.volume?.h24 ?? null,
     buys24h: txns?.buys ?? null,
     sells24h: txns?.sells ?? null,
     txns24h: txns ? (txns.buys ?? 0) + (txns.sells ?? 0) : null,
     pairAddress: raw.pairAddress || null,
     dexId: raw.dexId || null,
+    pairCreatedAt: raw.pairCreatedAt || null,
     url: raw.url || null,
     icon: raw.info?.imageUrl || null,
     websites: (raw.info?.websites || []).map((w: any) => w.url),
@@ -206,11 +210,13 @@ export async function getTokenPairs(chainId: ChainId, address: string): Promise<
 // Track pools that returned 404 to avoid repeated GeckoTerminal calls
 const failedPools = new Set<string>();
 
-// Get OHLCV candles from GeckoTerminal — cached per timeframe
+// Get OHLCV candles from GeckoTerminal — cached per timeframe.
+// Only aggregates the provider actually serves are exposed:
+// minute 1/5/15, hour 1/4, day 1.
 export async function getCandles(
   chainId: ChainId,
   poolAddress: string,
-  timeframe: '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '1w' = '1h'
+  timeframe: '1m' | '5m' | '15m' | '1h' | '4h' | '1d' = '1h'
 ): Promise<CandleData[]> {
   const networkMap: Record<ChainId, string> = {
     bsc: 'bsc', solana: 'solana', base: 'base', robinhood: '',
@@ -228,10 +234,10 @@ export async function getCandles(
   return cacheGetOrCompute(CACHE_KEYS.candles(chainId, poolAddress, timeframe), async () => {
     const tfMap: Record<string, string> = {
       '1m': 'minute', '5m': 'minute', '15m': 'minute',
-      '1h': 'hour', '4h': 'hour', '1d': 'day', '1w': 'day',
+      '1h': 'hour', '4h': 'hour', '1d': 'day',
     };
     const aggregateMap: Record<string, string> = {
-      '1m': '1', '5m': '5', '15m': '15', '1h': '1', '4h': '4', '1d': '1', '1w': '7',
+      '1m': '1', '5m': '5', '15m': '15', '1h': '1', '4h': '4', '1d': '1',
     };
     try {
       const res = await fetch(
