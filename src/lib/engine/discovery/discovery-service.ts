@@ -201,3 +201,13 @@ export function getRegisteredAdapters(): DiscoveryAdapter[] {
 export function getBlockedSources(): Record<string, string> {
   return { ...blockedSources };
 }
+
+/** Get PumpPortal real-time stream stats (for health display). */
+export async function getPumpPortalStats() {
+  try {
+    const { getStreamStats } = await import('./pumpportal-stream');
+    return getStreamStats();
+  } catch {
+    return null;
+  }
+}

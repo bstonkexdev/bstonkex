@@ -12,19 +12,31 @@
 
 import { runDiscoveryCycle } from './discovery-service';
 import { enrichPendingTokens } from './market-enrichment';
+import { startPumpPortalStream } from './pumpportal-stream';
 
 let registered = false;
 
 /**
  * Register the discovery pipeline (idempotent).
- * Call this once on app mount. Does NOT start any background loops.
- * Use requestRefresh() from refresh-controller.ts to trigger actual scanning.
+ * Starts the PumpPortal real-time WebSocket stream for instant new token detection.
+ * Use requestRefresh() from refresh-controller.ts for polling-based discovery.
  */
 export function initDiscoveryPipeline(): void {
   if (registered) return;
   registered = true;
-  // Pipeline is now available for on-demand triggers via refresh-controller.
-  // No timers, no intervals, no autonomous loops.
+
+  // Start the PumpPortal real-time WebSocket stream — this catches EVERY
+  // Pump.fun token creation instantly (no polling, no RPC latency).
+  startPumpPortalStream();
+
+  // Fetch SOL/USD price and pass it to the stream for USD conversions
+  import('../sol-price').then(async m => {
+    const result = await m.getSolUsdPrice();
+    if (result?.priceUsd) {
+      const stream = await import('./pumpportal-stream');
+      stream.setSolUsdPrice(result.priceUsd);
+    }
+  }).catch(() => {});
 }
 
 /**
