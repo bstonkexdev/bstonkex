@@ -15,6 +15,7 @@ import { routeDegen } from './degen-routes.js';
 import { isDbConfigured, pingDb, closePool, getDbStatus } from './db/pool.js';
 import { runMigrations, getMigrationStatus } from './db/migrate.js';
 import { routeRewards } from './reward-routes.js';
+import { LAUNCHPAD_CONFIG, getAllLaunchpads, getLaunchpad } from './config/launchpads.js';
 
 // ── Configuration ────────────────────────────────────────────
 
@@ -126,6 +127,13 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
   const cachedRoute = cachedTokenRoutes[`${req.method} ${url.pathname}`];
   if (cachedRoute) {
     cachedRoute(req, res);
+    return;
+  }
+
+  // Launchpad registry routes
+  const launchpadRoute = launchpadRoutes[`${req.method} ${url.pathname}`];
+  if (launchpadRoute) {
+    launchpadRoute(req, res);
     return;
   }
 
@@ -795,6 +803,67 @@ const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
       res.end(JSON.stringify(tokens));
     } catch (err: any) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+  },
+};
+
+// ── Launchpad Registry Routes ──────────────────────────────────
+const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse) => void> = {
+  // GET /api/launchpads — full registry with chain context
+  'GET /api/launchpads': (_req, res) => {
+    const launchpads = getAllLaunchpads();
+    const { getStoreStats } = require('./trenches-store.js');
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({
+      launchpads,
+      storeStats: getStoreStats(),
+      pumpportal: {
+        connected: pumpConnected,
+        tokensReceived: pumpTokensReceived,
+        reconnects: pumpReconnects,
+      },
+      timestamp: Date.now(),
+    }));
+  },
+
+  // GET /api/launchpads/status — per-chain readiness + token counts
+  'GET /api/launchpads/status': (_req, res) => {
+    const { zrevrange } = require('./trenches-store.js');
+    const status: Record<string, { chainId: string | number; launchpads: Array<{ id: string; name: string; tokenCount: number; hasData: boolean }> }> = {};
+
+    for (const [chainKey, config] of Object.entries(LAUNCHPAD_CONFIG)) {
+      status[chainKey] = {
+        chainId: config.chainId,
+        launchpads: config.launchpads.map(lp => {
+          const flatKey = `trenches:${lp.id}`;
+          const mints = zrevrange(flatKey, 0, -1) || [];
+          return {
+            id: lp.id,
+            name: lp.name,
+            tokenCount: mints.length,
+            hasData: mints.length > 0,
+          };
+        }),
+      };
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ status, timestamp: Date.now() }));
+  },
+
+  // GET /api/tokens/trenches/:launchpadId — generic launchpad token lookup
+  'GET /api/tokens/trenches/generic': (req, res) => {
+    try {
+      const url = new URL(req.url || '/', `http://${req.headers.host}`);
+      const lp = (url.searchParams.get('launchpad') || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const { zrevrange, hgetall } = require('./trenches-store.js');
+      const mints = zrevrange(`trenches:${lp}`, 0, 49) || [];
+      const tokens = mints.map((m: string) => hgetall(`token:${m}`)).filter((t: any) => t && t.mint);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify(tokens));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
       res.end(JSON.stringify({ error: err.message }));
     }
   },
