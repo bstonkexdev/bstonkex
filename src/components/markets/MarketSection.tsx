@@ -235,12 +235,30 @@ export default function MarketSection() {
                   transition: 'all 0.15s',
                 }}
               >
-                <img
-                  src={`/assets/launchpads/${pad.id}.png`}
-                  alt=""
-                  style={{ width: 16, height: 16, borderRadius: 8, objectFit: 'contain' }}
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
+                {pad.logo ? (
+                  <img
+                    src={pad.logo}
+                    alt=""
+                    style={{ width: 16, height: 16, borderRadius: 8, objectFit: 'cover', background: '#fff' }}
+                    onError={e => {
+                      const el = e.target as HTMLImageElement;
+                      el.style.display = 'none';
+                      // Show initials badge as fallback
+                      const badge = el.nextElementSibling as HTMLElement;
+                      if (badge) badge.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <span
+                  className="launchpad-initials-badge"
+                  style={{
+                    display: pad.logo ? 'none' : 'flex',
+                    width: 16, height: 16, borderRadius: 8,
+                    background: pad.brandColor, color: '#fff',
+                    alignItems: 'center', justifyContent: 'center',
+                    fontSize: 7, fontWeight: 800, flexShrink: 0,
+                  }}
+                >{pad.initials}</span>
                 <span>{pad.name}</span>
               </button>
             );

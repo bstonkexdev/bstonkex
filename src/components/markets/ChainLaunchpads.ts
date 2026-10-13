@@ -1,19 +1,14 @@
-// Multi-chain launchpad mapping matrix — 8 chains with official logos + launchpads
+// Multi-chain launchpad mapping with official logos from launchpad-logos.ts
 import { CHAIN_LOGOS } from '../../assets/wallet-chains';
 
 export interface ChainInfo {
-  key: string;
-  label: string;
-  logo: string;
-  color: string;
+  key: string; label: string; logo: string; color: string;
 }
 
 export interface LaunchpadInfo {
-  id: string;
-  name: string;
+  id: string; name: string; logo: string; initials: string; brandColor: string;
 }
 
-// Official chain logos from DefiLlama icon service (wallet-chains assets)
 export const CHAIN_LIST: ChainInfo[] = [
   { key: 'BSC', label: 'BSC', logo: CHAIN_LOGOS.bsc, color: '#F0B90B' },
   { key: 'BASE', label: 'Base', logo: CHAIN_LOGOS.base, color: '#0052FF' },
@@ -29,35 +24,35 @@ export const CHAINS = CHAIN_LIST.map(c => c.key);
 
 export const LAUNCHPADS_BY_CHAIN: Record<string, LaunchpadInfo[]> = {
   BSC: [
-    { id: 'flap', name: 'Flap Swap' },
-    { id: 'fourmeme', name: '4meme' },
-    { id: 'genius', name: 'Genius' },
+    { id: 'flap', name: 'Flap Swap', logo: '/assets/1791777500495-fss118.jpg', initials: 'FS', brandColor: '#D0FF00' },
+    { id: 'fourmeme', name: '4meme', logo: '/assets/1791779927588-khb50w.jpg', initials: '4M', brandColor: '#FF6D00' },
+    { id: 'genius', name: 'Genius', logo: '/images/launchpads/genius.svg', initials: 'GN', brandColor: '#FE86B4' },
   ],
   BASE: [
-    { id: 'o1exchange', name: 'O1 Exchange' },
-    { id: 'stonk', name: 'Stonk' },
-    { id: 'openlaunch', name: 'OpenLaunch' },
+    { id: 'o1exchange', name: 'O1 Exchange', logo: '/assets/1791781275000-fjxpw0.png', initials: 'O1', brandColor: '#0052FF' },
+    { id: 'stonk', name: 'Stonk', logo: '/images/launchpads/stonk-fun.png', initials: 'ST', brandColor: '#2E7D32' },
+    { id: 'openlaunch', name: 'OpenLaunch', logo: '/images/launchpads/openlaunch.svg', initials: 'OL', brandColor: '#0052FF' },
   ],
   RH: [
-    { id: 'pons', name: 'Pons' },
-    { id: 'longpad', name: 'Longpad' },
-    { id: 'openlaunch', name: 'OpenLaunch' },
+    { id: 'pons', name: 'Pons', logo: '/images/launchpads/pons.png', initials: 'PN', brandColor: '#F57F17' },
+    { id: 'longpad', name: 'Longpad', logo: '', initials: 'LP', brandColor: '#7C3AED' },
+    { id: 'openlaunch', name: 'OpenLaunch', logo: '/images/launchpads/openlaunch.svg', initials: 'OL', brandColor: '#0052FF' },
   ],
   SOL: [
-    { id: 'pumpfun', name: 'Pump.fun' },
-    { id: 'stonkfun', name: 'Stonkfun' },
+    { id: 'pumpfun', name: 'Pump.fun', logo: '/assets/1791780232085-5hdc0n.png', initials: 'PF', brandColor: '#5FCB88' },
+    { id: 'stonkfun', name: 'Stonkfun', logo: '/assets/1791780570183-l76tqa.png', initials: 'SF', brandColor: '#E64A19' },
   ],
   INK: [
-    { id: 'inkypump', name: 'InkyPump' },
+    { id: 'inkypump', name: 'InkyPump', logo: '', initials: 'IP', brandColor: '#7B3FE4' },
   ],
   ARC: [
-    { id: 'archway', name: 'Archway Launch' },
+    { id: 'archway', name: 'Archway Launch', logo: '', initials: 'AL', brandColor: '#E84142' },
   ],
   STABLE: [
-    { id: 'stablefun', name: 'Stable Launch' },
+    { id: 'stablefun', name: 'Stable Launch', logo: '', initials: 'SL', brandColor: '#26A17B' },
   ],
   TRON: [
-    { id: 'sunpump', name: 'SunPump' },
+    { id: 'sunpump', name: 'SunPump', logo: '', initials: 'SP', brandColor: '#EF0027' },
   ],
 };
 
