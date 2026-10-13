@@ -12,7 +12,7 @@ import { gitlawb } from '../lib/gitlawb';
 
 import MarketOverview from './markets/MarketOverview';
 import { type SubFilter, getSubFilterCategory, applySubFilter } from './markets/SubFilterBar';
-import PumpFunMarketSection from './markets/PumpFunMarketSection';
+import MarketSection from './markets/MarketSection';
 import FilterDrawer, { type FilterState, DEFAULT_FILTERS as FILTER_DEFAULTS } from './markets/FilterDrawer';
 import MarketTable from './markets/MarketTable';
 import MarketMobileList from './markets/MarketMobileList';
@@ -203,63 +203,8 @@ export default function MarketsPage() {
       {/* ── MARKET OVERVIEW ────────────────────────────────── */}
       <MarketOverview tokens={tokens} loading={loading} />
 
-      {/* ── UNIFIED FILTER TOOLBAR ────────────────────────── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '8px 16px', borderBottom: '1px solid var(--border)',
-        overflowX: 'auto', scrollbarWidth: 'none', flexShrink: 0,
-        background: 'var(--bg-surface)',
-      }}>
-        {(
-          [
-            { id: 'trending', label: '🔥 Trending' },
-            { id: 'new', label: '✨ New' },
-            { id: 'bonding', label: '🫧 Bonding' },
-            { id: 'migrated', label: '🔄 Migrated' },
-            { id: 'gainers', label: '📈 Gainers' },
-            { id: 'losers', label: '📉 Losers' },
-          ] as const
-        ).map(f => (
-          <button
-            key={f.id}
-            onClick={() => { setSubFilter(f.id); setPageNum(0); }}
-            style={{
-              padding: '5px 12px', borderRadius: 16, cursor: 'pointer',
-              fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
-              background: subFilter === f.id ? '#1A1A2E' : 'transparent',
-              color: subFilter === f.id ? '#fff' : 'var(--text-dim, #6B7280)',
-              border: subFilter === f.id ? '2px solid #1A1A2E' : '2px solid var(--border, #E5E7EB)',
-              transition: 'all 0.15s',
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
-        {/* Separator */}
-        <div style={{ width: 1, height: 20, background: 'var(--border)', flexShrink: 0 }} />
-        {/* Chain chips */}
-        {(['all', 'sol', 'bsc', 'base'] as const).map(c => (
-          <button
-            key={c}
-            onClick={() => { setChain(c as any); setSelectedLaunchpad(null); setPageNum(0); }}
-            style={{
-              padding: '5px 10px', borderRadius: 14, cursor: 'pointer',
-              fontSize: 9, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
-              background: chain === c ? '#22C55E' : 'transparent',
-              color: chain === c ? '#fff' : 'var(--text-dim, #9CA3AF)',
-              border: chain === c ? '2px solid #22C55E' : '1px solid var(--border, #E5E7EB)',
-              transition: 'all 0.15s',
-            }}
-          >
-            {c === 'all' ? 'All Chains' : c === 'sol' ? '◎ SOL' : c === 'bsc' ? '◆ BSC' : '⬡ Base'}
-          </button>
-        ))}
-      </div>
-
-      {/* ── PUMP.FUN LIVE TOKEN TABLE ──────────────────────── */}
-      <div style={{ padding: '0 16px 12px' }}>
-        <PumpFunMarketSection subFilter={subFilter} launchpad={selectedLaunchpad || 'pumpfun'} />
-      </div>
+      {/* ── MARKET SECTION (Chain → Launchpad → Filter → Tokens) ─ */}
+      <MarketSection />
 
           {/* ── TOOLBAR (sort + filter) ──────────────────────────── */}
           <div style={{
