@@ -14,6 +14,7 @@ import MarketOverview from './markets/MarketOverview';
 import MarketChainFilter from './markets/MarketChainFilter';
 import LaunchpadLogoSelector from './markets/LaunchpadLogoSelector';
 import SubFilterBar, { type SubFilter, getSubFilterCategory, applySubFilter } from './markets/SubFilterBar';
+import PumpFunMarketSection from './markets/PumpFunMarketSection';
 import FilterDrawer, { type FilterState, DEFAULT_FILTERS as FILTER_DEFAULTS } from './markets/FilterDrawer';
 import MarketTable from './markets/MarketTable';
 import MarketMobileList from './markets/MarketMobileList';
@@ -218,6 +219,11 @@ export default function MarketsPage() {
 
       {/* ── ROW 3: SUB-FILTER BAR [New] [Bonding] [Migrated] [Gainers] [Losers] ─ */}
       <SubFilterBar active={subFilter} onChange={v => { setSubFilter(v); setPageNum(0); }} />
+
+      {/* ── ROW 4: PUMP.FUN LIVE TOKEN TABLE ──────────────────── */}
+      <div style={{ padding: '0 16px 12px' }}>
+        <PumpFunMarketSection />
+      </div>
 
           {/* ── TOOLBAR (sort + filter) ──────────────────────────── */}
           <div style={{
