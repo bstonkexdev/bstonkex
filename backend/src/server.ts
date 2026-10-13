@@ -16,6 +16,7 @@ import { isDbConfigured, pingDb, closePool, getDbStatus } from './db/pool.js';
 import { runMigrations, getMigrationStatus } from './db/migrate.js';
 import { routeRewards } from './reward-routes.js';
 import { LAUNCHPAD_CONFIG, getAllLaunchpads, getLaunchpad } from './config/launchpads.js';
+import { startMultiChainListeners, getListenerHealth, stopMultiChainListeners } from './multi-chain-listener.js';
 
 // ── Configuration ────────────────────────────────────────────
 
@@ -761,6 +762,19 @@ function connectPumpPortal(): void {
 // Start PumpPortal stream on server boot
 connectPumpPortal();
 
+// Start Multi-Chain Factory Event Listeners
+startMultiChainListeners(
+  // Ingest callback: writes to trenches-store + enriches metadata
+  (event) => ingestTokenEvent(event),
+  // Broadcast callback: push to all connected WS clients
+  (data) => {
+    const msg = JSON.stringify(data);
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) client.send(msg);
+    });
+  },
+);
+
 // Discovery routes now include token data + PumpPortal health
 const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse) => void> = {
   'GET /api/discovery/status': (_req, res) => {
@@ -827,10 +841,17 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
     }));
   },
 
-  // GET /api/launchpads/status — per-chain readiness + token counts
+  // GET /api/launchpads/status — per-chain readiness + token counts + listener health
   'GET /api/launchpads/status': (_req, res) => {
     const { zrevrange } = require('./trenches-store.js');
-    const status: Record<string, { chainId: string | number; launchpads: Array<{ id: string; name: string; tokenCount: number; hasData: boolean }> }> = {};
+    const health = getListenerHealth();
+    const healthMap = new Map<string, typeof health[number]>();
+    for (const h of health) healthMap.set(`${h.chain}:${h.launchpad}`, h);
+
+    const status: Record<string, { chainId: string | number; launchpads: Array<{
+      id: string; name: string; tokenCount: number; hasData: boolean;
+      listenerConnected: boolean; eventsReceived: number; lastError: string | null;
+    }> }> = {};
 
     for (const [chainKey, config] of Object.entries(LAUNCHPAD_CONFIG)) {
       status[chainKey] = {
@@ -838,11 +859,15 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
         launchpads: config.launchpads.map(lp => {
           const flatKey = `trenches:${lp.id}`;
           const mints = zrevrange(flatKey, 0, -1) || [];
+          const h = healthMap.get(`${chainKey}:${lp.id}`);
           return {
             id: lp.id,
             name: lp.name,
             tokenCount: mints.length,
             hasData: mints.length > 0,
+            listenerConnected: h?.connected || false,
+            eventsReceived: h?.eventsReceived || 0,
+            lastError: h?.lastError || null,
           };
         }),
       };
