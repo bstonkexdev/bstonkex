@@ -94,11 +94,24 @@ export default function MarketSection() {
     return () => { cancelled = true; };
   }, [chain, launchpad, subFilter]);
 
-  // 2. Live WS merge
+  // 2. Live WS merge — handles both new tokens AND metadata-resolved updates
   useEffect(() => {
     const unsub = onTokenCreate((r: any) => {
       setTokens(prev => {
-        if (prev.some(t => t.mint === r.address)) return prev;
+        const existingIdx = prev.findIndex(t => t.mint === r.address);
+        if (existingIdx >= 0) {
+          // Update existing token (metadata resolved → real image URL)
+          const updated = [...prev];
+          const existing = updated[existingIdx];
+          updated[existingIdx] = {
+            ...existing,
+            image: r.icon || existing.image, // Replace with resolved image if available
+            name: r.name || existing.name,
+            symbol: r.symbol || existing.symbol,
+          };
+          return updated;
+        }
+        // New token — prepend
         return [{
           mint: r.address, name: r.name || 'Unknown', symbol: r.symbol || '???',
           image: r.icon || null, progress: r.bondingCurveProgress ?? 0,

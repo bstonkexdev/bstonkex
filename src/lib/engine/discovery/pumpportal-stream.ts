@@ -190,7 +190,7 @@ function buildTokenRecord(event: PumpPortalCreateEvent): TokenIndexRecord {
     routeBothVerified: false,
     name: event.name || null,
     symbol: event.symbol || null,
-    icon: event.uri ?? null,
+    icon: null, // Resolved async from metadataUri — don't store JSON URI as icon
     websites: null,
     socials: null,
     createdAt: Date.now(),
@@ -200,6 +200,71 @@ function buildTokenRecord(event: PumpPortalCreateEvent): TokenIndexRecord {
 
 // SOL/USD price — cached from enrichment or fallback
 let _solUsd = 200; // fallback until sol-price module provides real value
+
+// ── Async Metadata Resolution (IPFS → image URL) ─────────────
+const IPFS_GATEWAYS = [
+  'https://cf-ipfs.com/ipfs/',
+  'https://gateway.pinata.cloud/ipfs/',
+  'https://cloudflare-ipfs.com/ipfs/',
+  'https://ipfs.io/ipfs/',
+  'https://dweb.link/ipfs/',
+];
+
+function extractIpfsHash(uri: string): string | null {
+  if (!uri) return null;
+  if (uri.startsWith('ipfs://')) return uri.replace('ipfs://', '').replace(/^ipfs\//, '');
+  const match = uri.match(/\/ipfs\/([a-zA-Z0-9]+)/);
+  return match ? match[1] : null;
+}
+
+function gatewayUrls(uri: string): string[] {
+  const hash = extractIpfsHash(uri);
+  if (!hash) return [uri];
+  return IPFS_GATEWAYS.map(gw => gw + hash);
+}
+
+/**
+ * Fetch token metadata JSON from URI (with gateway rotation),
+ * extract the image URL, and notify listeners with the resolved icon.
+ */
+async function resolveTokenMetadata(mint: string, metadataUri: string, baseRecord: TokenIndexRecord): Promise<void> {
+  try {
+    const urls = gatewayUrls(metadataUri);
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+        if (!res.ok) continue;
+        const meta = await res.json();
+        const rawImage = meta.image || meta.image_uri || meta.image_url || '';
+        if (!rawImage) return;
+
+        // Convert ipfs:// image URLs to HTTPS gateway URLs
+        const imgHash = extractIpfsHash(rawImage);
+        const imageUrl = imgHash ? IPFS_GATEWAYS[0] + imgHash : rawImage;
+
+        // Build updated record and notify listeners
+        const socials: { platform: string; url: string }[] = [];
+        const tw = meta.twitter || meta.extensions?.twitter || '';
+        const tg = meta.telegram || meta.extensions?.telegram || '';
+        if (tw) socials.push({ platform: 'twitter', url: tw });
+        if (tg) socials.push({ platform: 'telegram', url: tg });
+
+        const updated: TokenIndexRecord = {
+          ...baseRecord,
+          icon: imageUrl,
+          websites: meta.website || meta.extensions?.website || null,
+          socials: socials.length ? socials : null,
+          updatedAt: Date.now(),
+        };
+
+        for (const listener of createListeners) {
+          try { listener(updated); } catch { /* listener error */ }
+        }
+        return; // Success — stop trying gateways
+      } catch { /* try next gateway */ }
+    }
+  } catch { /* metadata resolution is best-effort */ }
+}
 
 function handleMessage(data: string): void {
   try {
@@ -241,9 +306,14 @@ function handleMessage(data: string): void {
       const record = buildTokenRecord(event);
       indexToken(record).catch(() => {});
 
-      // Notify UI listeners
+      // Notify UI listeners (immediate — image pending)
       for (const listener of createListeners) {
         try { listener(record); } catch { /* listener error shouldn't break stream */ }
+      }
+
+      // Resolve metadata URI → real image URL (async, non-blocking)
+      if (event.uri) {
+        resolveTokenMetadata(event.mint, event.uri, record);
       }
 
       stats.tokensCreated++;
