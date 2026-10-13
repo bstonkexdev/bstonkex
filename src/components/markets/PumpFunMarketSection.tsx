@@ -245,22 +245,14 @@ export default function PumpFunMarketSection() {
             >
               {/* Token Info */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {token.image ? (
-                  <img
-                    src={token.image}
-                    alt={token.symbol}
-                    style={{ width: 32, height: 32, borderRadius: 16, objectFit: 'cover' }}
-                  />
-                ) : (
-                  <div style={{
-                    width: 32, height: 32, borderRadius: 16,
-                    background: 'linear-gradient(135deg, #22C55E22, #22C55E11)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 10, fontWeight: 700, color: '#22C55E',
-                  }}>
-                    {token.symbol.slice(0, 2)}
-                  </div>
-                )}
+                <img
+                  src={token.image && token.image.startsWith('http') ? token.image : '/fallback-token-icon.svg'}
+                  alt={token.symbol}
+                  style={{ width: 32, height: 32, borderRadius: 16, objectFit: 'cover', background: 'var(--bg-elevated, #1A1A2E)' }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/fallback-token-icon.svg';
+                  }}
+                />
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text, #111827)' }}>
                     {token.name}
