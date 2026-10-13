@@ -31,12 +31,11 @@ export const CHAINS = [
 ] as const;
 
 export const FILTER_TABS = [
-  { id: 'trending', label: '🔥 Trending' },
-  { id: 'new', label: '✨ New' },
-  { id: 'bonding', label: '🫧 Bonding' },
-  { id: 'migrated', label: '🔄 Migrated' },
-  { id: 'gainers', label: '📈 Gainers' },
-  { id: 'losers', label: '📉 Losers' },
+  { id: 'trending', label: 'Trending' },
+  { id: 'new', label: 'New' },
+  { id: 'bonding', label: 'Bonding' },
+  { id: 'migrated', label: 'Migrated' },
+  { id: 'gainers', label: 'Gainers' },
 ] as const;
 
 export function getLaunchpadName(id: string): string {

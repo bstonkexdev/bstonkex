@@ -119,7 +119,7 @@ export default function MarketSection() {
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 16px' }}>
 
       {/* ══════════ TIER 1: CHAIN SELECTOR ══════════ */}
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
         {CHAINS.map(ch => {
           const active = selectedChain === ch.key;
           return (
@@ -133,9 +133,9 @@ export default function MarketSection() {
               style={{
                 padding: '7px 16px', borderRadius: 20, cursor: 'pointer', flexShrink: 0,
                 fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
-                background: active ? '#EC489922' : 'var(--bg-surface, #111827)',
-                color: active ? '#EC4899' : 'var(--text-dim, #9CA3AF)',
-                border: `2px solid ${active ? '#EC4899' : 'var(--border, #1F2937)'}`,
+                background: active ? 'rgba(236,72,153,0.12)' : '#111827',
+                color: active ? '#F472B6' : '#9CA3AF',
+                border: `1.5px solid ${active ? '#EC4899' : '#1F2937'}`,
                 transition: 'all 0.15s',
               }}
             >
@@ -177,11 +177,11 @@ export default function MarketSection() {
         </div>
       )}
 
-      {/* ══════════ TIER 3: FILTER BAR ══════════ */}
+      {/* ══════════ TIER 3: FILTER BAR (Ave.ai Style) ══════════ */}
       <div style={{
-        display: 'flex', gap: 4, overflowX: 'auto', scrollbarWidth: 'none',
-        background: 'var(--bg-surface, rgba(0,0,0,0.3))',
-        padding: 4, borderRadius: 12,
+        display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none',
+        background: '#111827', padding: 6, borderRadius: 14,
+        border: '1px solid #1F2937',
       }}>
         {FILTER_TABS.map(tab => {
           const active = activeTab === tab.id;
@@ -190,10 +190,10 @@ export default function MarketSection() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                flex: 1, padding: '7px 10px', borderRadius: 9, cursor: 'pointer',
+                flex: 1, padding: '8px 12px', borderRadius: 10, cursor: 'pointer',
                 fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', textAlign: 'center',
                 background: active ? '#DB2777' : 'transparent',
-                color: active ? '#fff' : 'var(--text-dim, #9CA3AF)',
+                color: active ? '#fff' : '#9CA3AF',
                 transition: 'all 0.15s',
                 boxShadow: active ? '0 2px 8px rgba(219,39,119,0.35)' : 'none',
               }}
@@ -223,12 +223,12 @@ export default function MarketSection() {
                 style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '12px 14px', borderRadius: 14, cursor: 'pointer',
-                  background: 'var(--bg-surface, #111827)',
-                  border: '1px solid var(--border, #1F2937)',
+                  background: '#111827',
+                  border: '1px solid #1F2937',
                   transition: 'border-color 0.15s',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text-dim, #374151)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border, #1F2937)'; }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#374151'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#1F2937'; }}
               >
                 {/* Left: Token Identity */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
@@ -245,31 +245,31 @@ export default function MarketSection() {
                   <div>
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: 6,
-                      fontSize: 13, fontWeight: 700, color: 'var(--text, #F9FAFB)',
+                      fontSize: 13, fontWeight: 700, color: '#fff',
                     }}>
                       {token.symbol}
                       <span style={{
-                        fontSize: 9, padding: '1px 5px', borderRadius: 6,
-                        background: '#22C55E22', color: '#22C55E', fontWeight: 700,
+                        fontSize: 9, padding: '1px 5px', borderRadius: 4,
+                        background: 'rgba(16,185,129,0.15)', color: '#34D399', fontWeight: 700,
                       }}>pump</span>
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim, #9CA3AF)', marginTop: 2 }}>
-                      {formatAge(token.createdAt)} • {formatMcap(token.mcap)}
+                    <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2 }}>
+                      {formatAge(token.createdAt)} • {formatMcap(token.mcap)} MCAP
                       {token.holders > 0 && <span> • {formatHolders(token.holders)} holders</span>}
                     </div>
                   </div>
                 </div>
 
-                {/* Right: Price + Change */}
+                {/* Right: Price & 24h Change */}
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text, #E5E7EB)', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#E5E7EB', fontFamily: 'monospace' }}>
                     {formatPrice(token.priceUsd)}
                   </div>
                   <div style={{
                     fontSize: 10, fontWeight: 700,
                     color: isPositive ? '#34D399' : '#FB7185',
                   }}>
-                    {isPositive ? '+' : ''}{token.priceChange24h.toFixed(2)}%
+                    {isPositive ? '+' : ''}{token.priceChange24h.toFixed(1)}%
                   </div>
                 </div>
               </div>
