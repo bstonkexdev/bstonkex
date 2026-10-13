@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { onTokenCreate, getStreamHealth, getLivePrice } from '../../lib/engine/discovery/pumpportal-stream';
 import { CHAIN_LIST, LAUNCHPADS_BY_CHAIN, FILTER_TABS, getChainInfo } from './ChainLaunchpads';
+import TokenAvatar from './TokenAvatar';
 
 interface Token {
   mint: string; name: string; symbol: string; image: string | null;
@@ -18,21 +19,18 @@ function fmtMcap(v: number): string {
 function fmtPrice(p: number): string {
   return p === 0 ? '$0.0000' : p < 0.000001 ? `$${p.toExponential(2)}` : `$${p.toFixed(4)}`;
 }
-function fmtHolders(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n);
-}
 
 const API = 'https://api.bstonkex.xyz';
 
 // Sky blue palette
-const SKY_BG = '#E0F2FE';       // main box background
-const SKY_BG_LIGHT = '#F0F9FF'; // lighter cards
-const SKY_BG_MED = '#BAE6FD';   // medium — launchpad buttons, filter bar
-const SKY_BORDER = '#7DD3FC';   // borders
-const SKY_ACCENT = '#0284C7';   // active accent (sky-600)
-const DARK_TEXT = '#0C2340';    // primary text — very dark navy
-const MID_TEXT = '#3B5998';     // secondary text — readable mid-tone
-const LIGHT_TEXT = '#5B8DB8';   // tertiary / hints
+const SKY_BG = '#E0F2FE';
+const SKY_BG_LIGHT = '#F0F9FF';
+const SKY_BG_MED = '#BAE6FD';
+const SKY_BORDER = '#7DD3FC';
+const SKY_ACCENT = '#0284C7';
+const DARK_TEXT = '#0C2340';
+const MID_TEXT = '#3B5998';
+const LIGHT_TEXT = '#5B8DB8';
 
 export default function MarketSection() {
   const [chain, setChain] = useState<string>('SOL');
@@ -44,6 +42,7 @@ export default function MarketSection() {
   const [chainDrawerOpen, setChainDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
 
+  // Close chain drawer on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) setChainDrawerOpen(false);
@@ -59,15 +58,17 @@ export default function MarketSection() {
     setChainDrawerOpen(false);
   }
 
+  // 1. Fetch cached tokens instantly
   useEffect(() => {
     if (!launchpad) { setLoading(false); return; }
     let cancelled = false;
     async function fetchCached() {
       setLoading(true);
       try {
-        const res = await fetch(`${API}/api/tokens/cached?chain=${chain.toLowerCase()}&launchpad=${launchpad.toLowerCase()}&subFilter=${subFilter}`);
+        const query = `chain=${chain.toLowerCase()}&launchpad=${launchpad.toLowerCase()}&subFilter=${subFilter}`;
+        const res = await fetch(`${API}/api/tokens/cached?${query}`);
         const data = await res.json();
-        if (!cancelled && Array.isArray(data) && data.length > 0) {
+        if (!cancelled && Array.isArray(data)) {
           setTokens(data.map((t: any) => ({
             mint: t.mint || '', name: t.name || 'Unknown', symbol: t.symbol || '???',
             image: t.image || t.icon || null,
@@ -86,6 +87,7 @@ export default function MarketSection() {
     return () => { cancelled = true; };
   }, [chain, launchpad, subFilter]);
 
+  // 2. Live WS merge
   useEffect(() => {
     const unsub = onTokenCreate((r: any) => {
       setTokens(prev => {
@@ -109,6 +111,7 @@ export default function MarketSection() {
     return () => { unsub(); clearInterval(iv); };
   }, []);
 
+  // 3. Client-side filter
   const filtered = tokens.filter(t => {
     switch (subFilter) {
       case 'bonding': return t.progress < 100;
@@ -125,7 +128,7 @@ export default function MarketSection() {
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 16px', fontFamily: 'monospace' }}>
 
-      {/* ═══ TIER 1: CHAIN DRAWER ═══ */}
+      {/* ═══ TIER 1: CHAIN DRAWER (dropdown) ═══ */}
       <div ref={drawerRef} style={{ position: 'relative' }}>
         <button
           onClick={() => setChainDrawerOpen(!chainDrawerOpen)}
@@ -147,12 +150,8 @@ export default function MarketSection() {
             }}>{chain[0]}</div>
           )}
           <div style={{ flex: 1, textAlign: 'left' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: DARK_TEXT }}>
-              {activeChain?.label || chain}
-            </div>
-            <div style={{ fontSize: 9, color: MID_TEXT }}>
-              {LAUNCHPADS_BY_CHAIN[chain]?.length || 0} launchpads
-            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: DARK_TEXT }}>{activeChain?.label || chain}</div>
+            <div style={{ fontSize: 9, color: MID_TEXT }}>{LAUNCHPADS_BY_CHAIN[chain]?.length || 0} launchpads</div>
           </div>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{
             transform: chainDrawerOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s',
@@ -178,11 +177,11 @@ export default function MarketSection() {
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 12,
                     padding: '12px 16px', cursor: 'pointer',
-                    background: active ? '#BAE6FD' : 'transparent',
+                    background: active ? SKY_BG_MED : 'transparent',
                     border: 'none', borderBottom: `1px solid ${SKY_BORDER}`,
                     textAlign: 'left',
                   }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#F0F9FF'; }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = SKY_BG_LIGHT; }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                 >
                   {c.logo ? (
@@ -196,12 +195,8 @@ export default function MarketSection() {
                     }}>{c.label[0]}</div>
                   )}
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: active ? SKY_ACCENT : DARK_TEXT }}>
-                      {c.label}
-                    </div>
-                    <div style={{ fontSize: 10, color: LIGHT_TEXT }}>
-                      {padCount} launchpad{padCount !== 1 ? 's' : ''}
-                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: active ? SKY_ACCENT : DARK_TEXT }}>{c.label}</div>
+                    <div style={{ fontSize: 10, color: LIGHT_TEXT }}>{padCount} launchpad{padCount !== 1 ? 's' : ''}</div>
                   </div>
                   {active && <div style={{ width: 8, height: 8, borderRadius: 4, background: SKY_ACCENT }} />}
                 </button>
@@ -237,28 +232,23 @@ export default function MarketSection() {
               >
                 {pad.logo ? (
                   <img
-                    src={pad.logo}
-                    alt=""
+                    src={pad.logo} alt=""
                     style={{ width: 16, height: 16, borderRadius: 8, objectFit: 'cover', background: '#fff' }}
                     onError={e => {
                       const el = e.target as HTMLImageElement;
                       el.style.display = 'none';
-                      // Show initials badge as fallback
                       const badge = el.nextElementSibling as HTMLElement;
                       if (badge) badge.style.display = 'flex';
                     }}
                   />
                 ) : null}
-                <span
-                  className="launchpad-initials-badge"
-                  style={{
-                    display: pad.logo ? 'none' : 'flex',
-                    width: 16, height: 16, borderRadius: 8,
-                    background: pad.brandColor, color: '#fff',
-                    alignItems: 'center', justifyContent: 'center',
-                    fontSize: 7, fontWeight: 800, flexShrink: 0,
-                  }}
-                >{pad.initials}</span>
+                <span style={{
+                  display: pad.logo ? 'none' : 'flex',
+                  width: 16, height: 16, borderRadius: 8,
+                  background: pad.brandColor, color: '#fff',
+                  alignItems: 'center', justifyContent: 'center',
+                  fontSize: 7, fontWeight: 800, flexShrink: 0,
+                }}>{pad.initials}</span>
                 <span>{pad.name}</span>
               </button>
             );
@@ -295,12 +285,24 @@ export default function MarketSection() {
 
       {/* ═══ TIER 4: TOKEN FEED ═══ */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {filtered.length === 0 ? (
+        {loading ? (
           <div style={{
             textAlign: 'center', padding: '48px 16px', color: MID_TEXT, fontSize: 13,
             border: `2px dashed ${SKY_BORDER}`, borderRadius: 14, background: SKY_BG_LIGHT,
           }}>
-            {loading ? 'Loading cached tokens...' : `Waiting for ${launchpad ? launchpad.toUpperCase() : chain} token launches...`}
+            <div style={{
+              width: 24, height: 24, borderRadius: 12,
+              border: `3px solid ${SKY_BORDER}`, borderTopColor: SKY_ACCENT,
+              animation: 'spin 0.8s linear infinite', margin: '0 auto 12px',
+            }} />
+            Loading cached tokens...
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{
+            textAlign: 'center', padding: '48px 16px', color: MID_TEXT, fontSize: 13,
+            border: `2px dashed ${SKY_BORDER}`, borderRadius: 14, background: SKY_BG_LIGHT,
+          }}>
+            No cached tokens found for <strong>{launchpad ? launchpad.toUpperCase() : chain}</strong>.
           </div>
         ) : (
           filtered.slice(0, 50).map(t => {
@@ -317,16 +319,9 @@ export default function MarketSection() {
                 onMouseEnter={e => { e.currentTarget.style.borderColor = SKY_ACCENT; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = SKY_BORDER; }}
               >
+                {/* Left: Avatar + Identity */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <img
-                    src={t.image && t.image.startsWith('http') ? t.image : '/fallback-token-icon.svg'}
-                    alt={t.symbol}
-                    style={{
-                      width: 36, height: 36, borderRadius: 18,
-                      background: '#E0E7FF', border: '1.5px solid #C7D2FE', objectFit: 'cover',
-                    }}
-                    onError={e => { (e.target as HTMLImageElement).src = '/fallback-token-icon.svg'; }}
-                  />
+                  <TokenAvatar src={t.image} symbol={t.symbol} />
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: DARK_TEXT }}>
                       {t.symbol}
@@ -336,11 +331,12 @@ export default function MarketSection() {
                       }}>{chain.toLowerCase()}</span>
                     </div>
                     <div style={{ fontSize: 10, color: MID_TEXT, marginTop: 2 }}>
-                      {age(t.createdAt)} • {fmtMcap(t.mcap)}
-                      {t.holders > 0 && ` • ${fmtHolders(t.holders)} holders`}
+                      {t.name} • {fmtMcap(t.mcap)} MCAP
                     </div>
                   </div>
                 </div>
+
+                {/* Right: Price & Change */}
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: DARK_TEXT }}>{fmtPrice(t.priceUsd)}</div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: pos ? '#059669' : '#DC2626' }}>
@@ -361,6 +357,8 @@ export default function MarketSection() {
         <div style={{ width: 6, height: 6, borderRadius: 3, background: connected ? '#059669' : '#DC2626' }} />
         {connected ? 'LIVE · PumpPortal WebSocket' : 'OFFLINE · Reconnecting...'}
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
