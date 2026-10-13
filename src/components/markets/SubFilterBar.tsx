@@ -4,7 +4,7 @@
 
 import type { DiscoveryCategory } from '../../lib/market-discovery';
 
-export type SubFilter = 'new' | 'bonding' | 'migrated' | 'gainers' | 'losers';
+export type SubFilter = 'trending' | 'new' | 'bonding' | 'migrated' | 'gainers' | 'losers';
 
 interface SubFilterDef {
   id: SubFilter;
@@ -17,6 +17,10 @@ interface SubFilterDef {
 }
 
 export const SUB_FILTERS: SubFilterDef[] = [
+  {
+    id: 'trending', label: 'Trending', icon: '🔥', mapped: 'trending',
+    tip: 'Trending tokens by holders and market cap',
+  },
   {
     id: 'new', label: 'New', icon: '✨', mapped: 'new',
     tip: 'Newest launches sorted by creation time',
