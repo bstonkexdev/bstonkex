@@ -10,6 +10,7 @@ import { createBagsApiAdapter } from './adapters/bags-api';
 import { createDexScreenerNewPairsAdapter } from './adapters/dexscreener-newpairs';
 import { createPumpSwapAdapter } from './adapters/pumpswap-amm';
 import { createRaydiumCpmmAdapter } from './adapters/raydium-cpmm';
+import { createGeckoTerminalNewPoolsAdapter } from './adapters/geckoterminal-newpools';
 
 // ── Registered Adapters (verified sources only) ─────────────
 
@@ -47,6 +48,10 @@ registerAdapter(createRaydiumCpmmAdapter()); // Raydium CPMM (memecoin pools)
 // a native adapter for yet (Meteora, Orca, PancakeSwap, Uniswap, FOUR.MEME,
 // FLAP, Moonshot, etc.).
 registerAdapter(createDexScreenerNewPairsAdapter());
+// GeckoTerminal new-pools: the most comprehensive real-time source — covers
+// ALL Solana DEXes (Pump.fun, Raydium, Meteora, Orca, Jupiter, etc.) and
+// provides price/volume/liquidity inline (no separate enrichment needed).
+registerAdapter(createGeckoTerminalNewPoolsAdapter());
 
 // ── Discovery Service ───────────────────────────────────────
 
@@ -74,35 +79,44 @@ export async function runDiscoveryCycle(): Promise<{
       // Scan
       const result = await adapter.scan(cursor);
 
-      // Persist discovered tokens (idempotent)
-      const fullRecords: TokenIndexRecord[] = result.tokens.map(t => ({
-        chainId: t.chainId!,
-        address: t.address!,
-        launchpadId: t.launchpadId!,
-        launchpadName: t.launchpadName!,
-        creator: t.creator ?? null,
-        launchTimestamp: t.launchTimestamp!,
-        blockNumber: t.blockNumber ?? null,
-        solanaSlot: t.solanaSlot ?? null,
-        sourceTxHash: t.sourceTxHash!,
-        sourceLogIndex: t.sourceLogIndex ?? 0,
-        discoverySource: t.discoverySource!,
-        discoveryStatus: t.discoveryStatus!,
-        marketDataStatus: t.marketDataStatus!,
-        lastEnrichedAt: null,
-        price: null, volume24h: null, liquidity: null, marketCap: null,
-        priceSource: 'none', liquidityType: null,
-        marketState: (t as any).marketState ?? 'unknown',
-        tradeCount24h: null, buys24h: null, sells24h: null,
-        holdersEstimate: null, bondingCurveProgress: null,
-        routeVerified: false, routeVerifiedAt: null, routeProvider: null,
-        routeDirection: null, routeError: null,
-        routeBuyVerified: false, routeSellVerified: false,
-        routeBothVerified: false,
-        name: t.name ?? null, symbol: t.symbol ?? null, icon: t.icon ?? null,
-        websites: t.websites ?? null, socials: t.socials ?? null,
-        createdAt: Date.now(), updatedAt: Date.now(),
-      }));
+      // Persist discovered tokens (idempotent).
+      // Preserve market data from adapters that provide it (e.g. GeckoTerminal
+      // returns price/volume/liquidity inline — no separate enrichment needed).
+      const fullRecords: TokenIndexRecord[] = result.tokens.map(t => {
+        const hasMarketData = (t as any).price != null;
+        return {
+          chainId: t.chainId!,
+          address: t.address!,
+          launchpadId: t.launchpadId!,
+          launchpadName: t.launchpadName!,
+          creator: t.creator ?? null,
+          launchTimestamp: t.launchTimestamp!,
+          blockNumber: t.blockNumber ?? null,
+          solanaSlot: t.solanaSlot ?? null,
+          sourceTxHash: t.sourceTxHash!,
+          sourceLogIndex: t.sourceLogIndex ?? 0,
+          discoverySource: t.discoverySource!,
+          discoveryStatus: t.discoveryStatus!,
+          marketDataStatus: hasMarketData ? 'enriched' : t.marketDataStatus!,
+          lastEnrichedAt: hasMarketData ? Date.now() : null,
+          price: (t as any).price ?? null,
+          volume24h: (t as any).volume24h ?? null,
+          liquidity: (t as any).liquidity ?? null,
+          marketCap: (t as any).marketCap ?? null,
+          priceSource: hasMarketData ? 'dex_pair' : 'none',
+          liquidityType: (t as any).liquidity != null ? 'real' : null,
+          marketState: (t as any).marketState ?? 'unknown',
+          tradeCount24h: null, buys24h: null, sells24h: null,
+          holdersEstimate: null, bondingCurveProgress: null,
+          routeVerified: false, routeVerifiedAt: null, routeProvider: null,
+          routeDirection: null, routeError: null,
+          routeBuyVerified: false, routeSellVerified: false,
+          routeBothVerified: false,
+          name: t.name ?? null, symbol: t.symbol ?? null, icon: t.icon ?? null,
+          websites: t.websites ?? null, socials: t.socials ?? null,
+          createdAt: Date.now(), updatedAt: Date.now(),
+        };
+      });
 
 
 
