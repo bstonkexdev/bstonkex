@@ -78,7 +78,7 @@ export default function LandingFooter() {
         flexWrap: 'wrap', gap: 8,
       }}>
         <div style={{ fontSize: 7, color: 'var(--text-muted)' }}>
-          © {new Date().getFullYear()} Cupcak8 Swap — All market data from DexScreener. Not financial advice.
+          © {new Date().getFullYear()} Cupcak8 Swap — Market data for informational purposes only. Not financial advice.
         </div>
         <div style={{ fontSize: 7, color: 'var(--text-muted)' }}>
           Risk Disclosure: Trading digital assets involves substantial risk of loss.

@@ -17,7 +17,7 @@ const ENV_VARS: EnvVar[] = [
   { key: 'VITE_BNB_RPC_PRIMARY', name: 'BNB RPC', category: 'RPC', required: false, sensitive: false, description: 'Default: bsc-dataseed1.binance.org' },
   { key: 'VITE_BASE_RPC_PRIMARY', name: 'Base RPC', category: 'RPC', required: false, sensitive: false, description: 'Default: mainnet.base.org' },
   { key: 'VITE_SOL_RPC_PRIMARY', name: 'Solana RPC', category: 'RPC', required: false, sensitive: false, description: 'Default: api.mainnet-beta.solana.com' },
-  { key: 'VITE_1INCH_API_KEY', name: '1inch API Key', category: 'API', required: false, sensitive: true, description: 'For EVM swap routing' },
+  { key: 'VITE_1INCH_API_KEY', name: 'Swap Router API Key', category: 'API', required: false, sensitive: true, description: 'For EVM swap routing' },
   { key: 'ROBINHOOD_RPC_API_KEY', name: 'Robinhood API Key', category: 'Backend', required: true, sensitive: true, description: 'Server-side only — never expose to frontend' },
 ];
 

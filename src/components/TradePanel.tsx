@@ -10,6 +10,7 @@ import { PixelDivider } from './PixelUI';
 import TradeReceipt from './TradeReceipt';
 import SecurityChecklist from './SecurityChecklist';
 import TxLifecycle from './TxLifecycle';
+import TradingToolsDrawer from './trading/TradingToolsDrawer';
 
 interface Props {
   tokenAddress: string;
@@ -48,6 +49,7 @@ export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice, init
   const [showReceipt, setShowReceipt] = useState(false);
   const [doubleSubmitGuard, setDoubleSubmitGuard] = useState(false);
   const [quoteRemainingRefresh, setQuoteRemainingRefresh] = useState(0);
+  const [showTradingTools, setShowTradingTools] = useState(false);
 
   const chain = CHAINS[activeChain];
   const effectiveSlippage = isCustomSlippage ? (parseFloat(customSlippage) || 0.5) : slippage;
@@ -386,6 +388,17 @@ export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice, init
         TRADE {tokenSymbol}
         <div style={{ flex: 1 }} />
         {wallet.connected && (
+          <button onClick={() => setShowTradingTools(v => !v)} style={{
+            fontSize: 9, fontWeight: 700, padding: '3px 8px', letterSpacing: '0.04em',
+            background: showTradingTools ? 'var(--green-bg)' : 'var(--bg-elevated)',
+            border: `1px solid ${showTradingTools ? 'var(--green)' : 'var(--border)'}`,
+            color: showTradingTools ? 'var(--green)' : 'var(--text-dim)',
+            borderRadius: 4, cursor: 'pointer', transition: 'all 0.15s',
+          }}>
+            TOOLS
+          </button>
+        )}
+        {wallet.connected && (
           <span className="text-xs" style={{ color: 'var(--text-dim)', fontWeight: 600 }}>
             {chain.nativeSymbol} {wallet.balance ? parseFloat(wallet.balance).toFixed(4) : '—'}
           </span>
@@ -568,12 +581,17 @@ export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice, init
                     {quoteRemaining > 0 ? `VALID ${quoteRemaining}s` : 'EXPIRED'}
                   </span>
                 </div>
-                {/* Advanced settings */}
-                <div style={{ marginTop: 4 }}>
-                  <button className="btn btn-sm" style={{ fontSize: 7, padding: '2px 5px', width: '100%' }}
+                {/* Trading Tools */}
+                <div style={{ marginTop: 4, display: 'flex', gap: 4 }}>
+                  <button className="btn btn-sm btn-cyan" style={{ fontSize: 7, padding: '4px 8px', flex: 1 }}
+                    onClick={() => setShowTradingTools(true)}>
+                    🎯 SL/TP TOOLS
+                  </button>
+                  <button className="btn btn-sm" style={{ fontSize: 7, padding: '4px 8px', flex: 1 }}
                     onClick={() => setShowAdvanced(v => !v)}>
                     ⚙ ADVANCED {showAdvanced ? '▴' : '▾'}
                   </button>
+                </div>
                   {showAdvanced && (
                     <div style={{ padding: '6px', fontSize: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', marginTop: 2 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -595,7 +613,6 @@ export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice, init
                       </div>
                     </div>
                   )}
-                </div>
               </div>
             )}
 
@@ -695,6 +712,16 @@ export default function TradePanel({ tokenAddress, tokenSymbol, tokenPrice, init
           </>
         )}
       </div>
+
+      {/* Trading Tools Drawer */}
+      <TradingToolsDrawer
+        open={showTradingTools}
+        onClose={() => setShowTradingTools(false)}
+        tokenSymbol={tokenSymbol}
+        tokenAddress={tokenAddress}
+        chainId={activeChain}
+        tokenPrice={tokenPrice}
+      />
     </div>
   );
 }

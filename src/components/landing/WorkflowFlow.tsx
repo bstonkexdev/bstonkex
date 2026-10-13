@@ -5,7 +5,7 @@ const STEPS = [
   {
     icon: '◎',
     label: 'DISCOVER',
-    desc: 'Multi-chain token discovery across BNB, Solana, Base, Robinhood. Real-time DexScreener data.',
+    desc: 'Multi-chain token discovery across BNB, Solana, Base, Robinhood. Real-time market data.',
     color: 'var(--cyan)',
   },
   {
@@ -17,7 +17,7 @@ const STEPS = [
   {
     icon: '⇄',
     label: 'EXECUTE',
-    desc: 'Non-custodial swaps via Jupiter, 1inch, PancakeSwap. Multi-chain routing with real gas estimates.',
+    desc: 'Non-custodial swaps with multi-chain routing and real gas estimates.',
     color: 'var(--green)',
   },
   {

@@ -14,8 +14,40 @@ interface Props {
   onQuickBuy: () => void;
 }
 
+function MarketStateBadge({ state }: { state: MarketToken['marketState'] }) {
+  const map: Record<string, { label: string; color: string; bg: string }> = {
+    bonding_curve: { label: 'CURVE', color: 'var(--cyan, #0088FF)', bg: 'var(--green-bg)' },
+    migrating:     { label: 'MIGRATING', color: 'var(--amber, #FFD700)', bg: 'var(--yellow-bg)' },
+    launched:      { label: 'LIVE', color: 'var(--green)', bg: 'var(--green-bg)' },
+    inactive:      { label: 'INACTIVE', color: 'var(--text-muted)', bg: 'var(--bg-elevated)' },
+    unknown:       { label: 'NEW', color: 'var(--text-muted)', bg: 'var(--bg-elevated)' },
+  };
+  const s = map[state] ?? map.unknown;
+  return (
+    <span style={{
+      fontSize: 7, fontWeight: 700, padding: '1px 4px', borderRadius: 2,
+      border: `1px solid ${s.color}`, color: s.color, background: s.bg,
+      marginLeft: 3, whiteSpace: 'nowrap',
+    }}>{s.label}</span>
+  );
+}
+
+function PriceSourceBadge({ source }: { source: MarketToken['priceSource'] }) {
+  if (source === 'dex_pair') return null;
+  return (
+    <span style={{
+      fontSize: 7, fontWeight: 700, padding: '1px 3px', borderRadius: 2,
+      border: '1px solid var(--text-muted)', color: 'var(--text-muted)',
+      marginLeft: 2, whiteSpace: 'nowrap',
+    }}>
+      {source === 'bonding_curve' ? 'BC' : 'N/A'}
+    </span>
+  );
+}
+
 export default function MarketRow({ token: t, onClick, isWatched, onToggleWatch, onQuickBuy }: Props) {
   const chain = CHAINS[t.chainId];
+  const showPrice = t.price != null && isFinite(t.price);
 
   return (
     <tr onClick={onClick} style={{
@@ -35,9 +67,11 @@ export default function MarketRow({ token: t, onClick, isWatched, onToggleWatch,
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {t.icon && <img src={t.icon} alt="" width={24} height={24} style={{ borderRadius: '50%', objectFit: 'cover' }} onError={e => (e.currentTarget.style.display = 'none')} />}
           <div>
-            <div style={{ fontWeight: 800, fontSize: 12, color: 'var(--text-bright)' }}>
+            <div style={{ fontWeight: 800, fontSize: 12, color: 'var(--text-bright)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
               {t.symbol} <ChainIcon chainId={t.chainId as ChainId} size={10} />
-              <span style={{ fontSize: 9, color: chain?.color, marginLeft: 3 }}>{chain?.shortName}</span>
+              <span style={{ fontSize: 9, color: chain?.color }}>{chain?.shortName}</span>
+              <MarketStateBadge state={t.marketState} />
+              <PriceSourceBadge source={t.priceSource} />
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{t.name}</div>
           </div>
@@ -45,13 +79,13 @@ export default function MarketRow({ token: t, onClick, isWatched, onToggleWatch,
         </div>
       </td>
       <td style={{ padding: '8px 8px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-bright)' }}>
-        {formatUsd(t.price)}
+        {showPrice ? formatUsd(t.price) : <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>Price unavailable</span>}
       </td>
       <td style={{ padding: '8px 8px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
         {formatUsd(t.marketCap)}
       </td>
       <td style={{ padding: '8px 8px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
-        {formatUsd(t.liquidity)}
+        {formatUsd(t.liquidity) || (t.virtualLiquidity != null ? <span style={{ fontSize: 8 }}>V:{formatUsd(t.virtualLiquidity)}</span> : null)}
       </td>
       <td style={{ padding: '8px 8px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
         {formatUsd(t.volume24h)}

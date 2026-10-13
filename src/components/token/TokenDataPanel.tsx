@@ -136,7 +136,7 @@ export default function TokenDataPanel(p: Props) {
           <Row label="MCAP / FDV" value={`${t?.marketCap != null ? formatUsd(t.marketCap) : 'N/A'} / ${t?.fdv != null ? formatUsd(t.fdv) : 'N/A'}`} />
           {t?.url && (
             <div style={{ marginTop: 8 }}>
-              <a href={t.url} target="_blank" rel="noopener" className="btn btn-sm" style={{ fontSize: 8 }}>VIEW ON DEXSCREENER ↗</a>
+              <a href={t.url} target="_blank" rel="noopener" className="btn btn-sm" style={{ fontSize: 8 }}>VIEW ON EXPLORER ↗</a>
             </div>
           )}
         </div>
@@ -191,8 +191,8 @@ export default function TokenDataPanel(p: Props) {
             <Row label="EXEC CONTRACT" value={p.routeAddress} />
           )}
           <div style={{ fontSize: 7, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.7 }}>
-            All statistics come from live Cupcak8 Swap data services (CoinGecko, DexScreener,
-            GeckoTerminal, chain indexer). Execution requires a valid quote, a verified route,
+            All statistics come from live Cupcak8 Swap data services and chain indexers.
+            Execution requires a valid quote, a verified route,
             a connected wallet on {chain.name}, and explicit confirmation.
             {p.majorAssetId && ' Reference prices are not proof of a tradable pair.'}
           </div>

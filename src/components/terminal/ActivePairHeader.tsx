@@ -122,7 +122,7 @@ export default function ActivePairHeader({ token: t }: Props) {
             onMouseEnter={e => e.currentTarget.style.borderColor = '#E8547C'}
             onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
           >
-            DexScreener ↗
+            Explorer ↗
           </a>
         )}
       </div>

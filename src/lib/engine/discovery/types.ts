@@ -32,9 +32,21 @@ export interface TokenIndexRecord {
   marketDataStatus: 'awaiting' | 'enriched' | 'no_data' | 'data_only';
   lastEnrichedAt: number | null;
   price: number | null;
+  priceSource: 'bonding_curve' | 'dex_pair' | 'none';
   volume24h: number | null;
   liquidity: number | null;
+  liquidityType: 'real' | 'virtual' | null;
   marketCap: number | null;
+
+  // Market lifecycle state
+  marketState: 'bonding_curve' | 'migrating' | 'launched' | 'inactive' | 'unknown';
+
+  // On-chain metrics (from event indexing)
+  tradeCount24h: number | null;
+  buys24h: number | null;
+  sells24h: number | null;
+  holdersEstimate: number | null;
+  bondingCurveProgress: number | null; // 0-100 percent
   // Route verification (Step 8) — independent direction states
   routeVerified: boolean;           // at least one direction verified
   routeProvider: string | null;

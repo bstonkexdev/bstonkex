@@ -15,7 +15,7 @@ import PriceChart, { ChartErrorBoundary } from './PriceChart';
 import TradePanel from './TradePanel';
 import MarketSidebar from './MarketSidebar';
 import TokenHeaderBar from './token/TokenHeaderBar';
-import { TokenTabBar, TABS_A, TABS_B, type PanelTab } from './token/TokenTabs';
+import { TokenTabBar, TABS_B, type PanelTab } from './token/TokenTabs';
 import PriceStats, { type DataStatus } from './token/PriceStats';
 import MetaBadges, { type MetaBadge } from './token/MetaBadges';
 import TokenDataPanel from './token/TokenDataPanel';
@@ -197,8 +197,8 @@ export default function TokenPage() {
     ? (majorStatus === 'ok' ? 'DELAYED' : majorStatus === 'rate_limited' ? 'DATA DELAYED' : majorStatus === 'loading' ? 'DELAYED' : 'DATA UNAVAILABLE')
     : (t ? (freshness === 'LIVE' ? 'LIVE' : freshness === 'DELAYED' ? 'DELAYED' : 'DATA DELAYED') : 'DATA UNAVAILABLE');
 
-  const priceSource = coingeckoId ? `COINGECKO REFERENCE (${coingeckoId})` : 'DEXSCREENER / GECKOTERMINAL';
-  const candleSource = coingeckoId ? 'COINGECKO OHLC (REFERENCE)' : 'GECKOTERMINAL POOL OHLCV';
+  const priceSource = coingeckoId ? `MARKET REFERENCE (${coingeckoId})` : 'LIVE MARKET DATA';
+  const candleSource = coingeckoId ? 'MARKET OHLC (REFERENCE)' : 'POOL OHLCV';
 
   // Verified metadata badges only — nothing invented
   const badges: MetaBadge[] = [];
@@ -214,13 +214,6 @@ export default function TokenPage() {
     if (safety.checks.liquidityOk) badges.push({ label: 'LIQ CHECK', value: 'PASS', tone: 'green' });
   }
   if (priceValidation?.tradeable) badges.push({ label: 'MARKET', value: 'ACTIVE', tone: 'green' });
-
-  const selectTab = (tab: PanelTab) => {
-    setPanelTab(tab);
-    if (TABS_A.some(x => x.id === tab)) {
-      panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
 
   return (
     <div className="token-page">
@@ -239,7 +232,23 @@ export default function TokenPage() {
           alertEnabled={alert.enabled} onToggleAlert={alert.toggle}
         />
 
-        <TokenTabBar tabs={TABS_A} active={panelTab} onSelect={selectTab} label="Token info views" />
+        {/* RISK compact chip — near coin name and price stats */}
+        {safety && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--text-dim)' }}>RISK</span>
+            <span style={{
+              fontSize: 9, fontWeight: 800, padding: '2px 8px', borderRadius: 4,
+              border: `1px solid ${safety.warnings.length > 0 ? (safety.riskLevel === 'critical' ? 'var(--red)' : 'var(--amber, #FFD700)') : 'var(--green)'}`,
+              color: safety.warnings.length > 0 ? (safety.riskLevel === 'critical' ? 'var(--red)' : 'var(--amber, #FFD700)') : 'var(--green)',
+              background: safety.warnings.length > 0 ? (safety.riskLevel === 'critical' ? 'var(--red-bg)' : 'var(--yellow-bg)') : 'var(--green-bg)',
+            }}>
+              {safety.warnings.length > 0 ? `${safety.warnings.length} WARNING${safety.warnings.length > 1 ? 'S' : ''}` : 'NO WARNINGS'}
+            </span>
+            {safety.checks.liquidityOk && (
+              <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 3, border: '1px solid var(--green)', color: 'var(--green)', background: 'var(--green-bg)' }}>LIQ PASS</span>
+            )}
+          </div>
+        )}
 
         {/* Warnings — real checks only */}
         {priceValidation?.warning && (
@@ -256,16 +265,9 @@ export default function TokenPage() {
             ))}
           </div>
         )}
-        {majorAsset && (
-          <div className="token-banner">
-            <span>REFERENCE PRICE · COINGECKO "{majorAsset.id}"</span>
-            <span style={{ color: 'var(--text-muted)' }}>|</span>
-            {majorRoute ? (
-              <span style={{ color: 'var(--green)' }}>EXECUTION ROUTE: {majorRoute.label} ({majorRoute.symbol}) ON {chain.name.toUpperCase()}</span>
-            ) : (
-              <span style={{ color: 'var(--amber, #FFD700)' }}>NO VERIFIED EXECUTION ROUTE ON {chain.name.toUpperCase()} — BUY/SELL DISABLED</span>
-            )}
-          </div>
+        {/* Execution route status — compact, no provider branding */}
+        {majorAsset && !majorRoute && (
+          <div className="token-banner amber">NO VERIFIED EXECUTION ROUTE ON {chain.name.toUpperCase()} — BUY/SELL DISABLED</div>
         )}
         {isMajor && majorStatus === 'rate_limited' && (
           <div className="token-banner amber">PRICE FEED RATE LIMITED — SHOWING LAST KNOWN QUOTE</div>
@@ -282,6 +284,9 @@ export default function TokenPage() {
           high24h={isMajor ? (majorQuote?.high24h ?? null) : null}
           low24h={isMajor ? (majorQuote?.low24h ?? null) : null}
           dataStatus={dataStatus}
+          priceSource={(t as any)?.priceSource}
+          marketState={(t as any)?.marketState}
+          virtualLiquidity={(t as any)?.virtualLiquidity}
         />
 
         <MetaBadges badges={badges} />

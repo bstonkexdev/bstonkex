@@ -105,7 +105,7 @@ export default function BackendPanel() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <ServiceStatusRow name="Health API" status={status.health} detail={`Uptime: ${status.uptime}s`} />
           <ServiceStatusRow name="WebSocket" status={status.websocket} detail={`${status.connections}/${status.maxConnections} connections`} />
-          <ServiceStatusRow name="Market Pipeline" status={status.health === 'UP' ? 'UP' : 'UNKNOWN'} detail="Real DexScreener data" />
+          <ServiceStatusRow name="Market Pipeline" status={status.health === 'UP' ? 'UP' : 'UNKNOWN'} detail="Live market data" />
         </div>
       )}
 

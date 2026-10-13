@@ -64,8 +64,8 @@ export default function TokenHeaderBar({
       )}
 
       {/* Name + symbol + chain badge */}
-      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, flex: 1, overflow: 'hidden' }}>
+        <div className="thb-name-row" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flexWrap: 'wrap', overflow: 'hidden' }}>
           <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--text-bright)', whiteSpace: 'nowrap', fontFamily: 'var(--font)' }}>{symbol}</span>
           <span style={{
             fontSize: 7, fontWeight: 800, padding: '1px 4px', whiteSpace: 'nowrap',
@@ -73,7 +73,7 @@ export default function TokenHeaderBar({
           }}>
             {chain.shortName}
           </span>
-          <span style={{ fontSize: 8, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+          <span style={{ fontSize: 8, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: '1 1 auto' }}>{name}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <ChainIcon chainId={chainId} size={11} />

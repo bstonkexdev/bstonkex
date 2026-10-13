@@ -53,7 +53,7 @@ export default function MajorsPanel({ onSelect }: Props) {
           fontSize: 9, fontWeight: 700, color: '#E8547C',
           border: '1px solid #E8547C', padding: '1px 6px', borderRadius: 4,
         }}>
-          Live · CoinGecko
+          Live Price
         </span>
         <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
           Reference prices — click to open asset page
@@ -100,7 +100,7 @@ export default function MajorsPanel({ onSelect }: Props) {
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>
             {result?.status === 'rate_limited'
-              ? 'CoinGecko request limit reached — retry in a minute. No prices are fabricated.'
+              ? 'Market data rate limit reached — retry in a minute. No prices are fabricated.'
               : (result?.error || 'The data provider did not respond.')}
           </div>
           <button onClick={() => load(true)} style={{
@@ -222,7 +222,7 @@ export default function MajorsPanel({ onSelect }: Props) {
             </tbody>
           </table>
           <div style={{ marginTop: 8, fontSize: 9, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            Reference prices from CoinGecko. Trading enabled only where a verified on-chain execution route exists.
+            Live market reference prices. Trading enabled only where a verified on-chain execution route exists.
             {result?.fetchedAt && ` · Updated: ${new Date(result.fetchedAt).toLocaleTimeString()}`}
           </div>
         </div>

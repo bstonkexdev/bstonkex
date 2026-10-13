@@ -248,7 +248,7 @@ export default function PriceChart({ chainId, poolAddress, tokenSymbol, coingeck
         <span className="chart-source-chip">
           {coingeckoId
             ? `REF · COINGECKO${formatIntervalLabel(intervalMs) ? ` · ${formatIntervalLabel(intervalMs)}` : ''}`
-            : 'POOL · GECKOTERMINAL'}
+            : 'POOL OHLCV'}
         </span>
         <div style={{ flex: 1, minWidth: 4 }} />
 

@@ -41,6 +41,16 @@ export interface MarketToken {
   buySellRatio24h: number | null;
   tradability: 'tradable' | 'data_only' | 'no_liquidity' | 'no_route';
   dataFreshness: 'live' | 'recent' | 'stale';
+  // Price source: bonding_curve, dex_pair, or none
+  priceSource: 'bonding_curve' | 'dex_pair' | 'none';
+  // Market lifecycle state
+  marketState: 'bonding_curve' | 'migrating' | 'launched' | 'inactive' | 'unknown';
+  // Bonding-curve fill progress (0-100), null when not on a curve
+  bondingCurveProgress?: number | null;
+  // Liquidity type
+  liquidityType: 'virtual' | 'real' | 'none';
+  // Virtual reserves (for bonding curve tokens)
+  virtualLiquidity: number | null;
 }
 
 export type DiscoveryCategory =
@@ -127,6 +137,10 @@ function toMarketToken(raw: any): MarketToken | null {
     buySellRatio24h: ratio,
     tradability: liq && liq > 1000 ? 'data_only' : liq ? 'no_liquidity' : 'data_only',
     dataFreshness: freshness,
+    priceSource: price != null ? 'dex_pair' : 'none',
+    marketState: price != null ? 'launched' : 'unknown',
+    liquidityType: liq != null && liq > 0 ? 'real' : 'none',
+    virtualLiquidity: null,
   };
 }
 
@@ -182,7 +196,7 @@ const SEARCH_QUERIES: Record<DiscoveryCategory, string[]> = {
   watchlist: [],
 };
 
-/** Get raw market data — broad fetch for client-side sorting. */
+/** Get raw market data — broad fetch. Includes tokens with null price (data_only). */
 async function fetchBroadMarket(): Promise<MarketToken[]> {
   return cacheGetOrCompute(CACHE_KEYS.marketAll, async () => {
     const allQueries = ['USDT', 'USDC', 'BNB', 'ETH', 'SOL', 'PEPE', 'DOGE', 'SHIB', 'WIF', 'BONK', 'CAKE', 'RAYDIUM'];
@@ -192,11 +206,12 @@ async function fetchBroadMarket(): Promise<MarketToken[]> {
     for (const r of results) {
       if (r.status !== 'fulfilled') continue;
       for (const raw of r.value) {
-        const key = `${raw.chainId}:${raw.baseToken?.address}`;
+        const key = `${raw.chainId}:${(raw.baseToken?.address || '').toLowerCase()}`;
         if (seen.has(key)) continue;
         seen.add(key);
         const t = toMarketToken(raw);
-        if (t && t.price != null) tokens.push(t);
+        // Include tokens even if price is null — preserve data_only and no_liquidity records
+        if (t) tokens.push(t);
       }
     }
     return tokens;
@@ -227,23 +242,25 @@ export async function getDiscovery(category: DiscoveryCategory): Promise<MarketT
       .filter(r => !seen.has(`${r.chainId}:${r.address.toLowerCase()}`))
       .map(r => {
         // Step 8: Tradability requires BOTH directions verified + liquidity.
-        // - data_only: no market data, or only one direction verified
-        // - no_liquidity: has price but liquidity < threshold
-        // - tradable: both buy AND sell verified + liquidity-qualified
         const liq = r.liquidity;
         const bothOk = (r as any).routeBothVerified === true;
         let tradability: MarketToken['tradability'];
         if (r.marketDataStatus !== 'enriched') {
           tradability = 'data_only';
         } else if (bothOk && liq !== null && liq >= 1000) {
-          tradability = 'tradable'; // Both directions verified + liquidity
+          tradability = 'tradable';
         } else if (liq !== null && liq >= 1000) {
-          tradability = 'data_only'; // Liquidity-qualified but NOT both-directions verified
+          tradability = 'data_only';
         } else if (liq !== null && liq > 0) {
           tradability = 'no_liquidity';
         } else {
           tradability = 'data_only';
         }
+
+        const priceSource = (r as any).priceSource ?? (r.price != null ? 'dex_pair' : 'none');
+        const marketState = (r as any).marketState ?? 'unknown';
+        const liquidityType = (r as any).liquidityType ?? (liq != null && liq > 0 ? 'real' : 'none');
+        const virtualLiq = (r as any).virtualLiquidity ?? null;
 
         return {
           chainId: r.chainId,
@@ -253,7 +270,7 @@ export async function getDiscovery(category: DiscoveryCategory): Promise<MarketT
           price: r.price,
           priceChange5m: null, priceChange1h: null, priceChange6h: null, priceChange24h: null,
           volume5m: null, volume1h: null, volume6h: null, volume24h: r.volume24h,
-          liquidity: r.liquidity,
+          liquidity: liq,
           marketCap: r.marketCap,
           fdv: null,
           buys5m: null, sells5m: null, buys1h: null, sells1h: null, buys24h: null, sells24h: null,
@@ -265,12 +282,30 @@ export async function getDiscovery(category: DiscoveryCategory): Promise<MarketT
           buySellRatio24h: null,
           tradability,
           dataFreshness: (r.lastEnrichedAt && Date.now() - r.lastEnrichedAt < 300000) ? 'live' : 'recent',
+          priceSource,
+          marketState,
+          liquidityType,
+          virtualLiquidity: virtualLiq,
         } as MarketToken;
       });
   } catch { /* token index unavailable — DexScreener only */ }
 
   // 3. Merge (index tokens + DexScreener tokens, no duplicates)
   const tokens = [...indexTokens, ...dexTokens];
+
+  // 4. Enrich zero-liquidity Solana/Pump.fun tokens with bonding curve pricing
+  const { enrichWithBondingCurve } = await import('./engine/market-state').catch(() => ({ enrichWithBondingCurve: null as any }));
+  if (enrichWithBondingCurve) {
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      // Only enrich tokens without price that could be on a bonding curve
+      if (t.price === null && t.chainId === 'solana' && t.launchpadId === 'pumpfun') {
+        try {
+          tokens[i] = await enrichWithBondingCurve(t);
+        } catch { /* keep as-is if enrichment fails */ }
+      }
+    }
+  }
 
   switch (category) {
     case 'trending':

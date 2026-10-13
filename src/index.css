@@ -407,7 +407,7 @@ tr:hover td { background: var(--bg-hover); }
 .token-tab.active { color: var(--green); border-color: var(--green); background: var(--green-bg); }
 .token-banner { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 4px 12px; font-size: 11px; font-weight: 700; color: var(--text-dim); border-bottom: 1px solid var(--border); }
 .token-banner.amber { color: var(--yellow); background: var(--yellow-bg); }
-.price-stats { display: flex; gap: 16px; padding: 14px 16px; border-bottom: 1px solid var(--border); align-items: flex-start; background: var(--bg-surface); }
+.price-stats { display: flex; gap: 16px; padding: 8px 16px; border-bottom: 1px solid var(--border); align-items: flex-start; background: var(--bg-surface); }
 .price-stats-left { min-width: 150px; flex: 0 1 auto; }
 .ps-price { font-size: 26px; font-weight: 900; color: var(--text-bright); font-variant-numeric: tabular-nums; line-height: 1.1; font-family: var(--font-mono); }
 .ps-change { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -416,7 +416,7 @@ tr:hover td { background: var(--bg-hover); }
 .ps-label { color: var(--text-dim); white-space: nowrap; font-weight: 600; letter-spacing: 0.03em; }
 .ps-value { color: var(--text-bright); font-variant-numeric: tabular-nums; font-weight: 700; font-family: var(--font-mono); }
 @media (max-width: 420px) { .price-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ps-price { font-size: 20px; } }
-.meta-badges { display: flex; gap: 6px; padding: 8px 12px; overflow-x: auto; border-bottom: 1px solid var(--border); scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.meta-badges { display: flex; gap: 6px; padding: 4px 12px; overflow-x: auto; border-bottom: 1px solid var(--border); scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .meta-badges::-webkit-scrollbar { display: none; }
 .meta-badge { flex: 0 0 auto; display: inline-flex; gap: 5px; align-items: center; font-size: 11px; padding: 4px 9px; border: 1px solid var(--border); border-radius: 4px; color: var(--text-dim); white-space: nowrap; }
 .meta-badge-label { color: var(--text-muted); font-weight: 700; letter-spacing: 0.04em; }
@@ -450,10 +450,39 @@ tr:hover td { background: var(--bg-hover); }
 .market-row { cursor: pointer; }
 
 /* ── SLIPPAGE OPTIONS ── */
-.slippage-options { display: flex; gap: 4px; flex-wrap: wrap; }
-.slippage-opt { padding: 6px 12px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-elevated); color: var(--text-dim); cursor: pointer; transition: all 0.15s; }
-.slippage-opt.active { border-color: #E8547C; color: #E8547C; background: var(--green-bg); font-weight: 700; }
-.slippage-opt:hover { border-color: var(--border-bright); }
+/* ── SLIPPAGE SELECTOR ── */
+.slippage-options {
+  display: flex; gap: 6px; align-items: center;
+  min-width: 0; padding: 4px 0;
+}
+.slippage-btn {
+  padding: 5px 10px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em; font-family: var(--font-mono);
+  color: var(--text-dim); background: var(--bg-elevated);
+  border: 1px solid var(--border); border-radius: 20px;
+  cursor: pointer; transition: all 0.15s ease;
+  white-space: nowrap; flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.slippage-btn:hover {
+  color: var(--text-bright); background: var(--bg-hover);
+  border-color: var(--border-bright);
+}
+.slippage-btn.active {
+  color: var(--green); background: var(--green-bg-strong);
+  border-color: var(--green);
+}
+.slippage-btn:active {
+  transform: scale(0.96);
+}
+/* Custom slippage input — matches preset button height */
+.slippage-options .input,
+.slippage-options input[type="number"] {
+  width: 60px; padding: 5px 8px; font-size: 10px; font-weight: 700;
+  text-align: center; border-radius: 20px; flex-shrink: 0;
+  font-family: var(--font-mono); letter-spacing: 0.04em;
+}
+
 
 /* ── REFERRAL PAGE ── */
 .ref-page { min-height: 100vh; background: var(--bg-deep); color: var(--text); }
@@ -501,3 +530,198 @@ tr:hover td { background: var(--bg-hover); }
 
 /* ── SETTINGS PAGE ── */
 @media (max-width: 480px) { .settings-section { padding: 10px; } }
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE FIXES — Overlap prevention & safe layouts
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── GLOBAL OVERFLOW GUARDS ── */
+.token-page, .token-page-main, .token-page-terminal { overflow-x: hidden; }
+img, svg { max-width: 100%; height: auto; }
+
+/* ── TOKEN HEADER BAR — Prevent name/symbol/badge overlap ── */
+.token-header-bar { min-width: 0; }
+.token-header-bar > div { min-width: 0; }
+.token-header-bar .thb-name-row {
+  min-width: 0; overflow: hidden;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.token-header-bar .thb-name-row > * { min-width: 0; }
+
+/* ── PRICE STATS — Prevent horizontal overflow ── */
+.price-stats { flex-wrap: wrap; min-width: 0; }
+.price-stats-left { min-width: 0; flex: 1 1 140px; overflow: hidden; }
+.ps-price { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price-stats-grid { min-width: 0; }
+
+/* ── CHART CONTROLS — Safe wrapping on narrow screens ── */
+.chart-controls { min-width: 0; overflow: hidden; }
+.chart-tf-group { min-width: 0; max-width: 100%; }
+.chart-source-chip { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── CHART SHELL — Ensure it never overflows ── */
+.chart-shell { max-width: 100%; }
+
+/* ── CHART REGION — No gap between price stats and chart ── */
+.chart-region { margin: 0; padding: 0; line-height: 0; }
+.chart-region .panel { border-radius: 0; border-left: none; border-right: none; border-top: none; }
+.chart-region .chart-panel { margin: 0; padding: 0; border-bottom: none; }
+.chart-region .chart-shell { border-top: none; }
+
+/* ── META BADGES — Already scrollable, ensure no page overflow ── */
+.meta-badges { max-width: 100%; box-sizing: border-box; }
+
+/* ── TOKEN BANNERS — Safe text wrapping ── */
+.token-banner { min-width: 0; overflow: hidden; }
+.token-banner > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── TRADE PANEL — Prevent overflow on narrow screens ── */
+.trade-panel { min-width: 0; overflow: hidden; }
+.trade-input-row { min-width: 0; }
+.trade-input-row label { min-width: 0; flex-shrink: 0; }
+.trade-input-row input { min-width: 0; flex: 1; }
+.trade-tabs { min-width: 0; }
+.quick-amounts {
+  display: flex; gap: 6px; min-width: 0;
+  padding: 6px 0;
+}
+.quick-amount-btn {
+  flex: 1; min-width: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 7px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  font-family: var(--font-mono);
+  color: var(--text-dim); background: var(--bg-elevated);
+  border: 1px solid var(--border); border-radius: 20px;
+  cursor: pointer; transition: all 0.15s ease;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  -webkit-tap-highlight-color: transparent;
+}
+.quick-amount-btn:hover {
+  color: var(--text-bright); background: var(--bg-hover);
+  border-color: var(--border-bright);
+}
+.quick-amount-btn:active {
+  background: var(--green-bg-strong);
+  border-color: var(--green);
+  color: var(--green);
+  transform: scale(0.96);
+}
+.slippage-options { min-width: 0; }
+.slippage-opt { min-width: 0; flex-shrink: 0; }
+
+/* ── INFO ROWS — Prevent overflow ── */
+.info-row { min-width: 0; overflow: hidden; }
+.info-label { min-width: 0; flex-shrink: 0; }
+.info-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+
+/* ── TRADE TABLE — Scrollable on narrow screens ── */
+.panel-scroll { max-width: 100%; overflow-x: auto; }
+
+/* ── NARROW MOBILE (≤420px) ── */
+@media (max-width: 420px) {
+  /* Token header — stack name and badges */
+  .token-header-bar { gap: 6px; padding: 6px 8px; }
+  .token-header-bar .thb-name-row {
+    flex-wrap: wrap; gap: 4px;
+    max-width: 100%; overflow: hidden;
+  }
+
+  /* Price stats — single column on very narrow */
+  .price-stats { flex-direction: column; gap: 10px; padding: 10px; }
+  .price-stats-left { min-width: 0; width: 100%; }
+  .price-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px 12px; width: 100%;
+  }
+  .ps-price { font-size: 22px; }
+
+  /* Chart controls — tighter spacing */
+  .chart-controls { gap: 4px; padding: 4px 6px; }
+  .chart-tf-group { gap: 2px; }
+  .chart-tf-group .chart-tf-btn,
+  .chart-tf-group button { padding: 4px 6px; font-size: 10px; }
+
+  /* Trade panel inputs — full width */
+  .trade-input-row { flex-wrap: wrap; gap: 6px; }
+  .trade-input-row input { width: 100%; flex: 1 1 100%; }
+  .trade-tabs { margin-bottom: 8px; }
+  .trade-tab { padding: 10px 8px; font-size: 12px; }
+
+  /* Buttons — ensure touch targets */
+  .btn-buy, .btn-sell { padding: 14px 16px; font-size: 14px; }
+  .quick-amount-btn { padding: 6px 0; font-size: 10px; }
+
+  /* Info rows — stack label/value if needed */
+  .info-row { font-size: 11px; gap: 8px; }
+  .info-label { font-size: 9px; }
+
+  /* Banners — reduce font */
+  .token-banner { font-size: 9px; padding: 3px 8px; gap: 4px; }
+
+  /* Meta badges — tighter */
+  .meta-badges { gap: 4px; padding: 6px 8px; }
+  .meta-badge { font-size: 10px; padding: 3px 7px; }
+
+  /* Referral cards — already handled above */
+  /* Settings — already handled above */
+}
+
+/* ── SMALL PHONES (≤360px) — Extra tight ── */
+@media (max-width: 360px) {
+  .price-stats-grid { grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+  .ps-price { font-size: 18px; }
+  .chart-controls { padding: 3px 4px; }
+  .token-header-bar { padding: 5px 6px; gap: 4px; }
+  .info-row { font-size: 10px; }
+}
+
+/* ── TABLET (769–1024px) — Prevent terminal overlap ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .token-page-main { min-width: 0; overflow-x: hidden; }
+  .chart-shell { height: clamp(280px, 45vh, 450px); }
+}
+
+/* ── MODALS & OVERLAYS — Viewport safety ── */
+@media (max-width: 768px) {
+  .modal {
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+  .chart-menu {
+    max-width: calc(100vw - 32px);
+    right: 0;
+  }
+  .thb-menu {
+    max-width: calc(100vw - 32px);
+  }
+}
+
+/* ── SAFE AREA — iOS notch support ── */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .mobile-bottom-nav {
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 6px));
+  }
+  .mobile-trade-bar {
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  }
+}
+
+/* ── TRADING TOOLS DRAWER ── */
+.trading-tools-overlay {
+  position: fixed; inset: 0; z-index: 250;
+  background: rgba(61, 43, 31, 0.60); backdrop-filter: blur(6px);
+  display: flex; justify-content: flex-end;
+  animation: drawer-fade-in 0.2s ease-out;
+}
+.trading-tools-drawer {
+  width: 340px; max-width: 90vw; height: 100%;
+  background: var(--bg-surface); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  animation: drawer-slide-in 0.25s ease-out;
+  box-shadow: -8px 0 40px rgba(92, 61, 46, 0.15);
+}
+@media (max-width: 480px) {
+  .trading-tools-drawer { width: 100%; max-width: 100%; }
+}

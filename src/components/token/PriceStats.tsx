@@ -15,6 +15,9 @@ interface Props {
   high24h: number | null;
   low24h: number | null;
   dataStatus: DataStatus;
+  priceSource?: 'bonding_curve' | 'dex_pair' | 'none';
+  marketState?: string;
+  virtualLiquidity?: number | null;
 }
 
 function StatRow({ label, value, tone }: { label: string; value: string; tone?: string }) {
@@ -26,13 +29,35 @@ function StatRow({ label, value, tone }: { label: string; value: string; tone?: 
   );
 }
 
+function PriceSourceBadge({ source, marketState }: { source: Props['priceSource']; marketState?: string }) {
+  if (source === 'dex_pair' && !marketState) return null;
+  const labels: Record<string, string> = {
+    bonding_curve: 'BONDING CURVE',
+    dex_pair: marketState === 'launched' ? 'LIVE DEX' : 'DEX',
+    none: 'UNAVAILABLE',
+  };
+  const colors: Record<string, string> = {
+    bonding_curve: 'var(--cyan, #0088FF)',
+    dex_pair: 'var(--green)',
+    none: 'var(--text-muted)',
+  };
+  const s = source ?? 'none';
+  return (
+    <span className="thb-chip" style={{ color: colors[s], borderColor: colors[s], fontSize: 7 }}>
+      {labels[s]}
+    </span>
+  );
+}
+
 export default function PriceStats({
   price, change24h, marketCap, volume24h, txns24h, buys24h, sells24h, high24h, low24h, dataStatus,
+  priceSource, marketState, virtualLiquidity,
 }: Props) {
   const up = change24h != null && change24h >= 0;
   const statusColor =
     dataStatus === 'LIVE' ? 'var(--green)' :
     dataStatus === 'DATA UNAVAILABLE' ? 'var(--red)' : 'var(--amber, #FFD700)';
+  const showPrice = price != null && isFinite(price);
 
   return (
     <div className="price-stats">
@@ -40,7 +65,7 @@ export default function PriceStats({
       <div className="price-stats-left">
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
           <span className="ps-price">
-            {price != null && isFinite(price) ? formatUsd(price) : NA}
+            {showPrice ? formatUsd(price) : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Price unavailable</span>}
           </span>
           <span className="ps-change" style={{ color: up ? 'var(--green)' : 'var(--red)' }}>
             {change24h != null && isFinite(change24h) ? formatPct(change24h) : NA}
@@ -50,8 +75,14 @@ export default function PriceStats({
           <span className="thb-chip" style={{ color: statusColor, borderColor: statusColor }}>
             {dataStatus}
           </span>
+          <PriceSourceBadge source={priceSource} marketState={marketState} />
           {price != null && price > 0 && price < 0.01 && (
             <span className="thb-chip">{formatPrice(price)}</span>
+          )}
+          {virtualLiquidity != null && (
+            <span className="thb-chip" style={{ color: 'var(--text-muted)' }}>
+              V-LIQ {formatUsd(virtualLiquidity)}
+            </span>
           )}
         </div>
       </div>

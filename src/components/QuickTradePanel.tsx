@@ -304,14 +304,9 @@ export default memo(function QuickTradePanel({ token, allMarkets, onSelectMarket
             borderRadius: 6, padding: '10px 12px', fontSize: 18, fontWeight: 700,
             color: 'var(--text-bright)', outline: 'none', fontFamily: D.mono,
           }} />
-        <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+        <div className="quick-amounts">
           {[25, 50, 75, 100].map(pct => (
-            <button key={pct} onClick={() => handlePct(pct)} style={{
-              flex: 1, padding: '6px', fontSize: 11, fontWeight: 700,
-              background: D.bgAlt, border: `1px solid ${D.border}`,
-              borderRadius: 6, color: D.textMuted, cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}>
+            <button key={pct} className="quick-amount-btn" onClick={() => handlePct(pct)}>
               {pct}%
             </button>
           ))}
@@ -324,32 +319,24 @@ export default memo(function QuickTradePanel({ token, allMarkets, onSelectMarket
       {/* ── SLIPPAGE ────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 12px', background: D.bgPanel,
-        border: `1px solid ${D.border}`, borderRadius: 8, marginBottom: 10,
+        padding: '8px 12px', background: 'var(--bg-panel)',
+        border: '1px solid var(--border)', borderRadius: 8, marginBottom: 10,
       }}>
-        <span style={{ fontSize: 10, color: D.textMuted, fontWeight: 600, letterSpacing: '0.04em' }}>SLIPPAGE</span>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600, letterSpacing: '0.04em' }}>SLIPPAGE</span>
+        <div className="slippage-options" style={{ gap: 4 }}>
           {SLIPPAGE_OPTS.map(s => (
-            <button key={s} onClick={() => { setSlippage(s); setIsCustomSlippage(false); setQuote(null); }} style={{
-              padding: '4px 10px', fontSize: 10, fontWeight: 700,
-              background: !isCustomSlippage && slippage === s ? D.greenBg : D.bgAlt,
-              border: `1px solid ${!isCustomSlippage && slippage === s ? D.green : D.border}`,
-              borderRadius: 4, cursor: 'pointer',
-              color: !isCustomSlippage && slippage === s ? D.green : D.textMuted,
-              transition: 'all 0.15s',
-            }}>
+            <button key={s} className={`slippage-btn ${!isCustomSlippage && slippage === s ? 'active' : ''}`}
+              onClick={() => { setSlippage(s); setIsCustomSlippage(false); setQuote(null); }}>
               {s}%
             </button>
           ))}
-          <input type="number" placeholder="Custom" value={customSlippage}
+          <input className={`input ${isCustomSlippage ? 'active' : ''}`} type="number" placeholder="Custom" value={customSlippage}
             onFocus={() => setIsCustomSlippage(true)}
             onChange={e => { setCustomSlippage(e.target.value); setIsCustomSlippage(true); setQuote(null); }}
             style={{
-              width: 56, padding: '4px 8px', fontSize: 10, fontWeight: 700,
-              background: isCustomSlippage ? D.greenBg : D.bgAlt,
-              border: `1px solid ${isCustomSlippage ? D.green : D.border}`,
-              borderRadius: 4, color: isCustomSlippage ? D.green : D.textMuted,
-              outline: 'none', textAlign: 'center',
+              borderColor: isCustomSlippage ? 'var(--green)' : undefined,
+              background: isCustomSlippage ? 'var(--green-bg-strong)' : undefined,
+              color: isCustomSlippage ? 'var(--green)' : undefined,
             }} />
         </div>
       </div>

@@ -204,7 +204,7 @@ export async function listIndexedTokens(opts?: {
 export async function updateMarketData(
   chainId: ChainId,
   address: string,
-  data: Partial<Pick<TokenIndexRecord, 'price' | 'volume24h' | 'liquidity' | 'marketCap' | 'name' | 'symbol' | 'icon' | 'marketDataStatus' | 'lastEnrichedAt' | 'routeVerified' | 'routeVerifiedAt' | 'routeProvider' | 'routeDirection' | 'routeError' | 'routeBuyVerified' | 'routeSellVerified' | 'routeBothVerified'>>
+  data: Partial<Pick<TokenIndexRecord, 'price' | 'volume24h' | 'liquidity' | 'marketCap' | 'name' | 'symbol' | 'icon' | 'marketDataStatus' | 'lastEnrichedAt' | 'routeVerified' | 'routeVerifiedAt' | 'routeProvider' | 'routeDirection' | 'routeError' | 'routeBuyVerified' | 'routeSellVerified' | 'routeBothVerified' | 'marketState' | 'bondingCurveProgress' | 'priceSource' | 'liquidityType'>>
 ): Promise<boolean> {
   const key = cacheKey(chainId, address);
   const cached = indexCache.get(key);
@@ -229,6 +229,28 @@ export async function updateMarketData(
     recordError('token_index', e);
     return false;
   }
+}
+
+/**
+ * Update a token's market lifecycle state on its EXISTING record.
+ * Called on create/complete/migrate events — updates in place by (chainId, mint)
+ * so a token tracked through creation → curve trading → completion → PumpSwap
+ * migration NEVER produces a duplicate record or duplicated volume.
+ * On migrate, also switches market-data sourcing off the bonding curve
+ * (priceSource 'dex_pair') so post-migration pricing comes from the AMM pool.
+ * No-op when the record does not exist yet (create flow inserts it via indexToken).
+ */
+export async function updateTokenLifecycle(
+  chainId: ChainId,
+  mint: string,
+  lifecycle: {
+    marketState?: TokenIndexRecord['marketState'];
+    bondingCurveProgress?: number | null;
+    priceSource?: TokenIndexRecord['priceSource'];
+    liquidityType?: TokenIndexRecord['liquidityType'];
+  }
+): Promise<boolean> {
+  return updateMarketData(chainId, mint, lifecycle);
 }
 
 // ── Cursor Management ───────────────────────────────────────
