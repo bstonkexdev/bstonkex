@@ -38,7 +38,7 @@ export default memo(function FeaturedMarket({ token, allMarkets, onSelectMarket 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [livePrice, setLivePrice] = useState<number | null>(null);
-  const [dataStatus, setDataStatus] = useState<'LIVE' | 'DELAYED' | 'OFFLINE'>('OFFLINE');
+  const [dataStatus, setDataStatus] = useState<'LIVE' | 'DELAYED' | 'RECONNECTING' | 'OFFLINE'>('OFFLINE');
   const [buyVolume, setBuyVolume] = useState<number | null>(null);
   const [sellVolume, setSellVolume] = useState<number | null>(null);
 

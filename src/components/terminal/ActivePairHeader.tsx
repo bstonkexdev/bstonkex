@@ -75,11 +75,11 @@ export default function ActivePairHeader({ token: t }: Props) {
       {/* High / Low */}
       <div className="pair-stat show-mobile">
         <span className="pair-stat-label">High</span>
-        <span className="pair-stat-value">{formatUsd(t.high24h ?? null)}</span>
+        <span className="pair-stat-value">{formatUsd((t as any).high24h ?? null)}</span>
       </div>
       <div className="pair-stat show-mobile">
         <span className="pair-stat-label">Low</span>
-        <span className="pair-stat-value">{formatUsd(t.low24h ?? null)}</span>
+        <span className="pair-stat-value">{formatUsd((t as any).low24h ?? null)}</span>
       </div>
 
       {/* Volume */}

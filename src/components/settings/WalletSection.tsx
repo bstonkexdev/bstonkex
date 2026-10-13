@@ -28,7 +28,7 @@ export default function WalletSection() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Balance</span>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-bright)' }}>
-              {wallet.balance != null ? `${wallet.balance.toFixed(4)} ${CHAINS[activeChain]?.nativeSymbol || ''}` : '—'}
+              {wallet.balance != null ? `${parseFloat(wallet.balance).toFixed(4)} ${CHAINS[activeChain]?.nativeSymbol || ''}` : '—'}
             </span>
           </div>
           <button

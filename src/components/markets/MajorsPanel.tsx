@@ -231,7 +231,7 @@ export default function MajorsPanel({ onSelect }: Props) {
   );
 }
 
-function Th({ children, align }: { children: React.ReactNode; align?: string }) {
+function Th({ children, align }: { children?: React.ReactNode; align?: string }) {
   return (
     <th style={{
       textAlign: (align as any) ?? 'left', padding: '8px 8px',

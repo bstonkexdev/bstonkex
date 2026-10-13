@@ -33,8 +33,8 @@ export default function CenterChartPanel({ token, allMarkets, onSelect }: Props)
   useEffect(() => {
     if (!token) return;
     const unsub = onMarketEvent((ev) => {
-      if (ev.address === token.address && ev.chainId === token.chainId) {
-        if (ev.price != null) setLivePrice(ev.price);
+      if (ev.tokenAddress === token.address && ev.chainId === token.chainId) {
+        if (ev.data?.price != null) setLivePrice(ev.data.price);
       }
     });
     return unsub;

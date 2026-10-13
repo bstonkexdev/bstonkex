@@ -13,7 +13,7 @@ import type { IndexerCheckpoint } from './indexer/types';
 
 // ── State ──────────────────────────────────────────────────
 
-interface SourceStatus {
+export interface SourceStatus {
   factoryId: string;
   chain: ChainId;
   status: 'LIVE' | 'CATCHING_UP' | 'STOPPED' | 'ERROR' | 'NOT_VERIFIED';

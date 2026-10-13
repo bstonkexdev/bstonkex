@@ -35,6 +35,7 @@ export interface TradeQuote {
   minReceived: string;
   route: string[];
   dex: string;
+  spender?: string;
   available: boolean;
   error?: string;
   // Quote expiry

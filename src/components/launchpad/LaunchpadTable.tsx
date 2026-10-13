@@ -313,7 +313,7 @@ export default memo(function LaunchpadTable({ tokens, launchpads, loading, onTra
   );
 });
 
-function Th({ children, align }: { children: React.ReactNode; align?: string }) {
+function Th({ children, align }: { children?: React.ReactNode; align?: string }) {
   return (
     <th style={{
       textAlign: (align as any) || 'left',

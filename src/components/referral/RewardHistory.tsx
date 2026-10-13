@@ -43,8 +43,8 @@ export default function RewardHistory({ history }: Props) {
               <td>
                 <span style={{
                   fontSize: 7, fontWeight: 700, padding: '1px 4px',
-                  border: `1px solid ${r.status === 'claimed' ? 'var(--lime-dim)' : r.status === 'claimable' ? '#E8547C' : 'var(--yellow)'}`,
-                  color: r.status === 'claimed' ? 'var(--lime-dim)' : r.status === 'claimable' ? '#E8547C' : 'var(--yellow-dim)',
+                  border: `1px solid ${r.status === 'paid' ? 'var(--lime-dim)' : r.status === 'claimable' ? '#E8547C' : 'var(--yellow)'}`,
+                  color: r.status === 'paid' ? 'var(--lime-dim)' : r.status === 'claimable' ? '#E8547C' : 'var(--yellow-dim)',
                 }}>{r.status.toUpperCase()}</span>
               </td>
             </tr>

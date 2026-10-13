@@ -185,7 +185,7 @@ export default function WatchlistPage() {
                     </td>
                     <td>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                        <ChainIcon chainId={w.chainId as ChainId} size={11} />
+                        <ChainIcon chainId={entry.chainId as ChainId} size={11} />
                         <span className="badge" style={{ borderColor: chain?.color, color: chain?.color, fontSize: 7 }}>
                           {chain?.shortName}
                         </span>

@@ -12,7 +12,7 @@ interface Props {
 export default function ExchangeStatus({ readiness, health, activeMarkets, liveTradesCount }: Props) {
   const chainsReady = readiness.filter(r => r.mode === 'trading_enabled').length;
   const chainsTotal = readiness.length;
-  const healthOk = health.filter(h => h.status === 'UP').length;
+  const healthOk = health.filter(h => h.status === 'online').length;
 
   const streamOk = healthOk > 0;
   const liquidityOk = chainsReady > 0;

@@ -183,7 +183,7 @@ function TokenIcon({ src, symbol, chainId }: { src: string | null; symbol: strin
   );
 }
 
-function Th({ children, align, style }: { children: React.ReactNode; align?: string; style?: React.CSSProperties }) {
+function Th({ children, align, style }: { children?: React.ReactNode; align?: string; style?: React.CSSProperties }) {
   return (
     <th style={{
       padding: '10px 8px', fontSize: 10, fontWeight: 700,

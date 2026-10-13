@@ -1,7 +1,7 @@
 import type { TradeStatus } from '../lib/trading';
 
 interface Props {
-  status: TradeStatus;
+  status: TradeStatus | 'idle';
   txHash?: string;
   error?: string;
   chainId?: string;

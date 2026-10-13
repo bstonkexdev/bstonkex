@@ -36,7 +36,7 @@ export default function ReferralLinkCard({ username }: Props) {
           {link}
         </div>
         <button className="btn btn-sm btn-pink" onClick={copyLink}>{copied ? 'COPIED!' : 'COPY'}</button>
-        {navigator.share && <button className="btn btn-sm" onClick={shareLink}>SHARE</button>}
+        {typeof navigator.share === 'function' && <button className="btn btn-sm" onClick={shareLink}>SHARE</button>}
       </div>
       <div style={{ fontSize: 8, color: 'var(--text-muted)', marginTop: 8 }}>
         Share this link — you earn a share of Cupcak8 Swap platform fees from every trader you refer.

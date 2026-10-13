@@ -93,9 +93,9 @@ export default function TradingPerformance({ wallet }: { wallet: string | null }
         }}>Referral Earnings</div>
         {refSummary ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
-            <PerfCard label="Tier" value={String(refSummary.tier)} color="var(--cyan)" />
-            <PerfCard label="30D Volume" value={formatUsd(refSummary.rolling30dVolume)} />
-            <PerfCard label="Earnings" value={formatUsd(refSummary.claimable)} color="var(--lime-dim)" />
+            <PerfCard label="Tier" value={refSummary.currentTier.name} color="var(--cyan)" />
+            <PerfCard label="30D Volume" value={formatUsd(refSummary.rollingVolume30d)} />
+            <PerfCard label="Earnings" value={formatUsd(refSummary.claimableRewards)} color="var(--lime-dim)" />
           </div>
         ) : (
           <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: 10 }}>

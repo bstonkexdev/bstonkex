@@ -188,6 +188,7 @@ export interface FeeRecord {
   networkFeeUsd: number;
   chainId: string;
   status: string;
+  txHash?: string;
 }
 
 export interface FeeAnalytics {

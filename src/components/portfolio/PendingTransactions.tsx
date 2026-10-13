@@ -119,6 +119,6 @@ function formatStatus(s: TradeExecution['status']): string {
     case 'pending': return 'Pending';
     case 'confirmed': return 'Confirmed';
     case 'failed': return 'Failed';
-    default: return s.charAt(0).toUpperCase() + s.slice(1);
+    default: return String(s).charAt(0).toUpperCase() + String(s).slice(1);
   }
 }

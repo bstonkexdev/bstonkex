@@ -112,6 +112,7 @@ export interface WalletBalance {
   address: string;
   nativeBalance: string;
   nativeBalanceUsd: number;
+  nativeSymbol?: string;
   tokens: TokenBalance[];
   totalUsd: number;
   updatedAt: number;

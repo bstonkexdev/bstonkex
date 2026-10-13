@@ -41,7 +41,7 @@ export function IndexerMonitor() {
         </div>
       ) : (
         <>
-          <div style={{ marginBottom: 8, padding: '6px 0', fontSize: 11, color: statusColor(health.overallStatus), fontFamily: 'var(--font-pixel)', fontSize: 8 }}>
+          <div style={{ marginBottom: 8, padding: '6px 0', fontSize: 8, color: statusColor(health.overallStatus), fontFamily: 'var(--font-pixel)' }}>
             OVERALL: {health.overallStatus} | UPTIME: {formatUptime(health.uptime)} | SOURCE: {health.marketDataSource.toUpperCase()}
           </div>
           <div className="table-wrap">

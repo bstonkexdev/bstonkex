@@ -67,8 +67,7 @@ export default function TradeTape() {
         <div style={{ width: 1, height: 10, background: 'var(--border)', margin: '0 1px', flexShrink: 0 }} />
         {(['all', 'bsc', 'solana', 'base', 'robinhood'] as const).map(c => (
           <button key={c} className={`btn btn-sm ${chainFilter === c ? 'btn-cyan' : ''}`}
-            style={{ fontSize: 7, padding: '1px 3px' }}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}
+            style={{ fontSize: 7, padding: '1px 3px', display: 'inline-flex', alignItems: 'center', gap: 3 }}
             onClick={() => setChainFilter(c)}>{c === 'all' ? 'ALL' : <><ChainIcon chainId={c} size={10} />{CHAINS[c]?.shortName || c}</>}</button>
         ))}
       </div>

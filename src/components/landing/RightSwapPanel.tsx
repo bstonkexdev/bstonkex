@@ -27,7 +27,7 @@ export default function RightSwapPanel({ token }: Props) {
   const [quote, setQuote] = useState<TradeQuote | null>(null);
 
   const payNum = parseFloat(payAmount) || 0;
-  const receiveAmount = quote ? payNum * (quote.toAmount / quote.fromAmount) : payNum * 0.98;
+  const receiveAmount = quote ? parseFloat(quote.estimatedOutput) || payNum * 0.98 : payNum * 0.98;
 
   // Request quote when amount changes
   useEffect(() => {
@@ -35,10 +35,12 @@ export default function RightSwapPanel({ token }: Props) {
     const timer = setTimeout(() => {
       getQuote({
         chainId: token.chainId,
-        tokenIn: side === 'buy' ? CHAINS[token.chainId]?.nativeCurrency?.address ?? '' : token.address,
-        tokenOut: side === 'buy' ? token.address : CHAINS[token.chainId]?.nativeCurrency?.address ?? '',
-        amount: payNum,
-        slippage,
+        side,
+        tokenAddress: token.address,
+        tokenSymbol: token.symbol,
+        amountUsd: payNum,
+        slippagePct: slippage,
+        walletAddress: null,
       }).then(setQuote).catch(() => setQuote(null));
     }, 500);
     return () => clearTimeout(timer);

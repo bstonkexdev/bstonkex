@@ -54,7 +54,7 @@ export default function PortfolioPage() {
       const livePrices: { address: string; symbol: string; priceUsd: number | null }[] = [];
       for (const c of result.chains) {
         livePrices.push({
-          address: 'native', symbol: c.nativeSymbol,
+          address: 'native', symbol: c.nativeSymbol ?? 'SOL',
           priceUsd: c.nativeBalanceUsd > 0 ? c.nativeBalanceUsd / parseFloat(c.nativeBalance) : null,
         });
         for (const t of c.tokens) livePrices.push({ address: t.address, symbol: t.symbol, priceUsd: t.priceUsd });

@@ -1,4 +1,4 @@
-import { CHAINS, formatUsd, formatPct, shortenAddress } from '../lib/config';
+import { CHAINS, formatUsd, shortenAddress } from '../lib/config';
 import type { ChainId } from '../lib/config';
 import type { MarketToken } from '../lib/market-discovery';
 import { useApp } from '../lib/context';

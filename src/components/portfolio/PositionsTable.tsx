@@ -39,7 +39,7 @@ export default function PositionsTable({ allPortfolios, activeChain, positions, 
     if (!hideZeroBalances || parseFloat(c.nativeBalance) > 0) {
       const pos = positions.find(p => p.chainId === c.chainId && p.tokenSymbol === c.nativeSymbol);
       flat.push({
-        symbol: c.nativeSymbol, name: `${CHAINS[c.chainId]?.name || c.chainId} Native`, chainId: c.chainId,
+        symbol: c.nativeSymbol ?? 'SOL', name: `${CHAINS[c.chainId]?.name || c.chainId} Native`, chainId: c.chainId,
         address: 'native', balance: parseFloat(c.nativeBalance), priceUsd: c.nativeBalanceUsd > 0 ? c.nativeBalanceUsd / parseFloat(c.nativeBalance) : null,
         valueUsd: c.nativeBalanceUsd, avgEntry: pos?.avgEntryPrice ?? null,
         unrealizedPnl: pos?.unrealizedPnl ?? null, unrealizedPct: pos?.unrealizedPct ?? null,
