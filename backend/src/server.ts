@@ -700,6 +700,17 @@ function connectPumpPortal(): void {
 
           pumpTokensReceived++;
 
+          // Store in trenches-store (Redis-compatible sorted-set + hash)
+          const { hsetAll, zadd } = require('./trenches-store.js');
+          hsetAll(`token:${data.mint}`, {
+            mint: data.mint, name: data.name || 'Unknown', symbol: data.symbol || '???',
+            creator: data.traderPublicKey || '', spotPrice: String(spotPrice),
+            bondingCurveProgress: String(progress), virtualMcap: String(spotPrice * 1e9),
+            createdAt: String(Date.now()),
+          });
+          zadd('trenches:pumpfun', Date.now(), data.mint);
+          zadd('trenches:bonding', progress, data.mint);
+
           // Broadcast to all connected WebSocket clients
           const tokenData = JSON.stringify({ type: 'NEW_LAUNCHPAD_TOKEN', data: serverTokens.get(data.mint) });
           wss.clients.forEach(client => {
@@ -760,6 +771,24 @@ const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
     if (!pumpConnected) connectPumpPortal();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, pumpConnected, trackedTokens: serverTokens.size }));
+  },
+  // GET /api/tokens/trenches/:platform — serve stored tokens (Redis-compatible sorted-set + hash)
+  'GET /api/tokens/trenches/pumpfun': (_req, res) => {
+    try {
+      const { zrevrange, hgetall } = require('./trenches-store.js');
+      const mints: string[] = zrevrange('trenches:pumpfun', 0, 49);
+      if (!mints || mints.length === 0) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+        return;
+      }
+      const tokens = mints.map((mint: string) => hgetall(`token:${mint}`)).filter((t: any) => t && t.mint);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(tokens));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
   },
 };
 
