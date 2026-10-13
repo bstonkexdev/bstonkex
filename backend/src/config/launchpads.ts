@@ -10,7 +10,7 @@ export interface SolanaLaunchpad {
   id: string;
   name: string;
   factoryAddress: string;
-  eventType: 'solana_program_log';
+  eventType: 'solana_program_log' | 'tron_event_log';
   signatureKeyword: string;
 }
 
@@ -120,7 +120,7 @@ export const LAUNCHPAD_CONFIG: Record<string, ChainConfig> = {
     ],
   },
 
-  // ── 5. TRON (non-EVM — uses node event polling) ───────────────
+  // ── 5. TRON NETWORK (TRX Chain) ───────────────────────────────
   tron: {
     chainId: 'tron',
     rpcEndpoint: process.env.TRON_RPC_URL || 'https://api.trongrid.io',
@@ -128,48 +128,48 @@ export const LAUNCHPAD_CONFIG: Record<string, ChainConfig> = {
       {
         id: 'sunpump',
         name: 'SunPump',
-        factoryAddress: 'TKMpW4MFpwLUMF6Fs2VthLKVfGFpLPjZbs',
-        eventType: 'solana_program_log' as const,
-        signatureKeyword: 'ContractCreate',
+        factoryAddress: 'TTfvyrAz86hbZk5iDpKD78pqLGgi8C7AAw',
+        eventType: 'tron_event_log',
+        signatureKeyword: 'TokenCreate',
       },
     ],
   },
 
-  // ── 6. BSC (EVM Chain ID: 56) ─────────────────────────────────
+  // ── 6. BNB SMART CHAIN (BSC — EVM Chain ID: 56) ──────────────
   bsc: {
     chainId: 56,
     rpcEndpoint: process.env.BSC_RPC_URL || 'https://bsc-dataseed.binance.org',
     launchpads: [
       {
         id: 'fourmeme',
-        name: '4meme',
-        factoryAddress: '0x...PLACEHOLDER_ADDRESS',
+        name: 'Four.Meme',
+        factoryAddress: '0x5c952063c7fc8610FFDB798152D69F0B9550762b',
         topic0: UNISWAP_V2_PAIR_CREATED_TOPIC0,
       },
       {
         id: 'flap',
         name: 'Flap Swap',
-        factoryAddress: '0x...PLACEHOLDER_ADDRESS',
+        factoryAddress: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
         topic0: UNISWAP_V2_PAIR_CREATED_TOPIC0,
       },
       {
         id: 'genius',
         name: 'Genius',
-        factoryAddress: '0x...PLACEHOLDER_ADDRESS',
+        factoryAddress: '0xca143ce32fe78f1f7019d7d551a6402fc5350c73',
         topic0: UNISWAP_V2_PAIR_CREATED_TOPIC0,
       },
     ],
   },
 
-  // ── 7. ARCADEUM (EVM Chain ID: ?) ─────────────────────────────
+  // ── 7. ARCHWAY / ARC (EVM / Cosmos ETH-compatible) ────────────
   arc: {
-    chainId: 'arc',
-    rpcEndpoint: process.env.ARC_RPC_URL || '',
+    chainId: 'archway-1',
+    rpcEndpoint: process.env.ARC_RPC_URL || 'https://rpc.mainnet.archway.io',
     launchpads: [
       {
-        id: 'archway',
-        name: 'Archway Launch',
-        factoryAddress: '0x...PLACEHOLDER_ADDRESS',
+        id: 'archlaunch',
+        name: 'Arch Launch',
+        factoryAddress: '0x8035D4e1d9d95F47A22792c307040EcA9bA3B913',
         topic0: UNISWAP_V2_PAIR_CREATED_TOPIC0,
       },
     ],
@@ -177,13 +177,13 @@ export const LAUNCHPAD_CONFIG: Record<string, ChainConfig> = {
 
   // ── 8. STABLE CHAIN ───────────────────────────────────────────
   stable: {
-    chainId: 'stable',
-    rpcEndpoint: process.env.STABLE_RPC_URL || '',
+    chainId: 'stable-mainnet',
+    rpcEndpoint: process.env.STABLE_RPC_URL || 'https://rpc.stable.org',
     launchpads: [
       {
-        id: 'stablefun',
-        name: 'Stable Launch',
-        factoryAddress: '0x...PLACEHOLDER_ADDRESS',
+        id: 'stablelaunch',
+        name: 'Stable Launchpad',
+        factoryAddress: '0x2213F9f4c3dE81f3b890a599F84F8171112DDEB4',
         topic0: UNISWAP_V2_PAIR_CREATED_TOPIC0,
       },
     ],
