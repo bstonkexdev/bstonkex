@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react';
 import { useLiveTokens, useOnNewToken, useBondingCurveProgress } from '../../lib/useLiveTokens';
 import type { LiveToken } from '../../lib/engine/discovery/live-tokens';
+import SecurityBadges from './SecurityBadges';
 
 // ── Bonding Curve Meter ──────────────────────────────────────
 
@@ -58,6 +59,7 @@ function TokenRow({ token, isNew }: { token: LiveToken; isNew: boolean }) {
           <div className="text-[10px] text-gray-500 font-mono">
             {token.mint?.slice(0, 6)}...{token.mint?.slice(-4)}
           </div>
+          <SecurityBadges chainId="solana" address={token.mint} compact />
         </div>
       </div>
 

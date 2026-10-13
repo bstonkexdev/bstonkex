@@ -4,6 +4,7 @@ import { formatAge } from '../../lib/market-discovery';
 import type { MarketToken } from '../../lib/market-discovery';
 import type { ChainId } from '../../lib/config';
 import ChainIcon from '../ChainIcon';
+import SecurityBadges from './SecurityBadges';
 
 interface Props {
   token: MarketToken;
@@ -74,6 +75,7 @@ export default function MarketRow({ token: t, onClick, isWatched, onToggleWatch,
               <PriceSourceBadge source={t.priceSource} />
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{t.name}</div>
+            <SecurityBadges chainId={t.chainId as ChainId} address={t.address} compact />
           </div>
           <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 'auto' }}>{formatAge(t.ageMs)}</span>
         </div>
