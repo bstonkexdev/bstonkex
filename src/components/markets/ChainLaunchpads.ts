@@ -35,7 +35,7 @@ export const LAUNCHPADS_BY_CHAIN: Record<string, LaunchpadInfo[]> = {
   ],
   RH: [
     { id: 'pons', name: 'Pons', logo: '/images/launchpads/pons.png', initials: 'PN', brandColor: '#F57F17' },
-    { id: 'longpad', name: 'Longpad', logo: '', initials: 'LP', brandColor: '#7C3AED' },
+    { id: 'longpad', name: 'Long', logo: '/assets/1791896549191-h0uso7.jpg', initials: 'LG', brandColor: '#7C3AED' },
     { id: 'openlaunch', name: 'OpenLaunch', logo: '/images/launchpads/openlaunch.svg', initials: 'OL', brandColor: '#0052FF' },
   ],
   SOL: [
