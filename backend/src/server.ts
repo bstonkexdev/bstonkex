@@ -799,23 +799,68 @@ const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
   },
 };
 
-// ── IPFS / Metadata Sanitizer ──────────────────────────────────
+// ── IPFS Gateway Pool (multi-gateway rotation to avoid 429s) ──
+const IPFS_GATEWAYS = [
+  'https://cloudflare-ipfs.com/ipfs/',
+  'https://gateway.pinata.cloud/ipfs/',
+  'https://ipfs.io/ipfs/',
+  'https://dweb.link/ipfs/',
+  'https://nftstorage.link/ipfs/',
+];
+
+function extractIpfsHash(uri: string): string | null {
+  if (!uri) return null;
+  if (uri.startsWith('ipfs://')) return uri.replace('ipfs://', '').replace(/^ipfs\//, '');
+  const match = uri.match(/\/ipfs\/([a-zA-Z0-9]+)/);
+  return match ? match[1] : null;
+}
+
 function sanitizeUri(uri: string | undefined | null): string {
   if (!uri) return '';
-  if (uri.startsWith('ipfs://')) return uri.replace('ipfs://', 'https://ipfs.io/ipfs/');
+  if (uri.startsWith('ipfs://')) {
+    const hash = uri.replace('ipfs://', '').replace(/^ipfs\//, '');
+    return IPFS_GATEWAYS[0] + hash;
+  }
   return uri;
 }
 
-// ── Async Metadata Enrichment (IPFS + Socials) ─────────────────
-async function fetchMetadataAndEnrich(mint: string, metadataUrl: string) {
+function buildGatewayUrls(uri: string): string[] {
+  const hash = extractIpfsHash(uri);
+  if (!hash) return [uri]; // Already HTTPS — single attempt
+  return IPFS_GATEWAYS.map(gw => gw + hash);
+}
+
+async function fetchWithGatewayRotation(urls: string[], timeoutMs = 4000): Promise<any | null> {
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      if (response.ok) return await response.json();
+      if (response.status === 429) continue; // Rate limited — try next gateway
+    } catch { /* Try next gateway */ }
+  }
+  return null;
+}
+
+// ── Async Metadata Enrichment (multi-gateway IPFS + Socials) ───
+async function fetchMetadataAndEnrich(mint: string, uri: string) {
   try {
-    const response = await fetch(metadataUrl, { signal: AbortSignal.timeout(4000) });
-    if (!response.ok) return;
-    const meta: any = await response.json();
+    const urls = buildGatewayUrls(uri);
+    const meta = await fetchWithGatewayRotation(urls);
+    if (!meta) return;
+
     const { hsetAll } = require('./trenches-store.js');
-    const rawImage = meta.image || meta.image_uri || '';
+    const rawImage = meta.image || meta.image_uri || meta.image_url || '';
+
+    // Resolve image through gateway rotation and store HTTPS URL
+    let imageUrl = '';
+    const imageUrls = buildGatewayUrls(rawImage);
+    // For images, just pick the first valid HTTPS URL (no need to fetch)
+    imageUrl = rawImage.startsWith('ipfs://')
+      ? imageUrls[0] // Cloudflare gateway as default
+      : rawImage;
+
     hsetAll(`token:${mint}`, {
-      image: sanitizeUri(rawImage),
+      image: imageUrl,
       twitter: meta.twitter || meta.extensions?.twitter || '',
       telegram: meta.telegram || meta.extensions?.telegram || '',
       website: meta.website || meta.extensions?.website || '',
@@ -872,17 +917,40 @@ const cachedTokenRoutes: Record<string, (req: IncomingMessage, res: ServerRespon
   'GET /api/tokens/cached': (req, res) => {
     try {
       const url = new URL(req.url || '/', `http://${req.headers.host}`);
-      const chain = (url.searchParams.get('chain') || 'sol').toLowerCase();
-      const launchpad = (url.searchParams.get('launchpad') || 'pumpfun').toLowerCase();
-      const filter = (url.searchParams.get('subFilter') || 'trending').toLowerCase();
+      // Sanitize + lowercase all query params so `PUMPFUN` → `pumpfun`
+      const chain = (url.searchParams.get('chain') || 'sol').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const launchpad = (url.searchParams.get('launchpad') || 'pumpfun').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const filter = (url.searchParams.get('subFilter') || 'trending').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 
       const { zrevrange, hgetall } = require('./trenches-store.js');
-      const redisKey = `trenches:${chain}:${launchpad}:${filter}`;
-      let mints: string[] = zrevrange(redisKey, 0, 49);
 
-      // Fallback to flat launchpad key if category key empty
-      if (!mints || mints.length === 0) {
+      // Priority 1: exact match trenches:{chain}:{launchpad}:{filter}
+      let mints: string[] = zrevrange(`trenches:${chain}:${launchpad}:${filter}`, 0, 49) || [];
+
+      // Priority 2: flat launchpad key trenches:{launchpad}
+      if (mints.length === 0) {
         mints = zrevrange(`trenches:${launchpad}`, 0, 49) || [];
+      }
+
+      // Priority 3: scan all known launchpads on that chain
+      if (mints.length === 0) {
+        const chainLaunchpads = ['pumpfun', 'bags', 'stonkfun', 'flap', 'fourmeme', 'genius',
+          'o1exchange', 'stonk', 'openlaunch', 'pons', 'longpad', 'inkypump',
+          'archway', 'stablefun', 'sunpump'];
+        for (const lp of chainLaunchpads) {
+          if (lp === launchpad) continue;
+          const tryKeys = [`trenches:${chain}:${lp}:${filter}`, `trenches:${lp}`];
+          for (const key of tryKeys) {
+            mints = zrevrange(key, 0, 49) || [];
+            if (mints.length > 0) break;
+          }
+          if (mints.length > 0) break;
+        }
+      }
+
+      // Priority 4: global fallback — any tokens at all
+      if (mints.length === 0) {
+        mints = zrevrange('trenches:pumpfun', 0, 49) || [];
       }
 
       if (!mints || mints.length === 0) {
