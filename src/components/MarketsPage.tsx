@@ -11,6 +11,7 @@ import {
 import { gitlawb } from '../lib/gitlawb';
 
 import MarketOverview from './markets/MarketOverview';
+import TrenchesTerminal from './markets/TrenchesTerminal';
 import MarketChainFilter from './markets/MarketChainFilter';
 import LaunchpadLogoSelector from './markets/LaunchpadLogoSelector';
 import CategoryTabs, { CATEGORIES } from './markets/CategoryTabs';
@@ -203,6 +204,11 @@ export default function MarketsPage() {
 
       {/* ── MARKET OVERVIEW ────────────────────────────────── */}
       <MarketOverview tokens={tokens} loading={loading} />
+
+      {/* ── TRENCHES TERMINAL (Real-Time Launchpad Feed) ───── */}
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+        <TrenchesTerminal />
+      </div>
 
       {/* ── CHAIN FILTER ───────────────────────────────────── */}
       <div style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
