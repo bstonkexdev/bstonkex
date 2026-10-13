@@ -1,11 +1,9 @@
 /**
  * BSTONKEX — Launchpad Configuration
  * 
- * Multi-chain launchpad registry with factory addresses, event types,
- * and RPC endpoints. Used by the server to listen for new token creation
- * events across all supported chains.
- *
- * Replace PLACEHOLDER addresses with real on-chain factory contracts.
+ * Multi-chain launchpad registry with verified on-chain factory addresses,
+ * event types, and RPC endpoints. Used by the server to listen for new token
+ * creation events across all supported chains.
  */
 
 export interface SolanaLaunchpad {
@@ -49,7 +47,7 @@ export const LAUNCHPAD_CONFIG: Record<string, ChainConfig> = {
       {
         id: 'stonkfun',
         name: 'Stonkfun',
-        factoryAddress: 'STNK...PLACEHOLDER_PROGRAM_ID',
+        factoryAddress: '6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx',
         eventType: 'solana_program_log',
         signatureKeyword: 'Instruction: CreateCoin',
       },
@@ -64,19 +62,19 @@ export const LAUNCHPAD_CONFIG: Record<string, ChainConfig> = {
       {
         id: 'o1exchange',
         name: 'O1 Exchange',
-        factoryAddress: '0x01...PLACEHOLDER_ADDRESS',
+        factoryAddress: '0x8909Dc15e2017e5d71a179612A0f496ACD58eeF0',
         topic0: UNISWAP_V2_PAIR_CREATED_TOPIC0,
       },
       {
         id: 'stonk',
         name: 'Stonk Base',
-        factoryAddress: '0x...PLACEHOLDER_ADDRESS',
+        factoryAddress: '0x35084B692F09193796d1D50A2E2C85C83416FfeE',
         topic0: UNISWAP_V2_PAIR_CREATED_TOPIC0,
       },
       {
         id: 'openlaunch',
         name: 'OpenLaunch',
-        factoryAddress: '0x...PLACEHOLDER_ADDRESS',
+        factoryAddress: '0x028682F8125C170F5E6c5EE5cBA116AC6C3A824b',
         topic0: UNISWAP_V2_PAIR_CREATED_TOPIC0,
       },
     ],
@@ -90,19 +88,19 @@ export const LAUNCHPAD_CONFIG: Record<string, ChainConfig> = {
       {
         id: 'pons',
         name: 'Pons',
-        factoryAddress: '0x...PLACEHOLDER_ADDRESS',
+        factoryAddress: '0x39dBED3a2bd333467115dE45665cC57F813C4571',
         topic0: UNISWAP_V2_PAIR_CREATED_TOPIC0,
       },
       {
         id: 'longpad',
         name: 'Long',
-        factoryAddress: '0x...PLACEHOLDER_ADDRESS',
+        factoryAddress: '0x17A6321287e076A1B0220A9aEE2a20e231b17bF1',
         topic0: UNISWAP_V2_PAIR_CREATED_TOPIC0,
       },
       {
         id: 'openlaunch',
         name: 'OpenLaunch RH',
-        factoryAddress: '0x...PLACEHOLDER_ADDRESS',
+        factoryAddress: '0x1034A0a7E01C31f0E36087d853b51Ac60D25C030',
         topic0: UNISWAP_V2_PAIR_CREATED_TOPIC0,
       },
     ],
@@ -116,7 +114,7 @@ export const LAUNCHPAD_CONFIG: Record<string, ChainConfig> = {
       {
         id: 'inkypump',
         name: 'InkyPump',
-        factoryAddress: '0x...PLACEHOLDER_ADDRESS',
+        factoryAddress: '0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed',
         topic0: UNISWAP_V2_PAIR_CREATED_TOPIC0,
       },
     ],
