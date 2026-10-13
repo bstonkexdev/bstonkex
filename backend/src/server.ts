@@ -713,6 +713,7 @@ function connectPumpPortal(): void {
             symbol: data.symbol,
             name: data.name,
             uri: data.uri || data.metadataUri,
+            icon: data.icon || data.image || '',
             chain: 'sol',
             launchpad: 'pumpfun',
             price: String(spotPrice),
@@ -866,14 +867,17 @@ async function fetchMetadataAndEnrich(mint: string, uri: string) {
 // ── Token Event Ingestion with Async Metadata ──────────────────
 function ingestTokenEvent(event: {
   mint: string; symbol?: string; name?: string; uri?: string;
-  chain?: string; launchpad?: string; price?: string;
+  chain?: string; launchpad?: string; price?: string; icon?: string;
 }) {
-  const { mint, symbol, name, uri, chain, launchpad, price } = event;
+  const { mint, symbol, name, uri, chain, launchpad, price, icon } = event;
   const ch = (chain || 'sol').toLowerCase();
   const lp = (launchpad || 'pumpfun').toLowerCase();
   const { hsetAll, zadd } = require('./trenches-store.js');
 
-  // A. Immediate base record (image pending)
+  // Resolve image: use direct icon if provided, else sanitize from IPFS URI
+  const directImage = icon ? sanitizeUri(icon) : '';
+
+  // A. Immediate base record (image from icon or pending enrichment)
   hsetAll(`token:${mint}`, {
     mint,
     symbol: symbol || 'TOKEN',
@@ -881,7 +885,7 @@ function ingestTokenEvent(event: {
     chain: ch,
     launchpad: lp,
     uri: sanitizeUri(uri),
-    image: '',
+    image: directImage,
     twitter: '', telegram: '', website: '',
     spotPrice: price || '0.0000',
     virtualMcap: price ? String(parseFloat(price) * 1e9) : '6000',
@@ -891,17 +895,21 @@ function ingestTokenEvent(event: {
     createdAt: String(Date.now()),
   });
 
-  // B. Index into sorted sets
+  // B. Index into ALL sorted sets (including tokens:{chain} for fallback)
   const now = Date.now();
   zadd(`trenches:${ch}:${lp}:new`, now, mint);
   zadd(`trenches:${ch}:${lp}:trending`, now, mint);
+  zadd(`trenches:${ch}:${lp}`, now, mint);
   zadd(`trenches:${lp}`, now, mint);
+  zadd(`tokens:${ch}`, now, mint);
   zadd('trenches:pumpfun', now, mint);
 
-  // C. Async metadata enrichment (non-blocking)
-  const cleanUri = sanitizeUri(uri);
-  if (cleanUri) {
-    setTimeout(() => fetchMetadataAndEnrich(mint, cleanUri), 50);
+  // C. Async metadata enrichment (only if no direct icon)
+  if (!directImage) {
+    const cleanUri = sanitizeUri(uri);
+    if (cleanUri) {
+      setTimeout(() => fetchMetadataAndEnrich(mint, cleanUri), 50);
+    }
   }
 }
 

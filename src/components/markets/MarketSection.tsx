@@ -69,16 +69,23 @@ export default function MarketSection() {
         const res = await fetch(`${API}/api/tokens/cached?${query}`);
         const data = await res.json();
         if (!cancelled && Array.isArray(data)) {
-          setTokens(data.map((t: any) => ({
-            mint: t.mint || '', name: t.name || 'Unknown', symbol: t.symbol || '???',
-            image: t.image || t.icon || null,
-            progress: parseFloat(t.bondingCurveProgress) || 0,
-            mcap: parseFloat(t.virtualMcap) || parseFloat(t.spotPrice || t.price || '0') * 1e9,
-            holders: parseInt(t.holders) || 0,
-            priceUsd: parseFloat(t.spotPrice || t.price) || 0,
-            change24h: parseFloat(t.priceChange24h || t.change24h) || 0,
-            createdAt: parseInt(t.createdAt) || Date.now(),
-          })));
+          setTokens(data.map((t: any) => {
+            // Normalize image: prefer direct URL, convert ipfs:// to cf-ipfs.com
+            let img = (t.image || t.icon || '').trim();
+            if (img.startsWith('ipfs://')) {
+              img = 'https://cf-ipfs.com/ipfs/' + img.replace('ipfs://', '').replace(/^ipfs\//, '');
+            }
+            return {
+              mint: t.mint || '', name: t.name || 'Unknown', symbol: t.symbol || '???',
+              image: img || null,
+              progress: parseFloat(t.bondingCurveProgress) || 0,
+              mcap: parseFloat(t.virtualMcap) || parseFloat(t.spotPrice || t.price || '0') * 1e9,
+              holders: parseInt(t.holders) || 0,
+              priceUsd: parseFloat(t.spotPrice || t.price) || 0,
+              change24h: parseFloat(t.priceChange24h || t.change24h) || 0,
+              createdAt: parseInt(t.createdAt) || Date.now(),
+            };
+          }));
         }
       } catch { /* offline */ }
       finally { if (!cancelled) setLoading(false); }
