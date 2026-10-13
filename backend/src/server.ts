@@ -799,13 +799,13 @@ const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
   },
 };
 
-// ── IPFS Gateway Pool (multi-gateway rotation to avoid 429s) ──
+// ── IPFS Gateway Pool (cf-ipfs primary, fast + no rate-limit) ──
 const IPFS_GATEWAYS = [
-  'https://cloudflare-ipfs.com/ipfs/',
+  'https://cf-ipfs.com/ipfs/',
   'https://gateway.pinata.cloud/ipfs/',
+  'https://cloudflare-ipfs.com/ipfs/',
   'https://ipfs.io/ipfs/',
   'https://dweb.link/ipfs/',
-  'https://nftstorage.link/ipfs/',
 ];
 
 function extractIpfsHash(uri: string): string | null {
@@ -817,11 +817,9 @@ function extractIpfsHash(uri: string): string | null {
 
 function sanitizeUri(uri: string | undefined | null): string {
   if (!uri) return '';
-  if (uri.startsWith('ipfs://')) {
-    const hash = uri.replace('ipfs://', '').replace(/^ipfs\//, '');
-    return IPFS_GATEWAYS[0] + hash;
-  }
-  return uri;
+  const hash = extractIpfsHash(uri);
+  if (hash) return 'https://cf-ipfs.com/ipfs/' + hash;
+  return uri; // Already HTTPS non-IPFS — keep as-is
 }
 
 function buildGatewayUrls(uri: string): string[] {
@@ -851,13 +849,8 @@ async function fetchMetadataAndEnrich(mint: string, uri: string) {
     const { hsetAll } = require('./trenches-store.js');
     const rawImage = meta.image || meta.image_uri || meta.image_url || '';
 
-    // Resolve image through gateway rotation and store HTTPS URL
-    let imageUrl = '';
-    const imageUrls = buildGatewayUrls(rawImage);
-    // For images, just pick the first valid HTTPS URL (no need to fetch)
-    imageUrl = rawImage.startsWith('ipfs://')
-      ? imageUrls[0] // Cloudflare gateway as default
-      : rawImage;
+    // Always store as cf-ipfs.com HTTPS URL (fast, non-rate-limited)
+    const imageUrl = sanitizeUri(rawImage);
 
     hsetAll(`token:${mint}`, {
       image: imageUrl,
@@ -917,30 +910,41 @@ const cachedTokenRoutes: Record<string, (req: IncomingMessage, res: ServerRespon
   'GET /api/tokens/cached': (req, res) => {
     try {
       const url = new URL(req.url || '/', `http://${req.headers.host}`);
-      // Sanitize + lowercase all query params so `PUMPFUN` → `pumpfun`
-      const chain = (url.searchParams.get('chain') || 'sol').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-      const launchpad = (url.searchParams.get('launchpad') || 'pumpfun').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-      const filter = (url.searchParams.get('subFilter') || 'trending').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      // Normalize: strip non-alphanumeric, lowercase so PUMPFUN → pumpfun
+      const norm = (v: string | null, fallback: string) =>
+        (v || fallback).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const chain = norm(url.searchParams.get('chain'), 'sol');
+      const launchpad = norm(url.searchParams.get('launchpad'), 'pumpfun');
+      const filter = norm(url.searchParams.get('subFilter'), 'trending');
 
       const { zrevrange, hgetall } = require('./trenches-store.js');
 
-      // Priority 1: exact match trenches:{chain}:{launchpad}:{filter}
+      // Priority 1: trenches:{chain}:{launchpad}:{filter}
       let mints: string[] = zrevrange(`trenches:${chain}:${launchpad}:${filter}`, 0, 49) || [];
 
-      // Priority 2: flat launchpad key trenches:{launchpad}
+      // Priority 2: trenches:{chain}:{launchpad} (no filter)
+      if (mints.length === 0) {
+        mints = zrevrange(`trenches:${chain}:${launchpad}`, 0, 49) || [];
+      }
+
+      // Priority 3: tokens:{chain} (chain-level token index)
+      if (mints.length === 0) {
+        mints = zrevrange(`tokens:${chain}`, 0, 49) || [];
+      }
+
+      // Priority 4: flat launchpad key trenches:{launchpad}
       if (mints.length === 0) {
         mints = zrevrange(`trenches:${launchpad}`, 0, 49) || [];
       }
 
-      // Priority 3: scan all known launchpads on that chain
+      // Priority 5: scan all known launchpads on that chain
       if (mints.length === 0) {
         const chainLaunchpads = ['pumpfun', 'bags', 'stonkfun', 'flap', 'fourmeme', 'genius',
           'o1exchange', 'stonk', 'openlaunch', 'pons', 'longpad', 'inkypump',
           'archway', 'stablefun', 'sunpump'];
         for (const lp of chainLaunchpads) {
           if (lp === launchpad) continue;
-          const tryKeys = [`trenches:${chain}:${lp}:${filter}`, `trenches:${lp}`];
-          for (const key of tryKeys) {
+          for (const key of [`trenches:${chain}:${lp}:${filter}`, `trenches:${chain}:${lp}`, `trenches:${lp}`]) {
             mints = zrevrange(key, 0, 49) || [];
             if (mints.length > 0) break;
           }
@@ -948,7 +952,7 @@ const cachedTokenRoutes: Record<string, (req: IncomingMessage, res: ServerRespon
         }
       }
 
-      // Priority 4: global fallback — any tokens at all
+      // Priority 6: global fallback — any tokens at all
       if (mints.length === 0) {
         mints = zrevrange('trenches:pumpfun', 0, 49) || [];
       }
