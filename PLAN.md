@@ -1,21 +1,14 @@
-# Market Section Refactor — Build Plan
+# TerminalMarketNavigation — Build Plan
 
-## Files to Create/Modify (build order)
+## Files (build order)
 
-1. **`src/components/markets/MarketSection.tsx`** — New unified market section:
-   - Tier 1: Chain selector (All/BSC/SOL/Base)
-   - Tier 2: Launchpad list (per-chain, with logos)
-   - Tier 3: Filter bar (Trending/New/Bonding/Migrated/Gainers/Losers)
-   - Tier 4: Rich token rows (image+fallback, symbol, age, mcap, holders, price, 24h change)
-   - Cached fetch on mount + live PumpPortal WS ingestion
+1. **`src/components/markets/ChainLaunchpads.ts`** — 8-chain launchpad matrix (BSC, BASE, RH, SOL, INK, ARC, STABLE, TRON) + filter tabs + chain list
+2. **`src/components/markets/MarketSection.tsx`** — Rewrite: 4 tiers (chain drawer → launchpad list → filter toolbar → token feed) with cached fetch + live WS
+3. **`src/components/MarketsPage.tsx`** — Verify MarketSection import still works (no changes expected)
 
-2. **`src/components/markets/LaunchpadLogos.ts`** — Launchpad metadata (names, IDs, icons per chain)
-
-3. **`src/components/MarketsPage.tsx`** — Replace old filter stack + PumpFunMarketSection with new MarketSection
-
-## Architecture Decisions
-- Single component for the full market section (replaces 4+ scattered pieces)
-- Chain → Launchpad mapping drives data fetching
-- `useEffect` fetches cached tokens instantly on mount/switch
-- PumpPortal WS merges live tokens in real-time
-- Tailwind-style inline styles to match existing codebase patterns
+## Key Decisions
+- 8 chains: BSC, BASE, RH, SOL, INK, ARC, STABLE, TRON (all scrollable)
+- Launchpad logos: `/assets/launchpads/{id}.png` with `onError` → hide
+- 6 sub-filters: Trending/New/Bonding/Migrated/Gainers/Losers
+- Token tag shows chain name (e.g. "sol", "bsc") not "pump"
+- Cached fetch on mount + launchpad change, PumpPortal WS for live
