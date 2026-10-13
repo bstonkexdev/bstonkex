@@ -1,7 +1,7 @@
 // Cupcak8 Swap Token Safety — Pre-trade risk assessment
 import type { ChainId } from '../config';
 import { getChainAdapter } from './chain-registry';
-import { cacheGetOrCompute, CACHE_KEYS, TTL } from './cache';
+import { cacheGetOrCompute, TTL } from './cache';
 import { isSandboxed } from './sandbox';
 
 // ── Safety Check Result ──────────────────────────────────────
@@ -121,6 +121,17 @@ export async function checkTokenSafety(
         honeypotCheckPassed = null; // inconclusive
       }
     }
+
+    // 4. External safety audit (RugCheck for Solana, GoPlus for EVM)
+    try {
+      const { auditTokenExternal } = await import('./external-safety');
+      const external = await auditTokenExternal(chainId, tokenAddress);
+      if (external.checked) {
+        for (const flag of external.dangerFlags) {
+          warnings.push({ level: flag.severity, label: flag.label, detail: flag.detail });
+        }
+      }
+    } catch { /* external audit is optional */ }
 
     // Determine overall risk level
     return mkReport(chainId, tokenAddress, warnings, {

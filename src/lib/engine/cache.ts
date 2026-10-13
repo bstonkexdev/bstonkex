@@ -107,4 +107,5 @@ export const TTL = {
   QUOTE: 8_000,           // 8s — quotes expire quickly
   DISCOVERY: 45_000,      // 45s — market discovery refresh
   NEW_PAIRS: 30_000,      // 30s — new pairs update
+  SAFETY: 300_000,        // 5min — safety audits don't change often
 } as const;
