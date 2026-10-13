@@ -3,6 +3,7 @@
 // Only processes verified sources. Unverified sources are explicitly blocked.
 import type { DiscoveryAdapter, AdapterHealth, TokenIndexRecord } from './types';
 import { indexTokens, getCursor, saveCursor, saveHealth, getAllHealth } from '../token-index';
+import { renewLock } from './discovery-lock';
 import { createOpenLaunchAdapter } from './adapters/openlaunch-events';
 import { createPumpFunAdapter } from './adapters/pumpfun-program';
 import { createBagsApiAdapter } from './adapters/bags-api';
@@ -120,6 +121,10 @@ export async function runDiscoveryCycle(): Promise<{
       if (result.errors.length > 0) allErrors.push(...result.errors.map(e => `[${adapter.id}] ${e}`));
 
       adapterResults[adapter.id] = { new: newCount.added, scanned: result.scanned, errors: result.errors };
+
+      // Renew lock between adapters — Solana RPC calls are slow and multiple
+      // adapters can push total cycle time past the lock TTL.
+      await renewLock();
     } catch (e: any) {
       const errMsg = `[${adapter.id}] fatal: ${e.message}`;
       allErrors.push(errMsg);

@@ -12,7 +12,8 @@ import type { DiscoveryAdapter, DiscoveryCursor, DiscoveryScanResult, AdapterHea
 
 const RAYDIUM_CPMM_PROGRAM = 'CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C';
 const SOLANA_RPC = 'https://api.mainnet-beta.solana.com';
-const SIGNATURE_BATCH = 25;
+const SIGNATURE_BATCH = 50;
+const CONCURRENCY = 5;
 
 async function rpc(method: string, params: any): Promise<any> {
   const resp = await fetch(SOLANA_RPC, {
@@ -59,78 +60,81 @@ export function createRaydiumCpmmAdapter(): DiscoveryAdapter {
         const newSigs = sigs.filter((s: any) => s.slot > cursorSlot && !s.err);
 
         let maxSlot = cursorSlot;
-        for (const sigInfo of newSigs.slice(0, SIGNATURE_BATCH)) {
-          try {
-            const tx = await rpc('getTransaction', [
+        const toProcess = newSigs.slice(0, SIGNATURE_BATCH);
+
+        // Concurrent batch processing
+        for (let i = 0; i < toProcess.length; i += CONCURRENCY) {
+          const batch = toProcess.slice(i, i + CONCURRENCY);
+          const results = await Promise.allSettled(
+            batch.map((sigInfo: any) => rpc('getTransaction', [
               sigInfo.signature,
               { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' },
-            ]);
-            if (!tx) continue;
+            ]).then(tx => ({ tx, signature: sigInfo.signature })))
+          );
 
-            const message = tx.transaction?.message;
-            const accountKeys = message?.accountKeys?.map((k: any) => typeof k === 'string' ? k : k.pubkey) || [];
+          for (const r of results) {
+            if (r.status !== 'fulfilled' || !r.value.tx) continue;
+            const { tx, signature } = r.value;
 
-            // Raydium CPMM pool creation: look for SPL token mint initialization
-            // or the CPMM program's initializePool instruction
-            let baseMint: string | null = null;
+            try {
+              const message = tx.transaction?.message;
+              const accountKeys = message?.accountKeys?.map((k: any) => typeof k === 'string' ? k : k.pubkey) || [];
 
-            // Check parsed instructions for Raydium CPMM calls
-            const instructions = message?.instructions || [];
-            for (const ix of instructions) {
-              if (ix.programId === RAYDIUM_CPMM_PROGRAM && ix.parsed?.type === 'initializePool') {
-                // initializePool accounts: creator, ammConfig, poolState, tokenMint0, tokenMint1, ...
-                const info = ix.parsed.info || {};
-                baseMint = info.tokenMint0 || info.tokenMint1 || null;
-                break;
-              }
-            }
+              let baseMint: string | null = null;
 
-            // Fallback: check inner instructions for token mint initialization
-            if (!baseMint) {
-              const inner = tx.meta?.innerInstructions || [];
-              const seenMints = new Set<string>();
-              for (const group of inner) {
-                for (const ix of group.instructions || []) {
-                  if (ix.program === 'spl-token' && ix.parsed?.type === 'initializeAccount') {
-                    const mint = ix.parsed.info?.mint;
-                    if (mint) seenMints.add(mint);
-                  }
-                }
-              }
-              // For CPMM pools, the base token is typically the first unique mint
-              // (SOL/USDC are common quote tokens, so we filter them out)
-              const SOL_MINT = 'So11111111111111111111111111111111111111112';
-              const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-              for (const mint of seenMints) {
-                if (mint !== SOL_MINT && mint !== USDC_MINT) {
-                  baseMint = mint;
+              const instructions = message?.instructions || [];
+              for (const ix of instructions) {
+                if (ix.programId === RAYDIUM_CPMM_PROGRAM && ix.parsed?.type === 'initializePool') {
+                  const info = ix.parsed.info || {};
+                  baseMint = info.tokenMint0 || info.tokenMint1 || null;
                   break;
                 }
               }
-            }
 
-            if (baseMint && tx.slot > cursorSlot) {
-              tokens.push({
-                chainId: 'solana' as ChainId,
-                address: baseMint,
-                launchpadId: 'raydium',
-                launchpadName: 'Raydium',
-                creator: accountKeys[0] || null,
-                launchTimestamp: tx.blockTime ? tx.blockTime * 1000 : Date.now(),
-                blockNumber: null,
-                solanaSlot: tx.slot,
-                sourceTxHash: sigInfo.signature,
-                sourceLogIndex: 0,
-                discoverySource: 'solana_program',
-                discoveryStatus: 'verified',
-                marketDataStatus: 'awaiting',
-                name: null, symbol: null, icon: null,
-                marketState: 'launched',
-              });
-              if (tx.slot > maxSlot) maxSlot = tx.slot;
+              if (!baseMint) {
+                const inner = tx.meta?.innerInstructions || [];
+                const seenMints = new Set<string>();
+                for (const group of inner) {
+                  for (const ix of group.instructions || []) {
+                    if (ix.program === 'spl-token' && ix.parsed?.type === 'initializeAccount') {
+                      const mint = ix.parsed.info?.mint;
+                      if (mint) seenMints.add(mint);
+                    }
+                  }
+                }
+                const SOL_MINT = 'So11111111111111111111111111111111111111112';
+                const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+                for (const mint of seenMints) {
+                  if (mint !== SOL_MINT && mint !== USDC_MINT) {
+                    baseMint = mint;
+                    break;
+                  }
+                }
+              }
+
+              if (baseMint && tx.slot > cursorSlot) {
+                tokens.push({
+                  chainId: 'solana' as ChainId,
+                  address: baseMint,
+                  launchpadId: 'raydium',
+                  launchpadName: 'Raydium',
+                  creator: accountKeys[0] || null,
+                  launchTimestamp: tx.blockTime ? tx.blockTime * 1000 : Date.now(),
+                  blockNumber: null,
+                  solanaSlot: tx.slot,
+                  sourceTxHash: signature,
+                  sourceLogIndex: 0,
+                  discoverySource: 'solana_program',
+                  discoveryStatus: 'verified',
+                  marketDataStatus: 'awaiting',
+                  name: null, symbol: null, icon: null,
+                  marketState: 'launched',
+                });
+                if (tx.slot > maxSlot) maxSlot = tx.slot;
+              }
+            } catch (e: any) {
+              errors.push(`Raydium tx parse failed: ${e.message}`);
             }
-          } catch (e: any) {
-            errors.push(`Raydium tx parse failed: ${e.message}`);
           }
         }
 

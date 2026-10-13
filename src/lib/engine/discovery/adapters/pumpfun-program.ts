@@ -7,7 +7,8 @@ import type { DiscoveryAdapter, DiscoveryCursor, DiscoveryScanResult, AdapterHea
 
 const PROGRAM_ID = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
 const SOLANA_RPC = 'https://api.mainnet-beta.solana.com';
-const SIGNATURE_BATCH = 20;
+const SIGNATURE_BATCH = 50;
+const CONCURRENCY = 5; // Parallel getTransaction calls
 
 interface PumpFunTx {
   signature: string;
@@ -39,7 +40,11 @@ async function getTransaction(signature: string): Promise<PumpFunTx | null> {
     body: JSON.stringify({
       jsonrpc: '2.0', id: 1,
       method: 'getTransaction',
-      params: [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }],
+      params: [signature, {
+        encoding: 'jsonParsed',
+        maxSupportedTransactionVersion: 0,
+        commitment: 'confirmed',
+      }],
     }),
     signal: AbortSignal.timeout(15000),
   });
@@ -122,30 +127,40 @@ export function createPumpFunAdapter(): DiscoveryAdapter {
         const newSigs = sigs.filter((s: any) => s.slot > cursorSlot);
 
         let maxSlot = cursorSlot;
-        for (const sigInfo of newSigs.slice(0, SIGNATURE_BATCH)) {
-          try {
-            const tx = await getTransaction(sigInfo.signature);
-            if (tx && tx.mint && tx.slot > cursorSlot) {
-              tokens.push({
-                chainId: 'solana' as ChainId,
-                address: tx.mint,
-                launchpadId: 'pumpfun',
-                launchpadName: 'Pump.fun',
-                creator: tx.creator,
-                launchTimestamp: tx.timestamp ?? Date.now(),
-                blockNumber: null,
-                solanaSlot: tx.slot,
-                sourceTxHash: tx.signature,
-                sourceLogIndex: 0,
-                discoverySource: 'solana_program',
-                discoveryStatus: 'verified',
-                marketDataStatus: 'awaiting',
-                name: null, symbol: null, icon: null,
-              });
-              if (tx.slot > maxSlot) maxSlot = tx.slot;
+        const toProcess = newSigs.slice(0, SIGNATURE_BATCH);
+
+        // Concurrent batch processing — CONCURRENCY parallel getTransaction calls
+        for (let i = 0; i < toProcess.length; i += CONCURRENCY) {
+          const batch = toProcess.slice(i, i + CONCURRENCY);
+          const results = await Promise.allSettled(
+            batch.map(sigInfo => getTransaction(sigInfo.signature))
+          );
+          for (let j = 0; j < results.length; j++) {
+            const r = results[j];
+            if (r.status === 'fulfilled' && r.value) {
+              const tx = r.value;
+              if (tx.mint && tx.slot > cursorSlot) {
+                tokens.push({
+                  chainId: 'solana' as ChainId,
+                  address: tx.mint,
+                  launchpadId: 'pumpfun',
+                  launchpadName: 'Pump.fun',
+                  creator: tx.creator,
+                  launchTimestamp: tx.timestamp ?? Date.now(),
+                  blockNumber: null,
+                  solanaSlot: tx.slot,
+                  sourceTxHash: tx.signature,
+                  sourceLogIndex: 0,
+                  discoverySource: 'solana_program',
+                  discoveryStatus: 'verified',
+                  marketDataStatus: 'awaiting',
+                  name: null, symbol: null, icon: null,
+                });
+                if (tx.slot > maxSlot) maxSlot = tx.slot;
+              }
+            } else if (r.status === 'rejected') {
+              errors.push(`tx parse failed: ${r.reason?.message || 'unknown'}`);
             }
-          } catch (e: any) {
-            errors.push(`tx parse failed: ${e.message}`);
           }
         }
 

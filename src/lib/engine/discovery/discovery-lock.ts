@@ -3,7 +3,7 @@
 // TTL-based: lock auto-expires after LOCK_TTL_MS to handle crashed/tab-closed sessions.
 import { gitlawb } from '../../gitlawb';
 
-const LOCK_TTL_MS = 120_000;      // 2 minutes — max time a single discovery cycle should take
+const LOCK_TTL_MS = 300_000;      // 5 minutes — Solana RPC calls are slow on public endpoints
 const LOCK_RENEWAL_MS = 60_000;   // Renew lock every 60s during active work
 
 interface LockRecord {

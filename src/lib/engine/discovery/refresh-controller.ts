@@ -9,7 +9,7 @@
 // This is NOT a background loop — it is an on-demand, bounded scan.
 import { runDiscoveryCycle } from './discovery-service';
 import { enrichPendingTokens } from './market-enrichment';
-import { acquireLock, releaseLock, isLocked, getLockInfo } from './discovery-lock';
+import { acquireLock, releaseLock, isLocked, getLockInfo, renewLock } from './discovery-lock';
 
 const MIN_REFRESH_INTERVAL_MS = 45_000; // Minimum 45s between discovery cycles per session
 
@@ -55,8 +55,11 @@ export async function requestRefresh(): Promise<RefreshStatus> {
   const start = Date.now();
 
   try {
-    // Run discovery cycle
+    // Run discovery cycle (may take 1-3min on public Solana RPC)
     const discResult = await runDiscoveryCycle();
+
+    // Renew lock before enrichment (discovery may have taken a while)
+    await renewLock();
 
     // Run enrichment cycle
     const enrichResult = await enrichPendingTokens();
