@@ -6,6 +6,7 @@ import { LAUNCHPAD_REGISTRY, type Launchpad } from '../../lib/launchpads';
 import { getDiscovery, type MarketToken, type DiscoveryCategory } from '../../lib/market-discovery';
 import { useApp } from '../../lib/context';
 import LaunchpadTable from '../launchpad/LaunchpadTable';
+import LaunchpadTrenchesFeed from './LaunchpadTrenchesFeed';
 import ChainIcon from '../ChainIcon';
 
 type Category = 'all' | 'trending' | 'new' | 'gainers' | 'losers' | 'volume';
@@ -103,6 +104,9 @@ export default function LaunchpadContent() {
 
   return (
     <>
+      {/* Real-Time Launchpad Trenches Feed */}
+      <LaunchpadTrenchesFeed />
+
       {/* Stats + Search + Filters */}
       <section style={{
         padding: '12px 20px', borderBottom: '1px solid var(--border)',
