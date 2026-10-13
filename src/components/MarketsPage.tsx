@@ -14,7 +14,7 @@ import MarketOverview from './markets/MarketOverview';
 import TrenchesTerminal from './markets/TrenchesTerminal';
 import MarketChainFilter from './markets/MarketChainFilter';
 import LaunchpadLogoSelector from './markets/LaunchpadLogoSelector';
-import CategoryTabs, { CATEGORIES } from './markets/CategoryTabs';
+import SubFilterBar, { type SubFilter, getSubFilterCategory, applySubFilter } from './markets/SubFilterBar';
 import FilterDrawer, { type FilterState, DEFAULT_FILTERS as FILTER_DEFAULTS } from './markets/FilterDrawer';
 import MarketTable from './markets/MarketTable';
 import MarketMobileList from './markets/MarketMobileList';
@@ -30,7 +30,7 @@ const SORT_MAP: Record<SortBy, SortField> = {
 
 export default function MarketsPage() {
   const { setTradeToken, wallet } = useApp();
-  const [catTab, setCatTab] = useState('trending');
+  const [subFilter, setSubFilter] = useState<SubFilter>('new');
   const [search, setSearch] = useState('');
   const [chain, setChain] = useState<ChainId | 'all'>('all');
   const [sortBy, setSortBy] = useState<SortBy>('volume');
@@ -45,9 +45,8 @@ export default function MarketsPage() {
   const [selectedLaunchpad, setSelectedLaunchpad] = useState<string | null>(null);
 
   const discoveryCat = useMemo((): DiscoveryCategory => {
-    const found = CATEGORIES.find(c => c.id === catTab);
-    return (found?.mapped ?? 'trending') as DiscoveryCategory;
-  }, [catTab]);
+    return getSubFilterCategory(subFilter);
+  }, [subFilter]);
 
   useEffect(() => {
     setLoading(true);
@@ -100,9 +99,10 @@ export default function MarketsPage() {
   }, [setTradeToken]);
 
   const processed = useMemo(() => {
-    if (catTab === 'watchlist') return tokens.filter(t => watchedAddresses.has(t.address));
     const marketFilters: MarketFilters = { ...DEFAULT_FILTERS, chain };
     let filtered = filterTokens(tokens, marketFilters);
+    // Apply Ave.ai sub-filter: New / Bonding / Migrated / Gainers / Losers
+    filtered = applySubFilter(filtered, subFilter);
     if (filters.minMcap) filtered = filtered.filter(t => t.marketCap != null && t.marketCap >= parseFloat(filters.minMcap));
     if (filters.maxMcap) filtered = filtered.filter(t => t.marketCap != null && t.marketCap <= parseFloat(filters.maxMcap));
     if (filters.minLiquidity) filtered = filtered.filter(t => t.liquidity != null && t.liquidity >= parseFloat(filters.minLiquidity));
@@ -116,7 +116,7 @@ export default function MarketsPage() {
       );
     }
     return sortTokens(filtered, SORT_MAP[sortBy], sortDir);
-  }, [tokens, chain, filters, search, sortBy, sortDir, catTab, watchedAddresses]);
+  }, [tokens, chain, filters, search, sortBy, sortDir, subFilter]);
 
   const paged = processed.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
   const totalPages = Math.ceil(processed.length / PER_PAGE);
@@ -205,25 +205,25 @@ export default function MarketsPage() {
       {/* ── MARKET OVERVIEW ────────────────────────────────── */}
       <MarketOverview tokens={tokens} loading={loading} />
 
-      {/* ── TRENCHES TERMINAL (Real-Time Launchpad Feed) ───── */}
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-        <TrenchesTerminal />
-      </div>
-
-      {/* ── CHAIN FILTER ───────────────────────────────────── */}
+      {/* ── ROW 1: CHAIN BUTTONS (ALL / BNB / SOL / BASE) ──── */}
       <div style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
         <MarketChainFilter active={chain} onChange={c => { setChain(c); setSelectedLaunchpad(null); setPageNum(0); }} />
       </div>
 
-      {/* ── LAUNCHPAD LOGO SELECTOR ─────────────────────────── */}
+      {/* ── ROW 2: LAUNCHPAD LOGO BUTTONS (filtered by chain) ─ */}
       <LaunchpadLogoSelector
         chain={chain}
         selectedLaunchpad={selectedLaunchpad}
         onSelect={setSelectedLaunchpad}
       />
 
-          {/* ── CATEGORY TABS ──────────────────────────────────── */}
-          <CategoryTabs active={catTab} onChange={v => { setCatTab(v); setPageNum(0); }} />
+      {/* ── ROW 3: SUB-FILTER BAR [New] [Bonding] [Migrated] [Gainers] [Losers] ─ */}
+      <SubFilterBar active={subFilter} onChange={v => { setSubFilter(v); setPageNum(0); }} />
+
+      {/* ── TRENCHES TERMINAL (Real-Time Launchpad Feed) ───── */}
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+        <TrenchesTerminal />
+      </div>
 
           {/* ── TOOLBAR (sort + filter) ──────────────────────────── */}
           <div style={{
@@ -282,8 +282,8 @@ export default function MarketsPage() {
           {/* ── DESKTOP TABLE ───────────────────────────────────── */}
           <div className="markets-desktop" style={{ flex: 1, overflow: 'auto' }}>
             <MarketTable
-              tokens={paged} loading={loading} category={catTab}
-              onClickToken={handleTrade} onExplore={() => setCatTab('trending')}
+              tokens={paged} loading={loading} category={subFilter}
+              onClickToken={handleTrade} onExplore={() => setSubFilter('new')}
               watchedAddresses={watchedAddresses} onToggleWatch={toggleWatch}
               onQuickBuy={handleTrade}
             />
@@ -292,8 +292,8 @@ export default function MarketsPage() {
           {/* ── MOBILE CARDS ───────────────────────────────────── */}
           <div className="markets-mobile" style={{ flex: 1, overflow: 'auto', padding: '8px 12px' }}>
             <MarketMobileList
-              tokens={paged} loading={loading} category={catTab}
-              onClickToken={handleTrade} onExplore={() => setCatTab('trending')}
+              tokens={paged} loading={loading} category={subFilter}
+              onClickToken={handleTrade} onExplore={() => setSubFilter('new')}
               watchedAddresses={watchedAddresses} onToggleWatch={toggleWatch}
               onQuickBuy={handleTrade}
             />
