@@ -18,7 +18,7 @@ let registered = false;
 
 /**
  * Register the discovery pipeline (idempotent).
- * Starts the PumpPortal real-time WebSocket stream for instant new token detection.
+ * Starts the PumpPortal real-time WebSocket stream and the live token broadcast layer.
  * Use requestRefresh() from refresh-controller.ts for polling-based discovery.
  */
 export function initDiscoveryPipeline(): void {
@@ -28,6 +28,13 @@ export function initDiscoveryPipeline(): void {
   // Start the PumpPortal real-time WebSocket stream — this catches EVERY
   // Pump.fun token creation instantly (no polling, no RPC latency).
   startPumpPortalStream();
+
+  // Initialize the real-time token broadcast layer (Socket.io-equivalent)
+  // and load initial tokens from the index.
+  import('./live-tokens').then(m => {
+    m.initLiveTokenBroadcast();
+    m.loadInitialTokens().catch(() => {});
+  }).catch(() => {});
 
   // Fetch SOL/USD price and pass it to the stream for USD conversions
   import('../sol-price').then(async m => {
