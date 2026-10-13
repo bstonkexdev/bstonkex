@@ -38,14 +38,56 @@ const SUB_FILTERS = [
   { id: 'losers' as const, label: '📉 Losers' },
 ];
 
+const LAUNCHPADS = [
+  { id: 'pumpfun', label: '🟢 Pump.fun' },
+  { id: 'bags', label: '🟣 Bags' },
+  { id: 'stonk', label: '🟡 Stonk' },
+  { id: 'fourmeme', label: '🔵 Four.meme' },
+];
+
 type SubFilter = typeof SUB_FILTERS[number]['id'];
+
+const API_BASE = 'https://api.bstonkex.xyz';
 
 export default function PumpFunMarketSection() {
   const [activeSubFilter, setActiveSubFilter] = useState<SubFilter>('bonding');
+  const [activeLaunchpad, setActiveLaunchpad] = useState('pumpfun');
   const [tokens, setTokens] = useState<PumpToken[]>([]);
   const [connected, setConnected] = useState(false);
+  const [loadingCached, setLoadingCached] = useState(true);
 
-  // Ingest PumpPortal tokens
+  // Fetch cached tokens from backend — populates list instantly
+  useEffect(() => {
+    async function fetchCachedTokens() {
+      setLoadingCached(true);
+      try {
+        const response = await fetch(`${API_BASE}/api/tokens/trenches/${activeLaunchpad}`);
+        const cachedTokens = await response.json();
+        if (Array.isArray(cachedTokens) && cachedTokens.length > 0) {
+          const parsed: PumpToken[] = cachedTokens.map((t: any) => ({
+            mint: t.mint || '',
+            name: t.name || 'Unknown',
+            symbol: t.symbol || '???',
+            image: t.image || t.icon || null,
+            progress: parseFloat(t.bondingCurveProgress) || 0,
+            mcap: parseFloat(t.virtualMcap) || parseFloat(t.spotPrice || '0') * 1e9,
+            age: formatAge(parseInt(t.createdAt) || Date.now()),
+            priceChange24h: parseFloat(t.priceChange24h) || 0,
+            createdAt: parseInt(t.createdAt) || Date.now(),
+            spotPrice: parseFloat(t.spotPrice) || 0,
+          }));
+          setTokens(parsed);
+        }
+      } catch (err) {
+        console.error('Failed to load cached tokens:', err);
+      } finally {
+        setLoadingCached(false);
+      }
+    }
+    fetchCachedTokens();
+  }, [activeLaunchpad]);
+
+  // Ingest PumpPortal live tokens
   useEffect(() => {
     const unsub = onTokenCreate((record: TokenIndexRecord) => {
       const token: PumpToken = {
@@ -92,6 +134,26 @@ export default function PumpFunMarketSection() {
 
   return (
     <div className="w-full flex flex-col gap-3">
+      {/* Launchpad Selector */}
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {LAUNCHPADS.map(lp => (
+          <button
+            key={lp.id}
+            onClick={() => setActiveLaunchpad(lp.id)}
+            style={{
+              padding: '5px 12px', borderRadius: 16, cursor: 'pointer',
+              fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
+              background: activeLaunchpad === lp.id ? '#22C55E' : 'var(--bg-surface, #fff)',
+              color: activeLaunchpad === lp.id ? '#fff' : 'var(--text-dim, #6B7280)',
+              border: activeLaunchpad === lp.id ? '2px solid #22C55E' : '2px solid var(--border, #E5E7EB)',
+              transition: 'all 0.15s',
+            }}
+          >
+            {lp.label}
+          </button>
+        ))}
+      </div>
+
       {/* Sub-Filter Bar */}
       <div style={{
         display: 'flex', gap: 6, overflowX: 'auto', padding: '4px 0',
@@ -156,9 +218,11 @@ export default function PumpFunMarketSection() {
           }}>
             <div style={{ fontSize: 28, marginBottom: 6, opacity: 0.3 }}>📡</div>
             <div style={{ fontWeight: 600, marginBottom: 2 }}>
-              {connected ? 'Waiting for new token launches...' : 'Connecting to PumpPortal...'}
+              {loadingCached ? 'Loading cached tokens...' : connected ? 'Waiting for new token launches...' : 'Connecting to PumpPortal...'}
             </div>
-            <div style={{ fontSize: 10, opacity: 0.6 }}>Tokens appear here in real-time</div>
+            <div style={{ fontSize: 10, opacity: 0.6 }}>
+              {loadingCached ? 'Fetching from API' : 'Tokens appear here in real-time'}
+            </div>
           </div>
         ) : (
           displayedTokens.slice(0, 50).map((token) => (
