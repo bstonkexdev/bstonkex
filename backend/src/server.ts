@@ -642,28 +642,99 @@ const discoveryState: DiscoveryState = {
 
 // Scheduled discovery (server-side) — runs if DISCOVERY_INTERVAL_MS is set
 const DISCOVERY_INTERVAL_MS = parseInt(process.env.DISCOVERY_INTERVAL_MS || '0');
-if (DISCOVERY_INTERVAL_MS > 0) {
-  log('info', `Scheduled discovery enabled — ${DISCOVERY_INTERVAL_MS}ms interval`);
-  setInterval(async () => {
-    if (discoveryState.isRunning) return;
-    discoveryState.isRunning = true;
-    try {
-      // Server-side discovery placeholder: call the same adapter logic used by the frontend.
-      // When deployed, this runs without browser constraints.
-      discoveryState.lastRunAt = Date.now();
-      log('info', 'Scheduled discovery cycle completed');
-    } catch (e: any) {
-      discoveryState.lastError = e.message;
-      log('error', `Scheduled discovery failed: ${e.message}`);
-    } finally {
-      discoveryState.isRunning = false;
-    }
-  }, DISCOVERY_INTERVAL_MS);
-} else {
-  log('info', 'Scheduled discovery disabled — set DISCOVERY_INTERVAL_MS to enable');
+
+// ── Server-Side PumpPortal Stream ──────────────────────────
+// Maintains a persistent WebSocket to PumpPortal for real-time token events.
+// Stores tokens in memory and serves them via /api/discovery/tokens.
+
+interface ServerToken {
+  mint: string; name: string; symbol: string; creator: string;
+  virtualSol: number; virtualTokens: number; spotPrice: number;
+  bondingCurveProgress: number; createdAt: number;
 }
 
-// Discovery HTTP routes (handled in the main request handler)
+const serverTokens = new Map<string, ServerToken>();
+const MAX_SERVER_TOKENS = 500;
+let pumpWs: WebSocket | null = null;
+let pumpConnected = false;
+let pumpReconnects = 0;
+let pumpTokensReceived = 0;
+let pumpLastError: string | null = null;
+
+function connectPumpPortal(): void {
+  if (pumpWs) return;
+  try {
+    pumpWs = new WebSocket('wss://pumpportal.fun/api/data');
+
+    pumpWs.on('open', () => {
+      pumpConnected = true;
+      pumpLastError = null;
+      log('info', 'PumpPortal WebSocket connected');
+      pumpWs!.send(JSON.stringify({ method: 'subscribeNewToken' }));
+    });
+
+    pumpWs.on('message', (raw: Buffer) => {
+      try {
+        const data = JSON.parse(raw.toString());
+        if (data.txType === 'create' && data.mint) {
+          const spotPrice = data.vSolInBondingCurve / data.vTokensInBondingCurve;
+          const solInCurve = data.vSolInBondingCurve || 30;
+          const progress = Math.min(100, (solInCurve / 85) * 100);
+
+          serverTokens.set(data.mint, {
+            mint: data.mint,
+            name: data.name || 'Unknown',
+            symbol: data.symbol || '???',
+            creator: data.traderPublicKey || '',
+            virtualSol: data.vSolInBondingCurve || 0,
+            virtualTokens: data.vTokensInBondingCurve || 0,
+            spotPrice,
+            bondingCurveProgress: progress,
+            createdAt: Date.now(),
+          });
+
+          if (serverTokens.size > MAX_SERVER_TOKENS) {
+            const oldest = [...serverTokens.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt)[0];
+            if (oldest) serverTokens.delete(oldest[0]);
+          }
+
+          pumpTokensReceived++;
+
+          // Broadcast to all connected WebSocket clients
+          const tokenData = JSON.stringify({ type: 'NEW_LAUNCHPAD_TOKEN', data: serverTokens.get(data.mint) });
+          wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(tokenData);
+            }
+          });
+        }
+      } catch { /* malformed */ }
+    });
+
+    pumpWs.on('error', (err: Error) => {
+      pumpLastError = err.message;
+      log('error', `PumpPortal WS error: ${err.message}`);
+    });
+
+    pumpWs.on('close', () => {
+      pumpConnected = false;
+      pumpWs = null;
+      pumpReconnects++;
+      log('warn', 'PumpPortal WS closed — reconnecting in 5s');
+      setTimeout(connectPumpPortal, 5000);
+    });
+  } catch (e: any) {
+    pumpLastError = e.message;
+    pumpConnected = false;
+    pumpWs = null;
+    setTimeout(connectPumpPortal, 5000);
+  }
+}
+
+// Start PumpPortal stream on server boot
+connectPumpPortal();
+
+// Discovery routes now include token data + PumpPortal health
 const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse) => void> = {
   'GET /api/discovery/status': (_req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -671,25 +742,24 @@ const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
       ...discoveryState,
       scheduledEnabled: DISCOVERY_INTERVAL_MS > 0,
       scheduledIntervalMs: DISCOVERY_INTERVAL_MS || null,
+      pumpportal: {
+        connected: pumpConnected,
+        tokensReceived: pumpTokensReceived,
+        reconnects: pumpReconnects,
+        lastError: pumpLastError,
+        trackedTokens: serverTokens.size,
+      },
     }));
   },
+  'GET /api/discovery/tokens': (_req, res) => {
+    const tokens = [...serverTokens.values()].sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ tokens, total: serverTokens.size, pumpConnected }));
+  },
   'POST /api/discovery/refresh': (_req, res) => {
-    if (discoveryState.isRunning) {
-      res.writeHead(409, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Discovery already running' }));
-      return;
-    }
-    discoveryState.isRunning = true;
-    // Return immediately — discovery runs async
-    res.writeHead(202, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ started: true, timestamp: Date.now() }));
-
-    // Trigger discovery (placeholder — call adapter logic here)
-    setTimeout(() => {
-      discoveryState.lastRunAt = Date.now();
-      discoveryState.isRunning = false;
-      log('info', 'Manual discovery refresh completed');
-    }, 100);
+    if (!pumpConnected) connectPumpPortal();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, pumpConnected, trackedTokens: serverTokens.size }));
   },
 };
 

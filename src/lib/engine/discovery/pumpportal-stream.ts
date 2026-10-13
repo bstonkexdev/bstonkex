@@ -284,8 +284,10 @@ function connect(): void {
 
       // Subscribe to new token creation events
       ws!.send(JSON.stringify({ method: 'subscribeNewToken' }));
-      // Also subscribe to trades for live bonding curve price updates
-      ws!.send(JSON.stringify({ method: 'subscribeTokenTrade' }));
+      // Note: subscribeTokenTrade requires specific token keys.
+      // Trade updates for tracked tokens are received via the create event's
+      // bonding curve data, plus periodic enrichment. Avoid subscribing to
+      // ALL trades (no keys) — it floods the connection and causes disconnects.
     };
 
     ws.onmessage = (e: MessageEvent) => {
@@ -348,4 +350,15 @@ export function stopPumpPortalStream(): void {
 /** Update the SOL/USD price used for converting virtual SOL to USD. */
 export function setSolUsdPrice(price: number): void {
   _solUsd = price;
+}
+
+/** Get stream health for diagnostics / UI status display. */
+export function getStreamHealth() {
+  return {
+    ...stats,
+    trackedMints: seenMints.size,
+    livePriceEntries: livePrices.size,
+    isRunning,
+    wsUrl: WS_URL,
+  };
 }
