@@ -22,7 +22,7 @@ export const CHAIN_LIST: ChainInfo[] = [
   { key: 'INK', label: 'Ink', logo: CHAIN_LOGOS.ink, color: '#7B3FE4' },
   { key: 'ARC', label: 'Arc', logo: CHAIN_LOGOS.arc, color: '#E84142' },
   { key: 'STABLE', label: 'Stable', logo: CHAIN_LOGOS.stable, color: '#26A17B' },
-  { key: 'TRON', label: 'Tron', logo: '', color: '#EF0027' },
+  { key: 'TRON', label: 'Tron', logo: '/assets/1791895113291-t3hkdu.png', color: '#EF0027' },
 ];
 
 export const CHAINS = CHAIN_LIST.map(c => c.key);
