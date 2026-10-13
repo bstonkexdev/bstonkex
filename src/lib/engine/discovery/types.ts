@@ -62,6 +62,10 @@ export interface TokenIndexRecord {
   symbol: string | null;
   icon: string | null;
 
+  // Social links (from DexScreener enrichment)
+  websites: string[] | null;
+  socials: { platform: string; url: string }[] | null;
+
   // Bookkeeping
   createdAt: number;
   updatedAt: number;
@@ -124,4 +128,8 @@ export interface EnrichmentResult {
   icon: string | null;
   source: string;              // which provider enriched this
   enrichedAt: number;
+  /** Official websites (from DexScreener info field) */
+  websites: string[] | null;
+  /** Social profiles (Twitter, Telegram, Discord, etc.) */
+  socials: { platform: string; url: string }[] | null;
 }

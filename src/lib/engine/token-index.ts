@@ -82,7 +82,12 @@ export async function indexToken(record: TokenIndexRecord): Promise<{ added: boo
       return { added: false, persisted: true };
     }
 
-    await col.create({ ...record, createdAt: Date.now(), updatedAt: Date.now() });
+    await col.create({
+      ...record,
+      websites: record.websites ?? null,
+      socials: record.socials ?? null,
+      createdAt: Date.now(), updatedAt: Date.now(),
+    });
     indexCache.set(key, { record, remoteConfirmed: true });
     recordSuccess('token_index');
     return { added: true, persisted: true };
@@ -204,7 +209,7 @@ export async function listIndexedTokens(opts?: {
 export async function updateMarketData(
   chainId: ChainId,
   address: string,
-  data: Partial<Pick<TokenIndexRecord, 'price' | 'volume24h' | 'liquidity' | 'marketCap' | 'name' | 'symbol' | 'icon' | 'marketDataStatus' | 'lastEnrichedAt' | 'routeVerified' | 'routeVerifiedAt' | 'routeProvider' | 'routeDirection' | 'routeError' | 'routeBuyVerified' | 'routeSellVerified' | 'routeBothVerified' | 'marketState' | 'bondingCurveProgress' | 'priceSource' | 'liquidityType'>>
+  data: Partial<Pick<TokenIndexRecord, 'price' | 'volume24h' | 'liquidity' | 'marketCap' | 'name' | 'symbol' | 'icon' | 'marketDataStatus' | 'lastEnrichedAt' | 'routeVerified' | 'routeVerifiedAt' | 'routeProvider' | 'routeDirection' | 'routeError' | 'routeBuyVerified' | 'routeSellVerified' | 'routeBothVerified' | 'marketState' | 'bondingCurveProgress' | 'priceSource' | 'liquidityType' | 'websites' | 'socials'>>
 ): Promise<boolean> {
   const key = cacheKey(chainId, address);
   const cached = indexCache.get(key);

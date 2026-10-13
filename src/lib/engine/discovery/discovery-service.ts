@@ -1,12 +1,14 @@
 // Cupcak8 Swap — Discovery Service
 // Orchestrates discovery adapters with cursors, retry, health tracking.
 // Only processes verified sources. Unverified sources are explicitly blocked.
-import type { ChainId } from '../../config';
-import type { DiscoveryAdapter, DiscoveryCursor, AdapterHealth, TokenIndexRecord } from './types';
+import type { DiscoveryAdapter, AdapterHealth, TokenIndexRecord } from './types';
 import { indexTokens, getCursor, saveCursor, saveHealth, getAllHealth } from '../token-index';
 import { createOpenLaunchAdapter } from './adapters/openlaunch-events';
 import { createPumpFunAdapter } from './adapters/pumpfun-program';
 import { createBagsApiAdapter } from './adapters/bags-api';
+import { createDexScreenerNewPairsAdapter } from './adapters/dexscreener-newpairs';
+import { createPumpSwapAdapter } from './adapters/pumpswap-amm';
+import { createRaydiumCpmmAdapter } from './adapters/raydium-cpmm';
 
 // ── Registered Adapters (verified sources only) ─────────────
 
@@ -37,6 +39,13 @@ registerAdapter(createOpenLaunchAdapter('base'));
 registerAdapter(createOpenLaunchAdapter('robinhood'));
 registerAdapter(createPumpFunAdapter());
 registerAdapter(createBagsApiAdapter());
+// Native Solana DEX adapters — detects new pools directly on-chain
+registerAdapter(createPumpSwapAdapter());    // Pump.fun graduation → PumpSwap AMM
+registerAdapter(createRaydiumCpmmAdapter()); // Raydium CPMM (memecoin pools)
+// Broad catch-all: DexScreener covers every DEX and launchpad we don't have
+// a native adapter for yet (Meteora, Orca, PancakeSwap, Uniswap, FOUR.MEME,
+// FLAP, Moonshot, etc.).
+registerAdapter(createDexScreenerNewPairsAdapter());
 
 // ── Discovery Service ───────────────────────────────────────
 
@@ -81,13 +90,20 @@ export async function runDiscoveryCycle(): Promise<{
         marketDataStatus: t.marketDataStatus!,
         lastEnrichedAt: null,
         price: null, volume24h: null, liquidity: null, marketCap: null,
+        priceSource: 'none', liquidityType: null,
+        marketState: (t as any).marketState ?? 'unknown',
+        tradeCount24h: null, buys24h: null, sells24h: null,
+        holdersEstimate: null, bondingCurveProgress: null,
         routeVerified: false, routeVerifiedAt: null, routeProvider: null,
         routeDirection: null, routeError: null,
         routeBuyVerified: false, routeSellVerified: false,
         routeBothVerified: false,
         name: t.name ?? null, symbol: t.symbol ?? null, icon: t.icon ?? null,
+        websites: t.websites ?? null, socials: t.socials ?? null,
         createdAt: Date.now(), updatedAt: Date.now(),
       }));
+
+
 
       const newCount = await indexTokens(fullRecords);
 
@@ -99,11 +115,11 @@ export async function runDiscoveryCycle(): Promise<{
       // Save health
       await saveHealth(adapter.getHealth());
 
-      totalNew += newCount;
+      totalNew += newCount.added;
       totalScanned += result.scanned;
       if (result.errors.length > 0) allErrors.push(...result.errors.map(e => `[${adapter.id}] ${e}`));
 
-      adapterResults[adapter.id] = { new: newCount, scanned: result.scanned, errors: result.errors };
+      adapterResults[adapter.id] = { new: newCount.added, scanned: result.scanned, errors: result.errors };
     } catch (e: any) {
       const errMsg = `[${adapter.id}] fatal: ${e.message}`;
       allErrors.push(errMsg);

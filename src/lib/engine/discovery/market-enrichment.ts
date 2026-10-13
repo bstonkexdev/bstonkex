@@ -102,6 +102,13 @@ async function enrichFromDexScreener(chainId: ChainId, address: string): Promise
 
     const best = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
 
+    const info = best.info || {};
+    const websites = Array.isArray(info.websites) ? info.websites.map((w: any) => w.url || w).filter(Boolean) : null;
+    const socials = Array.isArray(info.socials) ? info.socials.map((s: any) => ({
+      platform: s.type || s.platform || 'unknown',
+      url: s.url || '',
+    })).filter((s: any) => s.url) : null;
+
     return {
       address, chainId,
       price: best.priceUsd ? parseFloat(best.priceUsd) : null,
@@ -110,9 +117,11 @@ async function enrichFromDexScreener(chainId: ChainId, address: string): Promise
       marketCap: best.marketCap ?? best.fdv ?? null,
       name: best.baseToken?.name ?? null,
       symbol: best.baseToken?.symbol ?? null,
-      icon: best.info?.imageUrl ?? null,
+      icon: info.imageUrl ?? null,
       source: 'dexscreener',
       enrichedAt: Date.now(),
+      websites,
+      socials,
     };
   } catch { return null; }
 }
@@ -144,6 +153,7 @@ async function enrichFromGeckoTerminal(chainId: ChainId, address: string): Promi
       name: null, symbol: null, icon: null,
       source: 'geckoterminal',
       enrichedAt: Date.now(),
+      websites: null, socials: null,
     };
   } catch { return null; }
 }
@@ -168,6 +178,7 @@ async function enrichFromJupiter(address: string): Promise<EnrichmentResult | nu
       name: null, symbol: null, icon: null,
       source: 'jupiter',
       enrichedAt: Date.now(),
+      websites: null, socials: null,
     };
   } catch { return null; }
 }
@@ -239,6 +250,8 @@ export async function enrichPendingTokens(): Promise<EnrichmentCycleResult & { r
         name: result.name ?? token.name,
         symbol: result.symbol ?? token.symbol,
         icon: result.icon ?? token.icon,
+        websites: result.websites ?? undefined,
+        socials: result.socials ?? undefined,
         marketDataStatus: 'enriched',
         lastEnrichedAt: result.enrichedAt,
       });
