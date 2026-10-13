@@ -65,7 +65,18 @@ const livePrices = new Map<string, {
   spotPrice: number;
   lastTradeAt: number;
   lastTradeType: 'buy' | 'sell';
+  bondingCurveProgress: number;
 }>();
+
+// Bonding curve graduation threshold (Pump.fun migrates at ~85 SOL virtual reserves)
+const BONDING_CURVE_SOL_THRESHOLD = 85;
+
+// In-memory sorted views (replaces Redis sorted sets)
+// Sorted by creation time (newest first)
+const newestTokens: string[] = [];
+const MAX_NEWEST = 500;
+// Sorted by bonding curve progress (highest first)
+const bondingProgress = new Map<string, number>(); // mint → progress%
 
 // Stats for health display
 let stats = {
@@ -92,10 +103,32 @@ export function onTokenCreate(listener: CreateListener): () => void {
 }
 
 /** Get live bonding curve price for a token (updated by trade events). */
-export function getLivePrice(mint: string): { spotPrice: number; lastTradeAt: number } | null {
+export function getLivePrice(mint: string): { spotPrice: number; lastTradeAt: number; bondingCurveProgress: number } | null {
   const entry = livePrices.get(mint);
   if (!entry) return null;
-  return { spotPrice: entry.spotPrice, lastTradeAt: entry.lastTradeAt };
+  return { spotPrice: entry.spotPrice, lastTradeAt: entry.lastTradeAt, bondingCurveProgress: entry.bondingCurveProgress };
+}
+
+/** Get newest token mint addresses (newest first). */
+export function getNewestTokenMints(limit = 20): string[] {
+  return newestTokens.slice(0, limit);
+}
+
+/** Get tokens sorted by bonding curve progress (highest first). */
+export function getTopBondingProgressMints(limit = 20): { mint: string; progress: number }[] {
+  return [...bondingProgress.entries()]
+    .map(([mint, progress]) => ({ mint, progress }))
+    .sort((a, b) => b.progress - a.progress)
+    .slice(0, limit);
+}
+
+/** Get tokens close to graduation (bonding curve progress ≥ threshold%). */
+export function getNearGraduationMints(minProgress = 80, limit = 20): { mint: string; progress: number }[] {
+  return [...bondingProgress.entries()]
+    .map(([mint, progress]) => ({ mint, progress }))
+    .filter(t => t.progress >= minProgress)
+    .sort((a, b) => b.progress - a.progress)
+    .slice(0, limit);
 }
 
 /** Get stream health stats. */
@@ -110,9 +143,14 @@ export function isStreamConnected(): boolean {
 
 // ── Core Stream Logic ────────────────────────────────────────
 
+function calcBondingProgress(virtualSol: number): number {
+  return Math.min(100, Math.round((virtualSol / BONDING_CURVE_SOL_THRESHOLD) * 100 * 100) / 100);
+}
+
 function buildTokenRecord(event: PumpPortalCreateEvent): TokenIndexRecord {
   const spotPrice = event.vSolInBondingCurve / event.vTokensInBondingCurve;
   const solUsd = _solUsd;
+  const progress = calcBondingProgress(event.vSolInBondingCurve);
 
   return {
     chainId: 'solana',
@@ -141,7 +179,7 @@ function buildTokenRecord(event: PumpPortalCreateEvent): TokenIndexRecord {
     buys24h: 1,
     sells24h: 0,
     holdersEstimate: null,
-    bondingCurveProgress: 0,
+    bondingCurveProgress: progress,
     routeVerified: false,
     routeVerifiedAt: null,
     routeProvider: null,
@@ -184,13 +222,20 @@ function handleMessage(data: string): void {
 
       // Update live price cache
       const spotPrice = event.vSolInBondingCurve / event.vTokensInBondingCurve;
+      const progress = calcBondingProgress(event.vSolInBondingCurve);
       livePrices.set(event.mint, {
         sol: event.vSolInBondingCurve,
         tokens: event.vTokensInBondingCurve,
         spotPrice,
         lastTradeAt: Date.now(),
         lastTradeType: 'buy',
+        bondingCurveProgress: progress,
       });
+
+      // Maintain sorted views (replaces Redis sorted sets)
+      newestTokens.unshift(event.mint); // newest first
+      if (newestTokens.length > MAX_NEWEST) newestTokens.length = MAX_NEWEST;
+      bondingProgress.set(event.mint, progress);
 
       // Build token record and persist asynchronously (non-blocking)
       const record = buildTokenRecord(event);
@@ -205,15 +250,18 @@ function handleMessage(data: string): void {
       stats.lastCreateAt = Date.now();
 
     } else if (event.txType === 'buy' || event.txType === 'sell') {
-      // Update live price for bonding curve tokens
+      // Update live price and bonding curve progress
       const spotPrice = event.vSolInBondingCurve / event.vTokensInBondingCurve;
+      const progress = calcBondingProgress(event.vSolInBondingCurve);
       livePrices.set(event.mint, {
         sol: event.vSolInBondingCurve,
         tokens: event.vTokensInBondingCurve,
         spotPrice,
         lastTradeAt: Date.now(),
         lastTradeType: event.txType,
+        bondingCurveProgress: progress,
       });
+      bondingProgress.set(event.mint, progress);
 
       stats.tradesProcessed++;
       stats.lastTradeAt = Date.now();
