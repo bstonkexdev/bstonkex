@@ -122,6 +122,13 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     return;
   }
 
+  // Cached token hydration routes (Redis-compatible fast serve)
+  const cachedRoute = cachedTokenRoutes[`${req.method} ${url.pathname}`];
+  if (cachedRoute) {
+    cachedRoute(req, res);
+    return;
+  }
+
   // ── 0x Quote Proxy ─────────────────────────────────────────
   // Proxies 0x Swap API v2 quote requests with server-side ZERO_EX_API_KEY.
   // Supports chains: 56 (BSC), 8453 (Base).
@@ -700,16 +707,16 @@ function connectPumpPortal(): void {
 
           pumpTokensReceived++;
 
-          // Store in trenches-store (Redis-compatible sorted-set + hash)
-          const { hsetAll, zadd } = require('./trenches-store.js');
-          hsetAll(`token:${data.mint}`, {
-            mint: data.mint, name: data.name || 'Unknown', symbol: data.symbol || '???',
-            creator: data.traderPublicKey || '', spotPrice: String(spotPrice),
-            bondingCurveProgress: String(progress), virtualMcap: String(spotPrice * 1e9),
-            createdAt: String(Date.now()),
+          // Store + enrich via async pipeline (Redis-compatible)
+          ingestTokenEvent({
+            mint: data.mint,
+            symbol: data.symbol,
+            name: data.name,
+            uri: data.uri || data.metadataUri,
+            chain: 'sol',
+            launchpad: 'pumpfun',
+            price: String(spotPrice),
           });
-          zadd('trenches:pumpfun', Date.now(), data.mint);
-          zadd('trenches:bonding', progress, data.mint);
 
           // Broadcast to all connected WebSocket clients
           const tokenData = JSON.stringify({ type: 'NEW_LAUNCHPAD_TOKEN', data: serverTokens.get(data.mint) });
@@ -787,6 +794,111 @@ const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
       res.end(JSON.stringify(tokens));
     } catch (err: any) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+  },
+};
+
+// ── IPFS / Metadata Sanitizer ──────────────────────────────────
+function sanitizeUri(uri: string | undefined | null): string {
+  if (!uri) return '';
+  if (uri.startsWith('ipfs://')) return uri.replace('ipfs://', 'https://ipfs.io/ipfs/');
+  return uri;
+}
+
+// ── Async Metadata Enrichment (IPFS + Socials) ─────────────────
+async function fetchMetadataAndEnrich(mint: string, metadataUrl: string) {
+  try {
+    const response = await fetch(metadataUrl, { signal: AbortSignal.timeout(4000) });
+    if (!response.ok) return;
+    const meta: any = await response.json();
+    const { hsetAll } = require('./trenches-store.js');
+    const rawImage = meta.image || meta.image_uri || '';
+    hsetAll(`token:${mint}`, {
+      image: sanitizeUri(rawImage),
+      twitter: meta.twitter || meta.extensions?.twitter || '',
+      telegram: meta.telegram || meta.extensions?.telegram || '',
+      website: meta.website || meta.extensions?.website || '',
+    });
+  } catch {
+    // Silent fail — metadata enrichment is best-effort
+  }
+}
+
+// ── Token Event Ingestion with Async Metadata ──────────────────
+function ingestTokenEvent(event: {
+  mint: string; symbol?: string; name?: string; uri?: string;
+  chain?: string; launchpad?: string; price?: string;
+}) {
+  const { mint, symbol, name, uri, chain, launchpad, price } = event;
+  const ch = (chain || 'sol').toLowerCase();
+  const lp = (launchpad || 'pumpfun').toLowerCase();
+  const { hsetAll, zadd } = require('./trenches-store.js');
+
+  // A. Immediate base record (image pending)
+  hsetAll(`token:${mint}`, {
+    mint,
+    symbol: symbol || 'TOKEN',
+    name: name || 'Unknown Token',
+    chain: ch,
+    launchpad: lp,
+    uri: sanitizeUri(uri),
+    image: '',
+    twitter: '', telegram: '', website: '',
+    spotPrice: price || '0.0000',
+    virtualMcap: price ? String(parseFloat(price) * 1e9) : '6000',
+    priceChange24h: '0.00',
+    bondingCurveProgress: '0',
+    holders: '0',
+    createdAt: String(Date.now()),
+  });
+
+  // B. Index into sorted sets
+  const now = Date.now();
+  zadd(`trenches:${ch}:${lp}:new`, now, mint);
+  zadd(`trenches:${ch}:${lp}:trending`, now, mint);
+  zadd(`trenches:${lp}`, now, mint);
+  zadd('trenches:pumpfun', now, mint);
+
+  // C. Async metadata enrichment (non-blocking)
+  const cleanUri = sanitizeUri(uri);
+  if (cleanUri) {
+    setTimeout(() => fetchMetadataAndEnrich(mint, cleanUri), 50);
+  }
+}
+
+// ── Cached Token Hydration Endpoint ────────────────────────────
+const cachedTokenRoutes: Record<string, (req: IncomingMessage, res: ServerResponse) => void> = {
+  'GET /api/tokens/cached': (req, res) => {
+    try {
+      const url = new URL(req.url || '/', `http://${req.headers.host}`);
+      const chain = (url.searchParams.get('chain') || 'sol').toLowerCase();
+      const launchpad = (url.searchParams.get('launchpad') || 'pumpfun').toLowerCase();
+      const filter = (url.searchParams.get('subFilter') || 'trending').toLowerCase();
+
+      const { zrevrange, hgetall } = require('./trenches-store.js');
+      const redisKey = `trenches:${chain}:${launchpad}:${filter}`;
+      let mints: string[] = zrevrange(redisKey, 0, 49);
+
+      // Fallback to flat launchpad key if category key empty
+      if (!mints || mints.length === 0) {
+        mints = zrevrange(`trenches:${launchpad}`, 0, 49) || [];
+      }
+
+      if (!mints || mints.length === 0) {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      const tokens = mints
+        .map((mint: string) => hgetall(`token:${mint}`))
+        .filter((t: any) => t && t.mint);
+
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify(tokens));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
       res.end(JSON.stringify({ error: err.message }));
     }
   },

@@ -65,16 +65,16 @@ export default function MarketSection() {
     async function fetchCached() {
       setLoading(true);
       try {
-        const res = await fetch(`${API}/api/tokens/trenches/${launchpad}`);
+        const res = await fetch(`${API}/api/tokens/cached?chain=${chain.toLowerCase()}&launchpad=${launchpad.toLowerCase()}&subFilter=${subFilter}`);
         const data = await res.json();
         if (!cancelled && Array.isArray(data) && data.length > 0) {
           setTokens(data.map((t: any) => ({
             mint: t.mint || '', name: t.name || 'Unknown', symbol: t.symbol || '???',
             image: t.image || t.icon || null,
             progress: parseFloat(t.bondingCurveProgress) || 0,
-            mcap: parseFloat(t.virtualMcap) || parseFloat(t.spotPrice || '0') * 1e9,
+            mcap: parseFloat(t.virtualMcap) || parseFloat(t.spotPrice || t.price || '0') * 1e9,
             holders: parseInt(t.holders) || 0,
-            priceUsd: parseFloat(t.spotPrice) || 0,
+            priceUsd: parseFloat(t.spotPrice || t.price) || 0,
             change24h: parseFloat(t.priceChange24h || t.change24h) || 0,
             createdAt: parseInt(t.createdAt) || Date.now(),
           })));
@@ -84,7 +84,7 @@ export default function MarketSection() {
     }
     fetchCached();
     return () => { cancelled = true; };
-  }, [chain, launchpad]);
+  }, [chain, launchpad, subFilter]);
 
   useEffect(() => {
     const unsub = onTokenCreate((r: any) => {
