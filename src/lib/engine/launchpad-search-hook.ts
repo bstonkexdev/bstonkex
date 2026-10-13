@@ -38,7 +38,7 @@ export async function searchIndexedTokens(query: string): Promise<IndexedTokenRe
       // Match by token address (partial or full)
       const tokenLower = event.tokenAddress.toLowerCase();
       if (tokenLower.includes(q) || q.includes(tokenLower.slice(0, 10))) {
-        const chainConfig = CHAINS[event.chain];
+        const chainConfig = CHAINS[event.chain as keyof typeof CHAINS];
         const explorerUrl = chainConfig?.explorerUrl
           ? `${chainConfig.explorerUrl}/address/${event.tokenAddress}`
           : event.chain === 'solana'
@@ -74,7 +74,7 @@ export async function getIndexedLaunchpadTokens(
   try {
     const events = await getLaunchEvents(chainId, launchpadId, 200);
     return events.map(event => {
-      const chainConfig = CHAINS[event.chain];
+      const chainConfig = CHAINS[event.chain as keyof typeof CHAINS];
       const explorerUrl = chainConfig?.explorerUrl
         ? `${chainConfig.explorerUrl}/address/${event.tokenAddress}`
         : event.chain === 'solana'

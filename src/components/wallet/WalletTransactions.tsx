@@ -37,11 +37,12 @@ export default memo(function WalletTransactions({ wallet, activeChain, showAllCh
   }, [wallet]);
 
   const filtered = trades.filter(t => {
-    if (filter === 'buy' && t.side !== 'buy') return false;
-    if (filter === 'sell' && t.side !== 'sell') return false;
-    if (filter === 'receive' && t.side !== 'receive' && t.side !== 'deposit') return false;
-    if (filter === 'send' && t.side !== 'send' && t.side !== 'withdraw') return false;
-    if (filter === 'approval' && t.side !== 'approval') return false;
+    const side = t.side as string;
+    if (filter === 'buy' && side !== 'buy') return false;
+    if (filter === 'sell' && side !== 'sell') return false;
+    if (filter === 'receive' && side !== 'receive' && side !== 'deposit') return false;
+    if (filter === 'send' && side !== 'send' && side !== 'withdraw') return false;
+    if (filter === 'approval' && side !== 'approval') return false;
     if (filter === 'pending' && t.status !== 'pending') return false;
     if (filter === 'confirmed' && t.status !== 'confirmed') return false;
     if (filter === 'failed' && t.status !== 'failed') return false;
@@ -95,15 +96,16 @@ export default memo(function WalletTransactions({ wallet, activeChain, showAllCh
             const statusColor = t.status === 'confirmed' ? 'var(--lime-dim)' : t.status === 'pending' ? 'var(--yellow-dim)' : 'var(--red)';
             const statusBg = t.status === 'confirmed' ? 'var(--lime-bg)' : t.status === 'pending' ? 'var(--yellow-bg)' : 'var(--red-bg)';
 
-            const sideLabel = t.side === 'receive' || t.side === 'deposit' ? 'Receive'
-              : t.side === 'send' || t.side === 'withdraw' ? 'Send'
-              : t.side === 'approval' ? 'Approve'
-              : t.side.charAt(0).toUpperCase() + t.side.slice(1);
-            const sideColor = t.side === 'buy' || t.side === 'receive' || t.side === 'deposit' ? 'var(--lime-dim)'
-              : t.side === 'approval' ? 'var(--yellow-dim)'
+            const ts = t.side as string;
+            const sideLabel = ts === 'receive' || ts === 'deposit' ? 'Receive'
+              : ts === 'send' || ts === 'withdraw' ? 'Send'
+              : ts === 'approval' ? 'Approve'
+              : ts.charAt(0).toUpperCase() + ts.slice(1);
+            const sideColor = ts === 'buy' || ts === 'receive' || ts === 'deposit' ? 'var(--lime-dim)'
+              : ts === 'approval' ? 'var(--yellow-dim)'
               : 'var(--red)';
-            const sideBg = t.side === 'buy' || t.side === 'receive' || t.side === 'deposit' ? 'var(--lime-bg)'
-              : t.side === 'approval' ? 'var(--yellow-bg)'
+            const sideBg = ts === 'buy' || ts === 'receive' || ts === 'deposit' ? 'var(--lime-bg)'
+              : ts === 'approval' ? 'var(--yellow-bg)'
               : 'var(--red-bg)';
 
             return (

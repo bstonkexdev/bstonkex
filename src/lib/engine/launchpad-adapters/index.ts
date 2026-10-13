@@ -36,7 +36,7 @@ register({
   id: 'openlaunch-base',
   chainId: 'base',
   getTokens: getOpenLaunchTokens,
-  getDiscovery: getOpenLaunchDiscovery,
+  getDiscovery: getOpenLaunchDiscovery as any,
   getHealth: getOpenLaunchHealth,
   invalidateCache: invalidateOpenLaunchCache,
 });
@@ -78,6 +78,10 @@ function indexRecordToMarketToken(record: any): MarketToken {
       : record.marketDataStatus === 'enriched' && record.liquidity != null && record.liquidity >= 1000
         ? 'data_only' // liquidity_qualified but NOT execution-verified
         : record.marketDataStatus === 'enriched' && record.liquidity ? 'no_liquidity' : 'data_only',
+    priceSource: record.priceSource ?? 'none',
+    marketState: record.marketState ?? 'unknown',
+    liquidityType: record.liquidityType ?? 'none',
+    virtualLiquidity: record.virtualLiquidity ?? null,
     dataFreshness: record.lastEnrichedAt && Date.now() - record.lastEnrichedAt < 300000 ? 'live' : 'recent',
   };
 }

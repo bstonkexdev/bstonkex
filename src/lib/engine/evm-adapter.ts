@@ -1,7 +1,7 @@
 // Cupcak8 Swap EVM Chain Adapter — shared logic for BNB, Base, Robinhood
 import { PLATFORM_FEE_PCT, type ChainId } from '../config';
 import { cacheGetOrCompute, cacheInvalidate, CACHE_KEYS, TTL } from './cache';
-import type { ChainAdapter, SwapParams, SwapQuote, UnsignedTx, GasEstimate, TxStatus, TokenMetadata, RouteStep } from './types';
+import type { ChainAdapter, SwapParams, SwapQuote, UnsignedTx, GasEstimate, TxStatus, TokenMetadata, RouteStep, TxHash } from './types';
 
 const ERC20_ABI_BALANCE = '0x70a08231'; // balanceOf(address)
 const ERC20_ABI_DECIMALS = '0x313ce567';

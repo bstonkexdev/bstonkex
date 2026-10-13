@@ -25,7 +25,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
 const COLLECTION = 'settings';
 
 function getCollection() {
-  return gitlawb.db.collection<UserSettings>(COLLECTION);
+  return gitlawb.db.collection<any>(COLLECTION);
 }
 
 export async function loadSettings(): Promise<UserSettings> {

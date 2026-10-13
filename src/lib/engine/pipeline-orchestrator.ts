@@ -167,7 +167,7 @@ registerEngine({
   stop: () => stopMarketPipeline(),
   getStatus: () => {
     const mpStatus = getMarketPipelineStatus();
-    return { status: mpStatus.running ? 'live' : 'offline', error: mpStatus.error };
+    return { status: (mpStatus.running ? 'live' : 'offline') as ComponentStatus, error: mpStatus.error ?? undefined };
   },
 });
 
@@ -177,6 +177,6 @@ registerEngine({
   stop: () => stopActivityPolling(),
   getStatus: () => {
     const aStatus = getActivityStatus();
-    return { status: aStatus.running ? 'live' : 'offline' };
+    return { status: ((aStatus as any).running ?? aStatus.status === 'running' ? 'live' : 'offline') as ComponentStatus };
   },
 });

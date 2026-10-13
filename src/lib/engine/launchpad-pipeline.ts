@@ -186,7 +186,7 @@ function normalizeHistoricalLaunch(
 
 // ── Persistence (idempotent) ───────────────────────────────
 
-const launchEventsCol = () => gitlawb.db.collection<LaunchpadEventRecord>('launchpad_events', { visibility: 'owner' });
+const launchEventsCol = () => gitlawb.db.collection<any>('launchpad_events', { visibility: 'owner' });
 
 async function isDuplicate(eventId: string): Promise<boolean> {
   try {
@@ -333,7 +333,7 @@ export async function scanEvmEvents(
   fromBlock: number,
   toBlock: number,
 ): Promise<LaunchpadEventRecord[]> {
-  const config = CHAINS[factory.chain];
+  const config = CHAINS[factory.chain as keyof typeof CHAINS];
   if (!config?.rpcUrl || factory.factoryAddresses.length === 0) return [];
 
   const fromHex = `0x${fromBlock.toString(16)}`;

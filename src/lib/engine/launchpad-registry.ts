@@ -3,7 +3,7 @@
 // If a factory cannot be verified: enabled=false, verified=false.
 // DO NOT guess addresses. DO NOT use testnet contracts on mainnet.
 
-import type { ChainId } from './types';
+import type { ChainId } from '../config';
 
 // ── Types ──────────────────────────────────────────────────
 

@@ -4,13 +4,13 @@ import { gitlawb } from '../../gitlawb';
 import type { MarketEvent, NormalizedTrade, LiquidityEvent, Candle, MarketIdentity, MarketStats, IndexerCheckpoint } from './types';
 
 // ── Collections ─────────────────────────────────────────────
-const eventsCol = () => gitlawb.db.collection<MarketEvent>('idx_events', { visibility: 'owner' });
-const tradesCol = () => gitlawb.db.collection<NormalizedTrade>('idx_trades', { visibility: 'owner' });
-const liquidityCol = () => gitlawb.db.collection<LiquidityEvent>('idx_liquidity', { visibility: 'owner' });
-const candlesCol = () => gitlawb.db.collection<Candle>('idx_candles', { visibility: 'owner' });
-const marketsCol = () => gitlawb.db.collection<MarketIdentity>('idx_markets', { visibility: 'owner' });
-const statsCol = () => gitlawb.db.collection<MarketStats>('idx_stats', { visibility: 'owner' });
-const checkpointsCol = () => gitlawb.db.collection<IndexerCheckpoint>('idx_checkpoints', { visibility: 'owner' });
+const eventsCol = () => gitlawb.db.collection<any>('idx_events', { visibility: 'owner' });
+const tradesCol = () => gitlawb.db.collection<any>('idx_trades', { visibility: 'owner' });
+const liquidityCol = () => gitlawb.db.collection<any>('idx_liquidity', { visibility: 'owner' });
+const candlesCol = () => gitlawb.db.collection<any>('idx_candles', { visibility: 'owner' });
+const marketsCol = () => gitlawb.db.collection<any>('idx_markets', { visibility: 'owner' });
+const statsCol = () => gitlawb.db.collection<any>('idx_stats', { visibility: 'owner' });
+const checkpointsCol = () => gitlawb.db.collection<any>('idx_checkpoints', { visibility: 'owner' });
 const blockMetaCol = () => gitlawb.db.collection<{ chain: string; blockNumber: number; blockHash: string; parentHash: string }>('idx_block_meta', { visibility: 'owner' });
 
 // ── Events ──────────────────────────────────────────────────

@@ -75,7 +75,7 @@ export async function getChainPortfolio(chainId: ChainId, walletAddress: string)
       address: walletAddress,
       nativeBalance,
       nativeBalanceUsd,
-      nativeSymbol: CHAINS[chainId]?.nativeCurrency?.symbol ?? 'SOL',
+      nativeSymbol: CHAINS[chainId]?.nativeSymbol ?? 'SOL',
       tokens,
       totalUsd: nativeBalanceUsd + totalTokenUsd,
       updatedAt: Date.now(),

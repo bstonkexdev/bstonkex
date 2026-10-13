@@ -9,7 +9,7 @@ type SortKey = 'value' | 'pnl' | '24h' | 'name';
 
 interface FlatHolding {
   symbol: string; name: string; chainId: ChainId; address: string;
-  balance: number; priceUsd: number | null; valueUsd: number;
+  balance: number; priceUsd: number | null; valueUsd: number | null;
   change24h: number | null; pnl: number | null;
 }
 
@@ -31,7 +31,7 @@ export default memo(function WalletHoldings({ portfolios, activeChain, showAllCh
     const nativeBal = parseFloat(c.nativeBalance);
     if (!hideZero || nativeBal > 0) {
       holdings.push({
-        symbol: c.nativeSymbol, name: `${CHAINS[c.chainId]?.name || c.chainId} Native`,
+        symbol: c.nativeSymbol ?? 'SOL', name: `${CHAINS[c.chainId]?.name || c.chainId} Native`,
         chainId: c.chainId as ChainId, address: 'native',
         balance: nativeBal, priceUsd: c.nativeBalanceUsd > 0 ? c.nativeBalanceUsd / nativeBal : null,
         valueUsd: c.nativeBalanceUsd, change24h: null, pnl: null,
@@ -43,14 +43,14 @@ export default memo(function WalletHoldings({ portfolios, activeChain, showAllCh
         holdings.push({
           symbol: t.symbol, name: t.symbol, chainId: c.chainId as ChainId,
           address: t.address, balance: bal, priceUsd: t.priceUsd,
-          valueUsd: t.balanceUsd, change24h: null, pnl: null,
+          valueUsd: t.valueUsd ?? null, change24h: null, pnl: null,
         });
       }
     }
   }
 
   holdings.sort((a, b) => {
-    if (sortBy === 'value') return b.valueUsd - a.valueUsd;
+    if (sortBy === 'value') return (b.valueUsd ?? 0) - (a.valueUsd ?? 0);
     if (sortBy === 'name') return a.symbol.localeCompare(b.symbol);
     if (sortBy === '24h') return (b.change24h ?? 0) - (a.change24h ?? 0);
     if (sortBy === 'pnl') return (b.pnl ?? 0) - (a.pnl ?? 0);
@@ -68,7 +68,7 @@ export default memo(function WalletHoldings({ portfolios, activeChain, showAllCh
     );
   }
 
-  const totalValue = holdings.reduce((s, h) => s + h.valueUsd, 0);
+  const totalValue = holdings.reduce((s, h) => s + (h.valueUsd ?? 0), 0);
 
   return (
     <div>
@@ -108,7 +108,7 @@ export default memo(function WalletHoldings({ portfolios, activeChain, showAllCh
             {holdings.map((h, i) => {
               const chain = CHAINS[h.chainId];
               const isUp = (h.change24h ?? 0) >= 0;
-              const alloc = totalValue > 0 ? (h.valueUsd / totalValue) * 100 : 0;
+              const alloc = totalValue > 0 ? (h.valueUsd ?? 0 / totalValue) * 100 : 0;
 
               return (
                 <tr key={`${h.chainId}-${h.address}-${i}`}
@@ -142,7 +142,7 @@ export default memo(function WalletHoldings({ portfolios, activeChain, showAllCh
                   </Td>
                   <Td align="right">
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--text-bright)' }}>
-                      {formatUsd(h.valueUsd)}
+                      {formatUsd(h.valueUsd ?? 0)}
                     </span>
                   </Td>
                   <Td align="right">
@@ -184,7 +184,7 @@ export default memo(function WalletHoldings({ portfolios, activeChain, showAllCh
         {holdings.map((h, i) => {
           const chain = CHAINS[h.chainId];
           const isUp = (h.change24h ?? 0) >= 0;
-          const alloc = totalValue > 0 ? (h.valueUsd / totalValue) * 100 : 0;
+          const alloc = totalValue > 0 ? (h.valueUsd ?? 0 / totalValue) * 100 : 0;
 
           return (
             <div key={`m-${h.chainId}-${h.address}-${i}`}
@@ -204,7 +204,7 @@ export default memo(function WalletHoldings({ portfolios, activeChain, showAllCh
                   <span style={{ fontSize: 10, color: chain?.color || 'var(--text-muted)' }}>{chain?.shortName}</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--text-bright)' }}>
-                  {formatUsd(h.valueUsd)}
+                  {formatUsd(h.valueUsd ?? 0)}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -245,7 +245,7 @@ export default memo(function WalletHoldings({ portfolios, activeChain, showAllCh
   );
 });
 
-function Th({ children, align }: { children: React.ReactNode; align?: string }) {
+function Th({ children, align }: { children?: React.ReactNode; align?: string }) {
   return (
     <th style={{
       textAlign: (align as any) || 'left',

@@ -8,7 +8,7 @@ import { cacheGetOrCompute, cacheSet, CACHE_KEYS, TTL } from './cache';
 import type { NormalizedTrade, NormalizedPool, NormalizedTokenMeta } from './data-normalizer';
 import { subscribeToken, fetchTokenTrades } from './market-pipeline';
 import { getCandles, type Candle, type CandleInterval } from './candle-engine';
-import { searchTokens, type SearchResult } from './search-engine';
+import { searchTokens, type SearchResult } from '../market';
 import { getHealthReport, type InfraHealthReport } from './infra-health';
 import { getPipelineState, type PipelineState } from './pipeline-orchestrator';
 

@@ -44,7 +44,7 @@ export interface VerificationReport {
 
 // ── Persistence ────────────────────────────────────────────
 
-const verificationCol = () => gitlawb.db.collection<VerificationReport>('launchpad_verification', { visibility: 'owner' });
+const verificationCol = () => gitlawb.db.collection<any>('launchpad_verification', { visibility: 'owner' });
 
 async function persistReport(report: VerificationReport): Promise<void> {
   try {

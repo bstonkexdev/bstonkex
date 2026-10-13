@@ -10,7 +10,7 @@ export interface AuditEntry {
   timestamp: string;
 }
 
-const auditLog = gitlawb.db.collection<AuditEntry>('admin_audit', { visibility: 'inbox' });
+const auditLog = gitlawb.db.collection<any>('admin_audit', { visibility: 'inbox' });
 
 /** Record an admin action to the audit log. */
 export async function logAdminAction(entry: Omit<AuditEntry, 'timestamp'>): Promise<void> {

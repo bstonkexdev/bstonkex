@@ -41,9 +41,9 @@ export function getPersistenceHealth(): PersistenceHealth {
 
 // ── Collections ─────────────────────────────────────────────
 
-const tokenCol = () => gitlawb.db.collection<TokenIndexRecord>('token_index', { visibility: 'owner' });
-const cursorCol = () => gitlawb.db.collection<DiscoveryCursor>('discovery_cursors', { visibility: 'owner' });
-const healthCol = () => gitlawb.db.collection<AdapterHealth>('discovery_health', { visibility: 'owner' });
+const tokenCol = () => gitlawb.db.collection<any>('token_index', { visibility: 'owner' });
+const cursorCol = () => gitlawb.db.collection<any>('discovery_cursors', { visibility: 'owner' });
+const healthCol = () => gitlawb.db.collection<any>('discovery_health', { visibility: 'owner' });
 
 // ── In-memory cache (fast lookup only — Gitlawb is source of truth) ──
 

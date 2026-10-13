@@ -25,7 +25,7 @@ import { gitlawb } from '../gitlawb';
 
 // ── Persistent Launch Events ───────────────────────────────
 
-const launchEventsCol = () => gitlawb.db.collection<LaunchpadEventRecord>('launchpad_events', { visibility: 'owner' });
+const launchEventsCol = () => gitlawb.db.collection<any>('launchpad_events', { visibility: 'owner' });
 
 /** Persist a launch event. Deduplicates by deterministic eventId. */
 export async function storeLaunchEvent(event: LaunchpadEventRecord): Promise<boolean> {

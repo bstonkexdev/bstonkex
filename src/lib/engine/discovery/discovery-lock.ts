@@ -21,7 +21,7 @@ function sessionId(): string {
 const MY_SESSION = sessionId();
 
 function lockCol() {
-  return gitlawb.db.collection<LockRecord>('discovery_lock', { visibility: 'owner' });
+  return gitlawb.db.collection<any>('discovery_lock', { visibility: 'owner' });
 }
 
 /**

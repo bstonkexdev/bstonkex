@@ -70,7 +70,7 @@ export default memo(function WalletPositions({ positions, activeChain, showAllCh
                 </Td>
                 <Td align="right">
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-bright)' }}>
-                    {formatUsd(p.currentPriceUsd)}
+                    {formatUsd(p.currentPrice)}
                   </span>
                 </Td>
                 <Td align="right">

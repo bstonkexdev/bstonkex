@@ -15,7 +15,7 @@ export default function EmergencyBanner() {
   useEffect(() => {
     const check = async () => {
       try {
-        const col = gitlawb.db.collection<PauseConfig>('emergency_config');
+        const col = gitlawb.db.collection<any>('emergency_config');
         const { records } = await col.list({ limit: 1 });
         if (records.length > 0 && records[0].data.tradingPaused) {
           setPause(records[0].data);

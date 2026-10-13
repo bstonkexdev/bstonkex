@@ -82,7 +82,7 @@ export interface AllocationItem {
 export function getTokenAllocation(chains: WalletBalance[]): AllocationItem[] {
   const allTokens: { symbol: string; valueUsd: number }[] = [];
   for (const c of chains) {
-    allTokens.push({ symbol: c.nativeSymbol, valueUsd: c.nativeBalanceUsd });
+    allTokens.push({ symbol: c.nativeSymbol ?? 'SOL', valueUsd: c.nativeBalanceUsd });
     for (const t of c.tokens) {
       if (t.valueUsd != null && t.valueUsd > 0) allTokens.push({ symbol: t.symbol, valueUsd: t.valueUsd });
     }

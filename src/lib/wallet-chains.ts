@@ -115,17 +115,6 @@ export function walletChainForTrading(chainId: ChainId): WalletChain | null {
   return WALLET_CHAINS.find(c => c.swapChainId === chainId) ?? null;
 }
 
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: any[] }) => Promise<any>;
-      on: (event: string, cb: (...args: any[]) => void) => void;
-      removeListener: (event: string, cb: (...args: any[]) => void) => void;
-    };
-    solana?: { connect: () => Promise<any>; publicKey?: { toString(): string }; isConnected?: boolean };
-  }
-}
-
 /** Ask the wallet for its ACTUAL chain — never assume. */
 export async function getConnectedEvmChainHex(): Promise<string | null> {
   const p = window.ethereum;

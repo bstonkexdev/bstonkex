@@ -73,6 +73,10 @@ function dexPairToMarketToken(raw: any, launchpadId: string, launchpadName: stri
     ageMs,
     buySellRatio24h: ratio,
     tradability: (raw as any).routeBothVerified && liq && liq > 1000 ? 'tradable' : liq && liq > 1000 ? 'data_only' : liq ? 'no_liquidity' : 'data_only',
+    priceSource: 'none' as const,
+    marketState: 'unknown' as const,
+    liquidityType: 'none' as const,
+    virtualLiquidity: null,
     dataFreshness: freshness,
   };
 }
@@ -202,7 +206,7 @@ export async function getOpenLaunchTokens(): Promise<MarketToken[]> {
 
 /** Get OpenLaunch tokens sorted by discovery category */
 export async function getOpenLaunchDiscovery(
-  category: 'trending' | 'new' | 'gainers' | 'losers' | 'volume' | 'active' | 'liquidity'
+  category: 'trending' | 'new' | 'gainers' | 'losers' | 'volume' | 'active' | 'liquidity' | 'watchlist'
 ): Promise<MarketToken[]> {
   const tokens = await getOpenLaunchTokens();
 

@@ -33,9 +33,9 @@ export default function ExecutionPane({ token }: Props) {
 
   // Quote timer
   useEffect(() => {
-    if (!quote || !isQuoteValid(quote)) { setQuoteRemaining(0); return; }
+    if (!quote || !isQuoteValid(quote.quoteId)) { setQuoteRemaining(0); return; }
     const iv = setInterval(() => {
-      const rem = getQuoteRemainingSeconds(quote);
+      const rem = getQuoteRemainingSeconds(quote.quoteId);
       setQuoteRemaining(rem);
       if (rem <= 0) setQuote(null);
     }, 1000);
@@ -69,12 +69,15 @@ export default function ExecutionPane({ token }: Props) {
     setTxError('');
 
     try {
-      const result = await executeTrade({
-        chainId: activeChain, side, tokenAddress: token.address,
-        tokenSymbol: token.symbol, amountUsd: amountNum,
-        slippagePct: slippage, walletAddress: wallet.address,
-        quote, addNotification,
-      });
+      const result = await executeTrade(
+        {
+          chainId: activeChain, side, tokenAddress: token.address,
+          tokenSymbol: token.symbol, amountUsd: amountNum,
+          slippagePct: slippage, walletAddress: wallet.address,
+        },
+        quote,
+        wallet.address,
+      );
 
       if (result.success && result.txHash) {
         setTxStatus('pending');
@@ -85,7 +88,7 @@ export default function ExecutionPane({ token }: Props) {
           txHash: result.txHash, chainId: activeChain,
         });
 
-        const confirmed = await submitSignedTx(result.txHash, activeChain, side, token.symbol, amountNum, wallet.address, quote, addNotification);
+        const confirmed = await submitSignedTx(result.tradeId ?? '', result.txHash);
         if (confirmed.success) {
           setTxStatus('confirmed');
           addNotification({
@@ -116,12 +119,18 @@ export default function ExecutionPane({ token }: Props) {
   const readiness = checkTradeReadiness({
     wallet: { connected: wallet.connected, address: wallet.address },
     walletChain: wallet.chainId,
-    activeChain,
-    amountUsd: amountNum,
-    nativeBalance: parseFloat(wallet.balance || '0'),
+    requiredChain: activeChain,
+    balance: parseFloat(wallet.balance || '0'),
+    tradeAmount: amountNum,
+    networkFeeReserve: activeChain === 'solana' ? 0.005 : 0.001,
     nativePrice: activeChain === 'solana' ? 180 : activeChain === 'base' ? 3500 : activeChain === 'robinhood' ? 3500 : 600,
-    gasReserve: activeChain === 'solana' ? 0.005 : 0.001,
-    tokenAddress: token?.address || '',
+    quote: quote ? { available: quote.available, quoteId: quote.quoteId, remainingSeconds: quoteRemaining } : null,
+    priceImpact: quote?.priceImpact ?? 0,
+    slippage,
+    route: quote?.route ?? [],
+    dex: quote?.dex,
+    spender: quote?.spender,
+    platformFeePct: 0.40,
   });
 
   return (
@@ -269,9 +278,9 @@ export default function ExecutionPane({ token }: Props) {
       )}
 
       {/* Readiness errors */}
-      {!readiness.ready && readiness.errors.length > 0 && (
+      {!readiness.ready && readiness.blockingChecks.length > 0 && (
         <div style={{ fontSize: 10, color: 'var(--red)', marginBottom: 6, fontWeight: 600 }}>
-          {readiness.errors[0]}
+          {readiness.blockingChecks[0]?.message}
         </div>
       )}
 

@@ -7,7 +7,7 @@ import { wsManager } from './realtime-ws';
 
 // ── Types ────────────────────────────────────────────────────
 
-export type ComponentStatus = 'live' | 'delayed' | 'reconnecting' | 'stale' | 'offline' | 'blocked' | 'not_verified';
+export type ComponentStatus = 'live' | 'delayed' | 'reconnecting' | 'stale' | 'offline' | 'blocked' | 'not_verified' | 'error';
 
 export interface ComponentHealth {
   name: string;

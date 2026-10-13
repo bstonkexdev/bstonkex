@@ -129,7 +129,7 @@ export async function fetchChainBalances(wallet: string, chain: WalletChain): Pr
   if (chain.balances === 'unverified') {
     return {
       chain: chain.key, status: 'unavailable', native: null, tokens: [],
-      chainTotalUsd: 0, unpricedCount: 0, priceStatus: 'unknown', updatedAt: null,
+      chainTotalUsd: 0, unpricedCount: 0, priceStatus: 'unavailable', updatedAt: null,
       error: 'INTEGRATION NOT VERIFIED FOR THIS NETWORK',
     };
   }
