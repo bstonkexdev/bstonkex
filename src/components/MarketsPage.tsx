@@ -11,7 +11,6 @@ import {
 import { gitlawb } from '../lib/gitlawb';
 
 import MarketOverview from './markets/MarketOverview';
-import TrenchesTerminal from './markets/TrenchesTerminal';
 import MarketChainFilter from './markets/MarketChainFilter';
 import LaunchpadLogoSelector from './markets/LaunchpadLogoSelector';
 import SubFilterBar, { type SubFilter, getSubFilterCategory, applySubFilter } from './markets/SubFilterBar';
@@ -219,11 +218,6 @@ export default function MarketsPage() {
 
       {/* ── ROW 3: SUB-FILTER BAR [New] [Bonding] [Migrated] [Gainers] [Losers] ─ */}
       <SubFilterBar active={subFilter} onChange={v => { setSubFilter(v); setPageNum(0); }} />
-
-      {/* ── TRENCHES TERMINAL (Real-Time Launchpad Feed) ───── */}
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-        <TrenchesTerminal />
-      </div>
 
           {/* ── TOOLBAR (sort + filter) ──────────────────────────── */}
           <div style={{
