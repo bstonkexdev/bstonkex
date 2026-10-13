@@ -2,7 +2,7 @@
 // Runs RugCheck (Solana) + GoPlus (EVM) in background, caches 5min,
 // attaches SecurityFlags to token records in the trenches store.
 
-import { hsetAll, getCached, setCached, hgetall } from './trenches-store';
+import { hsetAll, getCached, setCached, hgetall } from './trenches-store.js';
 
 const RUGCHECK_BASE = 'https://api.rugcheck.xyz/v1';
 const GOPLUS_BASE = 'https://api.gopluslabs.io/api/v1';
