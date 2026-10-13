@@ -24,6 +24,16 @@ function fmtHolders(n: number): string {
 
 const API = 'https://api.bstonkex.xyz';
 
+// Sky blue palette
+const SKY_BG = '#E0F2FE';       // main box background
+const SKY_BG_LIGHT = '#F0F9FF'; // lighter cards
+const SKY_BG_MED = '#BAE6FD';   // medium — launchpad buttons, filter bar
+const SKY_BORDER = '#7DD3FC';   // borders
+const SKY_ACCENT = '#0284C7';   // active accent (sky-600)
+const DARK_TEXT = '#0C2340';    // primary text — very dark navy
+const MID_TEXT = '#3B5998';     // secondary text — readable mid-tone
+const LIGHT_TEXT = '#5B8DB8';   // tertiary / hints
+
 export default function MarketSection() {
   const [chain, setChain] = useState<string>('SOL');
   const [launchpad, setLaunchpad] = useState<string>('pumpfun');
@@ -34,12 +44,9 @@ export default function MarketSection() {
   const [chainDrawerOpen, setChainDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
 
-  // Close drawer on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
-        setChainDrawerOpen(false);
-      }
+      if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) setChainDrawerOpen(false);
     }
     if (chainDrawerOpen) document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -52,7 +59,6 @@ export default function MarketSection() {
     setChainDrawerOpen(false);
   }
 
-  // 1. Fetch cached tokens
   useEffect(() => {
     if (!launchpad) { setLoading(false); return; }
     let cancelled = false;
@@ -80,7 +86,6 @@ export default function MarketSection() {
     return () => { cancelled = true; };
   }, [chain, launchpad]);
 
-  // 2. Live WS
   useEffect(() => {
     const unsub = onTokenCreate((r: any) => {
       setTokens(prev => {
@@ -104,7 +109,6 @@ export default function MarketSection() {
     return () => { unsub(); clearInterval(iv); };
   }, []);
 
-  // 3. Filter
   const filtered = tokens.filter(t => {
     switch (subFilter) {
       case 'bonding': return t.progress < 100;
@@ -121,15 +125,14 @@ export default function MarketSection() {
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 16px', fontFamily: 'monospace' }}>
 
-      {/* ═══ TIER 1: CHAIN DRAWER (dropdown on click) ═══ */}
+      {/* ═══ TIER 1: CHAIN DRAWER ═══ */}
       <div ref={drawerRef} style={{ position: 'relative' }}>
-        {/* Trigger Button */}
         <button
           onClick={() => setChainDrawerOpen(!chainDrawerOpen)}
           style={{
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '10px 16px', borderRadius: 14, cursor: 'pointer',
-            background: 'rgba(236,72,153,0.1)', border: '2px solid #EC4899',
+            background: SKY_BG_MED, border: `2px solid ${SKY_ACCENT}`,
             minWidth: 180,
           }}
         >
@@ -138,34 +141,32 @@ export default function MarketSection() {
           ) : (
             <div style={{
               width: 22, height: 22, borderRadius: 11,
-              background: activeChain?.color || '#EC4899',
+              background: activeChain?.color || SKY_ACCENT,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 10, fontWeight: 700, color: '#fff',
             }}>{chain[0]}</div>
           )}
           <div style={{ flex: 1, textAlign: 'left' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#F9FAFB' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: DARK_TEXT }}>
               {activeChain?.label || chain}
             </div>
-            <div style={{ fontSize: 9, color: '#9CA3AF' }}>
+            <div style={{ fontSize: 9, color: MID_TEXT }}>
               {LAUNCHPADS_BY_CHAIN[chain]?.length || 0} launchpads
             </div>
           </div>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{
-            transform: chainDrawerOpen ? 'rotate(180deg)' : 'rotate(0)',
-            transition: 'transform 0.2s',
+            transform: chainDrawerOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s',
           }}>
-            <path d="M3 4.5L6 7.5L9 4.5" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M3 4.5L6 7.5L9 4.5" stroke={DARK_TEXT} strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </button>
 
-        {/* Dropdown Panel */}
         {chainDrawerOpen && (
           <div style={{
             position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
             marginTop: 6, borderRadius: 14, overflow: 'hidden',
-            background: '#111827', border: '1px solid #1F2937',
-            boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+            background: SKY_BG, border: `2px solid ${SKY_BORDER}`,
+            boxShadow: '0 12px 40px rgba(2,132,199,0.25)',
           }}>
             {CHAIN_LIST.map(c => {
               const active = chain === c.key;
@@ -177,11 +178,11 @@ export default function MarketSection() {
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 12,
                     padding: '12px 16px', cursor: 'pointer',
-                    background: active ? 'rgba(236,72,153,0.12)' : 'transparent',
-                    border: 'none', borderBottom: '1px solid #1F2937',
+                    background: active ? '#BAE6FD' : 'transparent',
+                    border: 'none', borderBottom: `1px solid ${SKY_BORDER}`,
                     textAlign: 'left',
                   }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#F0F9FF'; }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                 >
                   {c.logo ? (
@@ -195,20 +196,14 @@ export default function MarketSection() {
                     }}>{c.label[0]}</div>
                   )}
                   <div style={{ flex: 1 }}>
-                    <div style={{
-                      fontSize: 13, fontWeight: 700,
-                      color: active ? '#F472B6' : '#F9FAFB',
-                    }}>{c.label}</div>
-                    <div style={{ fontSize: 10, color: '#6B7280' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: active ? SKY_ACCENT : DARK_TEXT }}>
+                      {c.label}
+                    </div>
+                    <div style={{ fontSize: 10, color: LIGHT_TEXT }}>
                       {padCount} launchpad{padCount !== 1 ? 's' : ''}
                     </div>
                   </div>
-                  {active && (
-                    <div style={{
-                      width: 8, height: 8, borderRadius: 4,
-                      background: '#EC4899',
-                    }} />
-                  )}
+                  {active && <div style={{ width: 8, height: 8, borderRadius: 4, background: SKY_ACCENT }} />}
                 </button>
               );
             })}
@@ -220,7 +215,7 @@ export default function MarketSection() {
       {launchpad && LAUNCHPADS_BY_CHAIN[chain] && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
           <span style={{
-            fontSize: 10, color: '#6B7280', textTransform: 'uppercase',
+            fontSize: 10, color: MID_TEXT, textTransform: 'uppercase',
             letterSpacing: '0.08em', fontWeight: 700, flexShrink: 0,
           }}>Launchpad:</span>
           {LAUNCHPADS_BY_CHAIN[chain].map(pad => {
@@ -233,10 +228,10 @@ export default function MarketSection() {
                   padding: '6px 12px', borderRadius: 10, cursor: 'pointer', flexShrink: 0,
                   fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
                   display: 'flex', alignItems: 'center', gap: 6,
-                  background: active ? 'rgba(88,28,135,0.6)' : '#111827',
-                  color: active ? '#C4B5FD' : '#9CA3AF',
-                  border: `1.5px solid ${active ? '#8B5CF6' : '#1F2937'}`,
-                  boxShadow: active ? '0 2px 8px rgba(139,92,246,0.2)' : 'none',
+                  background: active ? SKY_ACCENT : SKY_BG_LIGHT,
+                  color: active ? '#fff' : DARK_TEXT,
+                  border: `1.5px solid ${active ? SKY_ACCENT : SKY_BORDER}`,
+                  boxShadow: active ? '0 2px 8px rgba(2,132,199,0.3)' : 'none',
                   transition: 'all 0.15s',
                 }}
               >
@@ -256,8 +251,8 @@ export default function MarketSection() {
       {/* ═══ TIER 3: FILTER TOOLBAR ═══ */}
       <div style={{
         display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none',
-        background: 'rgba(17,24,39,0.9)', padding: 6, borderRadius: 14,
-        border: '1px solid #1F2937',
+        background: SKY_BG_MED, padding: 6, borderRadius: 14,
+        border: `1px solid ${SKY_BORDER}`,
       }}>
         {FILTER_TABS.map(f => {
           const active = subFilter === f.id;
@@ -268,9 +263,9 @@ export default function MarketSection() {
               style={{
                 flex: 1, padding: '8px 12px', borderRadius: 10, cursor: 'pointer',
                 fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', textAlign: 'center',
-                background: active ? '#DB2777' : 'transparent',
-                color: active ? '#fff' : '#9CA3AF',
-                boxShadow: active ? '0 2px 8px rgba(219,39,119,0.35)' : 'none',
+                background: active ? SKY_ACCENT : 'transparent',
+                color: active ? '#fff' : DARK_TEXT,
+                boxShadow: active ? '0 2px 8px rgba(2,132,199,0.35)' : 'none',
                 transition: 'all 0.15s',
               }}
             >
@@ -284,8 +279,8 @@ export default function MarketSection() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {filtered.length === 0 ? (
           <div style={{
-            textAlign: 'center', padding: '48px 16px', color: '#6B7280', fontSize: 13,
-            border: '2px dashed #1F2937', borderRadius: 14,
+            textAlign: 'center', padding: '48px 16px', color: MID_TEXT, fontSize: 13,
+            border: `2px dashed ${SKY_BORDER}`, borderRadius: 14, background: SKY_BG_LIGHT,
           }}>
             {loading ? 'Loading cached tokens...' : `Waiting for ${launchpad ? launchpad.toUpperCase() : chain} token launches...`}
           </div>
@@ -298,11 +293,11 @@ export default function MarketSection() {
                 style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '12px 14px', borderRadius: 14, cursor: 'pointer',
-                  background: '#111827', border: '1px solid #1F2937',
+                  background: SKY_BG_LIGHT, border: `1px solid ${SKY_BORDER}`,
                   transition: 'border-color 0.15s',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#374151'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#1F2937'; }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = SKY_ACCENT; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = SKY_BORDER; }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <img
@@ -310,27 +305,27 @@ export default function MarketSection() {
                     alt={t.symbol}
                     style={{
                       width: 36, height: 36, borderRadius: 18,
-                      background: '#2D1B69', border: '1.5px solid #4C1D95', objectFit: 'cover',
+                      background: '#E0E7FF', border: '1.5px solid #C7D2FE', objectFit: 'cover',
                     }}
                     onError={e => { (e.target as HTMLImageElement).src = '/fallback-token-icon.svg'; }}
                   />
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#fff' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: DARK_TEXT }}>
                       {t.symbol}
                       <span style={{
                         fontSize: 9, padding: '1px 5px', borderRadius: 4,
-                        background: 'rgba(16,185,129,0.15)', color: '#34D399', fontWeight: 700,
+                        background: '#D1FAE5', color: '#065F46', fontWeight: 700,
                       }}>{chain.toLowerCase()}</span>
                     </div>
-                    <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2 }}>
+                    <div style={{ fontSize: 10, color: MID_TEXT, marginTop: 2 }}>
                       {age(t.createdAt)} • {fmtMcap(t.mcap)}
                       {t.holders > 0 && ` • ${fmtHolders(t.holders)} holders`}
                     </div>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#E5E7EB' }}>{fmtPrice(t.priceUsd)}</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: pos ? '#34D399' : '#FB7185' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: DARK_TEXT }}>{fmtPrice(t.priceUsd)}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: pos ? '#059669' : '#DC2626' }}>
                     {pos ? '+' : ''}{t.change24h.toFixed(2)}%
                   </div>
                 </div>
@@ -343,9 +338,9 @@ export default function MarketSection() {
       {/* ═══ STATUS ═══ */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        fontSize: 10, fontWeight: 600, color: connected ? '#22C55E' : '#EF4444', padding: 4,
+        fontSize: 10, fontWeight: 600, color: connected ? '#059669' : '#DC2626', padding: 4,
       }}>
-        <div style={{ width: 6, height: 6, borderRadius: 3, background: connected ? '#22C55E' : '#EF4444' }} />
+        <div style={{ width: 6, height: 6, borderRadius: 3, background: connected ? '#059669' : '#DC2626' }} />
         {connected ? 'LIVE · PumpPortal WebSocket' : 'OFFLINE · Reconnecting...'}
       </div>
     </div>
