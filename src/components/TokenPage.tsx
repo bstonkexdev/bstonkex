@@ -5,13 +5,17 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../lib/context';
 import { getTokenByAddress, validatePrice, type TokenData, type PriceValidation } from '../lib/market';
 import { getMajorAsset, getMajorRoute, fetchMajorQuotes, type MajorQuote, type ProviderStatus } from '../lib/major-assets';
-import { CHAINS, formatUsd, formatPct } from '../lib/config';
+import { CHAINS, PLATFORM_FEE_BPS, formatUsd, formatPct } from '../lib/config';
 import { checkTokenSafety, type SafetyReport } from '../lib/engine/token-safety';
 import { checkChainReadiness, type ChainReadiness } from '../lib/engine/chain-readiness';
 import { subscribeToken, onMarketEvent, getDataFreshness, type MarketStreamEvent } from '../lib/engine/market-stream';
 import { processTrade } from '../lib/engine/candle-engine';
 import { useTokenTradeFeed, useMyTrades, useTokenAlert, formatAge } from '../lib/token-page-data';
 import PriceChart, { ChartErrorBoundary } from './PriceChart';
+import AveTokenHeader from './token/AveTokenHeader';
+import AveLiveChart from './token/AveLiveChart';
+import AveQuickBar from './token/AveQuickBar';
+import { getCandles, onCandleUpdate, type Candle } from '../lib/engine/candle-engine';
 import TradePanel from './TradePanel';
 import MarketSidebar from './MarketSidebar';
 import TokenHeaderBar from './token/TokenHeaderBar';
@@ -149,6 +153,25 @@ export default function TokenPage() {
   const myTrades = useMyTrades(wallet.address, [displaySymbol, tradeToken?.symbol ?? '']);
   const alert = useTokenAlert(activeChain, displayAddress, displaySymbol);
 
+  // Live candle data for AveLiveChart (mapped from candle-engine to chart format)
+  const [aveCandles, setAveCandles] = useState<Array<{ time: number; open: number; high: number; low: number; close: number; volume: number }>>([]);
+  useEffect(() => {
+    if (!displayAddress) { setAveCandles([]); return; }
+    const map = (c: Candle) => ({ time: c.timestamp, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume });
+    const initial = getCandles(activeChain, displayAddress, '1m').map(map);
+    setAveCandles(initial);
+    const unsub = onCandleUpdate((key, candle) => {
+      if (key !== `${activeChain}:1m:${displayAddress}`) return;
+      const mapped = map(candle);
+      setAveCandles(prev => {
+        const idx = prev.findIndex(c => c.time === mapped.time);
+        if (idx >= 0) { const next = [...prev]; next[idx] = mapped; return next; }
+        return [...prev, mapped].sort((a, b) => a.time - b.time).slice(-200);
+      });
+    });
+    return unsub;
+  }, [activeChain, displayAddress]);
+
   // ── No token selected ──
   if (!tradeToken) {
     return (
@@ -222,10 +245,16 @@ export default function TokenPage() {
 
       {/* Main column — identical component order on mobile and desktop */}
       <div className="token-page-main">
-        <TokenHeaderBar
+        <AveTokenHeader
           symbol={displaySymbol} name={displayName} icon={displayIcon}
           chainId={activeChain} address={displayAddress}
           pairCreatedAt={t?.pairCreatedAt ?? null}
+          price={displayPrice} priceChange24h={displayChange}
+          marketCap={isMajor ? (majorQuote?.marketCap ?? null) : (t?.marketCap ?? null)}
+          volume24h={isMajor ? (majorQuote?.volume24h ?? null) : (t?.volume24h ?? null)}
+          txns24h={t?.txns24h ?? null} buys24h={t?.buys24h ?? null} sells24h={t?.sells24h ?? null}
+          holderCount={null} devHolders={null} taxPct={null}
+          smartMoneyCount={null} whaleCount={null} dexScore={null}
           isWatched={isWatched} onToggleWatch={toggleWatchlist}
           onBack={() => setPage('markets')}
           onToggleFullscreen={() => setFullscreenChart(v => !v)}
@@ -291,18 +320,22 @@ export default function TokenPage() {
 
         <MetaBadges badges={badges} />
 
-        {/* Chart — primary visual element */}
+        {/* Chart — primary visual element: AveLiveChart for tokens, PriceChart for majors */}
         <div className="chart-region">
-          <ChartErrorBoundary tokenSymbol={displaySymbol}>
-            <PriceChart
-              chainId={activeChain}
-              poolAddress={isMajor ? null : (t?.pairAddress || null)}
-              coingeckoId={coingeckoId}
-              tokenSymbol={displaySymbol}
-              fullscreen={fullscreenChart}
-              onToggleFullscreen={() => setFullscreenChart(v => !v)}
-            />
-          </ChartErrorBoundary>
+          {!isMajor && aveCandles.length > 0 ? (
+            <AveLiveChart candles={aveCandles} currentPrice={displayPrice} />
+          ) : (
+            <ChartErrorBoundary tokenSymbol={displaySymbol}>
+              <PriceChart
+                chainId={activeChain}
+                poolAddress={isMajor ? null : (t?.pairAddress || null)}
+                coingeckoId={coingeckoId}
+                tokenSymbol={displaySymbol}
+                fullscreen={fullscreenChart}
+                onToggleFullscreen={() => setFullscreenChart(v => !v)}
+              />
+            </ChartErrorBoundary>
+          )}
         </div>
 
         <TokenTabBar tabs={TABS_B} active={panelTab} onSelect={setPanelTab} label="Token data views" />
@@ -344,14 +377,16 @@ export default function TokenPage() {
         )}
       </aside>
 
-      {/* Mobile BUY/SELL bar — opens the execution panel, never trades on tap */}
-      <MobileTradeBar
-        symbol={displaySymbol} price={displayPrice}
-        canTrade={tradingEnabled && !!displayAddress}
-        disabledReason={disabledReason}
-        onBuy={() => setTradeSheet('buy')}
-        onSell={() => setTradeSheet('sell')}
-      />
+      {/* Mobile BUY/SELL bar — Ave-style quick execution */}
+      <div className="mobile-only" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 150, padding: '0 0 env(safe-area-inset-bottom, 0) 0' }}>
+        <AveQuickBar
+          chainId={activeChain} symbol={displaySymbol}
+          feeBps={PLATFORM_FEE_BPS}
+          onBuy={() => setTradeSheet('buy')}
+          onSell={() => setTradeSheet('sell')}
+          disabled={!tradingEnabled || !displayAddress}
+        />
+      </div>
 
       {/* Mobile execution sheet (existing TradePanel) */}
       {tradeSheet && (
