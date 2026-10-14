@@ -48,9 +48,10 @@ const API_BASE = 'https://api.bstonkex.xyz';
 interface Props {
   subFilter: string;
   launchpad: string;
+  onTokenClick?: (t: { chainId: string; address: string; name: string; symbol: string }) => void;
 }
 
-export default function PumpFunMarketSection({ subFilter, launchpad }: Props) {
+export default function PumpFunMarketSection({ subFilter, launchpad, onTokenClick }: Props) {
   const [tokens, setTokens] = useState<PumpToken[]>([]);
   const [connected, setConnected] = useState(false);
   const [loadingCached, setLoadingCached] = useState(true);
@@ -206,6 +207,7 @@ export default function PumpFunMarketSection({ subFilter, launchpad }: Props) {
           return (
             <div
               key={token.mint}
+              onClick={() => onTokenClick?.({ chainId: 'solana', address: token.mint, name: token.name, symbol: token.symbol })}
               style={{
                 display: 'grid', gridTemplateColumns: '2fr 60px 90px 80px 90px 110px',
                 alignItems: 'center', padding: '10px 16px',
