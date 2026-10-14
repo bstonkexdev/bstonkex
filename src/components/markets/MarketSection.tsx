@@ -34,7 +34,7 @@ const DARK_TEXT = '#0C2340';
 const MID_TEXT = '#3B5998';
 const LIGHT_TEXT = '#5B8DB8';
 
-export default function MarketSection() {
+export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { chainId: string; address: string; name: string; symbol: string }) => void }) {
   const [chain, setChain] = useState<string>('SOL');
   const [launchpad, setLaunchpad] = useState<string>('pumpfun');
   const [subFilter, setSubFilter] = useState<string>('trending');
@@ -388,6 +388,7 @@ export default function MarketSection() {
             return (
               <div
                 key={t.mint}
+                onClick={() => onTokenClick?.({ chainId: chain.toLowerCase() === 'sol' ? 'solana' : chain.toLowerCase(), address: t.mint, name: t.name, symbol: t.symbol })}
                 style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '12px 14px', borderRadius: 14, cursor: 'pointer',

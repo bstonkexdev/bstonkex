@@ -204,7 +204,7 @@ export default function MarketsPage() {
       <MarketOverview tokens={tokens} loading={loading} />
 
       {/* ── MARKET SECTION (Chain → Launchpad → Filter → Tokens) ─ */}
-      <MarketSection />
+      <MarketSection onTokenClick={(t) => setTradeToken({ chainId: (t.chainId === 'sol' ? 'solana' : t.chainId) as any, address: t.address, name: t.name, symbol: t.symbol })} />
 
           {/* ── TOOLBAR (sort + filter) ──────────────────────────── */}
           <div style={{
