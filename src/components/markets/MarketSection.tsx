@@ -97,8 +97,42 @@ export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { c
         if (cancelled) return;
 
         if (Array.isArray(data) && data.length > 0) {
-          // Got data — set tokens immediately
+          // Got backend data — set tokens immediately, but ALSO enrich with bootstrapper
           setTokens(data.map(mapToken));
+          // Always enrich: fetch DexScreener/GeckoTerminal data and merge into existing tokens
+          if (retryCount === 0) {
+            fetchBootstrapTokens(true).then(bootstrapTokens => {
+              if (cancelled || bootstrapTokens.length === 0) return;
+              const chainMap: Record<string, string> = { SOL: 'sol', ETH: 'eth', BSC: 'bsc', BASE: 'base' };
+              const targetChain = chainMap[chain] || chain.toLowerCase();
+              const enriched = bootstrapTokens
+                .filter(t => targetChain === 'all' || t.chain === targetChain)
+                .map(mapToken);
+              if (enriched.length > 0) {
+                // Merge: keep backend tokens, add new ones from bootstrapper, enrich existing
+                setTokens(prev => {
+                  const byMint = new Map(prev.map(t => [t.mint, t]));
+                  for (const t of enriched) {
+                    const existing = byMint.get(t.mint);
+                    if (existing) {
+                      // Enrich: fill in volume/mcap/holders if backend had zeros
+                      if (t.volume24h > existing.volume24h) existing.volume24h = t.volume24h;
+                      if (t.mcap > existing.mcap) existing.mcap = t.mcap;
+                      if (t.liquidity > existing.liquidity) existing.liquidity = t.liquidity;
+                      if (t.holders > existing.holders) existing.holders = t.holders;
+                      if (t.buys24h > existing.buys24h) existing.buys24h = t.buys24h;
+                      if (t.sells24h > existing.sells24h) existing.sells24h = t.sells24h;
+                      if (t.priceUsd > 0 && existing.priceUsd === 0) existing.priceUsd = t.priceUsd;
+                      if (t.change24h !== 0 && existing.change24h === 0) existing.change24h = t.change24h;
+                    } else {
+                      byMint.set(t.mint, t);
+                    }
+                  }
+                  return [...byMint.values()];
+                });
+              }
+            }).catch(() => {});
+          }
         } else if (retryCount < 6) {
           // Empty response — fetch from DexScreener + GeckoTerminal + PumpPortal in parallel
           // (this is how ave.ai/GMGN populate instantly — don't wait for backend)
@@ -187,8 +221,8 @@ export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { c
       case 'migrated': return t.progress >= 100;
       case 'gainers': return t.change24h > 0;
       case 'losers': return t.change24h < 0;
-      case 'trending': return t.holders > 50 || t.mcap > 50000 || t.volume24h > 1000;
-      case 'volume': return t.volume24h > 0;
+      case 'trending': return true; // Show ALL tokens — sort by volume+mcap handles ranking
+      case 'volume': return true;   // Show ALL — volume sort handles ordering
       default: return true;
     }
   }).sort((a, b) => {
@@ -196,7 +230,7 @@ export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { c
       case 'volume': return b.volume24h - a.volume24h;
       case 'gainers': return b.change24h - a.change24h;
       case 'losers': return a.change24h - b.change24h;
-      case 'trending': return (b.volume24h + b.mcap) - (a.volume24h + a.mcap);
+      case 'trending': return (b.volume24h + b.mcap + b.createdAt * 0.001) - (a.volume24h + a.mcap + a.createdAt * 0.001);
       default: return b.createdAt - a.createdAt; // newest first
     }
   });
