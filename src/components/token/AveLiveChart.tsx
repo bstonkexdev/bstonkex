@@ -290,6 +290,35 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
     return () => { cancelled = true; };
   }, [mint, activeTimeframe]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Subscribe to real-time candle_tick from backend WS gateway
+  useEffect(() => {
+    if (!mint) return;
+    let unsub: (() => void) | undefined;
+    import('../../lib/engine/realtime-ws').then(({ wsManager }) => {
+      const intervalMap: Record<Timeframe, string> = {
+        '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d',
+      };
+      const channel = `chart:${mint}:${intervalMap[activeTimeframe] || '1m'}`;
+      unsub = wsManager.subscribe(channel, (msg: any) => {
+        if (msg.type === 'candle_tick' && msg.candle) {
+          const c = msg.candle;
+          setCandles(prev => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last && last.time === c.time) {
+              updated[updated.length - 1] = { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume };
+            } else {
+              updated.push({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume });
+              if (updated.length > 500) updated.splice(0, updated.length - 500);
+            }
+            return updated;
+          });
+        }
+      });
+    }).catch(() => {});
+    return () => { unsub?.(); };
+  }, [mint, activeTimeframe]);
+
   // Update candles when fallbackCandles changes (real-time trades)
   useEffect(() => {
     if (source.startsWith('local engine') && fallbackCandles.length > 0) {
