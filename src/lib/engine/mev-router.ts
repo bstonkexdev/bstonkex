@@ -64,94 +64,65 @@ export function getMevConfig(): MevConfig {
 
 // ── Jito Block Engine (Solana) ───────────────────────────────
 
-const JITO_ENDPOINTS = [
-  'https://mainnet.block-engine.jito.wtf/api/v1/transactions',
-  'https://amsterdam.mainnet.block-engine.jito.wtf/api/v1/transactions',
-  'https://ny.mainnet.block-engine.jito.wtf/api/v1/transactions',
-  'https://tokyo.mainnet.block-engine.jito.wtf/api/v1/transactions',
-];
+const JITO_BUNDLE_URL = process.env?.JITO_BLOCK_ENGINE_URL || 'https://mainnet.block-engine.jito.wtf/api/v1/bundles';
 
 const JITO_TIP_ACCOUNTS = [
-  '96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5',
-  'HFqU5x63VTqvQss8hp11i4bPg4W3Cn2Q8CZ4HT9g5J5K',
-  'Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY',
-  'ADaUMid9yfUytqMBgopwjb2DTLSLrfa5TY3bG1C4C2jG',
-  'DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh',
-  'ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt',
-  'DttWaMuVvTiDuNwLVS2B95aJGjKGamZiHmXRiCvGMZaJ',
-  '3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT',
+  '96gYZGLnJYVFmbjzopA41228JH4x4WAC4zMrCg9x4qTh',
+  'HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gE8',
+  'Cw8CFyM9FkoMi7K7Crf6HNQqf4uXY3LqJuM89y4fuCqB',
+  'ADaManUn2foLjt92BNch2p62Y3rA7mJcKqrh9KpxiC2',
 ];
 
-/** Send a transaction through Jito Block Engine with MEV protection. */
+/** Send a transaction bundle through Jito Block Engine with MEV protection. */
 export async function sendViaJito(
-  serializedTx: string,
+  base64SignedTransactions: string | string[],
   options: { tipLamports?: number; timeoutMs?: number } = {},
 ): Promise<RouteResult> {
-  const tip = options.tipLamports ?? config.jitoTipLamports;
   const timeout = options.timeoutMs ?? 30_000;
-
-  // Pick closest Jito endpoint (round-robin for now)
-  const endpoint = JITO_ENDPOINTS[Math.floor(Math.random() * JITO_ENDPOINTS.length)];
   const startTime = Date.now();
+  const txs = Array.isArray(base64SignedTransactions) ? base64SignedTransactions : [base64SignedTransactions];
 
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
 
-    const res = await fetch(endpoint, {
+    const res = await fetch(JITO_BUNDLE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 1,
-        method: 'sendTransaction',
-        params: [
-          serializedTx,
-          {
-            encoding: 'base64',
-            skipPreflight: true,
-            maxRetries: 3,
-          },
-        ],
+        method: 'sendBundle',
+        params: [txs],
       }),
       signal: controller.signal,
     });
 
     clearTimeout(timer);
+    const latencyMs = Date.now() - startTime;
 
     if (!res.ok) {
       throw new Error(`Jito HTTP ${res.status}`);
     }
 
     const data = await res.json();
-    const latencyMs = Date.now() - startTime;
 
     if (data.error) {
-      console.warn('[mev-router] Jito error:', data.error.message || data.error);
-      return {
-        provider: 'jito',
-        endpoint,
-        latencyMs,
-        protected: false,
-      };
+      console.warn('[mev-router] Jito bundle error:', data.error.message || JSON.stringify(data.error));
+      return { provider: 'jito', endpoint: JITO_BUNDLE_URL, latencyMs, protected: false };
     }
 
     return {
       provider: 'jito',
-      endpoint,
+      endpoint: JITO_BUNDLE_URL,
       latencyMs,
       protected: true,
-      bundleId: data.result,
+      bundleId: data.result, // Returns Bundle ID
     };
   } catch (e: any) {
     const latencyMs = Date.now() - startTime;
     console.warn('[mev-router] Jito failed:', e?.message || e);
-    return {
-      provider: 'jito',
-      endpoint,
-      latencyMs,
-      protected: false,
-    };
+    return { provider: 'jito', endpoint: JITO_BUNDLE_URL, latencyMs, protected: false };
   }
 }
 
@@ -304,8 +275,8 @@ export async function routeTransaction(
 /** Check the status of a Jito bundle. */
 export async function getJitoBundleStatus(bundleId: string): Promise<BundleStatus | null> {
   try {
-    const endpoint = JITO_ENDPOINTS[0].replace('/transactions', '/bundles');
-    const res = await fetch(endpoint, {
+    const statusUrl = JITO_BUNDLE_URL.replace('/bundles', '/bundle-status');
+    const res = await fetch(statusUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -342,7 +313,7 @@ export async function getJitoBundleStatus(bundleId: string): Promise<BundleStatu
 export interface MevRouterStats {
   enabled: boolean;
   provider: RpcProvider;
-  jitoEndpoints: number;
+  jitoBundleUrl: string;
   tipLamports: number;
   priorityFee: number;
 }
@@ -351,7 +322,7 @@ export function getMevRouterStats(): MevRouterStats {
   return {
     enabled: config.enabled,
     provider: config.enabled ? 'jito' : 'public',
-    jitoEndpoints: JITO_ENDPOINTS.length,
+    jitoBundleUrl: JITO_BUNDLE_URL,
     tipLamports: config.jitoTipLamports,
     priorityFee: config.priorityFee,
   };
