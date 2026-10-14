@@ -13,8 +13,7 @@
   },
   "dependencies": {
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "lightweight-charts": "^4.2.2"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
