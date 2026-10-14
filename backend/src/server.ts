@@ -914,6 +914,47 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
       uniqueMints: health.uniqueMints,
     }));
   },
+
+  // GET /api/launchpads/persistence — persistence layer status
+  'GET /api/launchpads/persistence': async (_req, res) => {
+    const dbConfigured = isDbConfigured();
+    const seeder = getSeederHealth();
+    let dbStatus: { connected: boolean; tokenCount: number; byChain: Record<string, number> } = {
+      connected: false, tokenCount: 0, byChain: {},
+    };
+
+    if (dbConfigured) {
+      try {
+        const { pingDb } = require('./db/pool.js');
+        const { getTokenCount, getTokensByChain } = require('./db/market-tokens.js');
+        const connected = await pingDb();
+        const tokenCount = connected ? await getTokenCount() : 0;
+        const byChain = connected ? await getTokensByChain() : {};
+        dbStatus = { connected, tokenCount, byChain };
+      } catch { /* swallow */ }
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({
+      postgres: {
+        configured: dbConfigured,
+        connected: dbStatus.connected,
+        tokenCount: dbStatus.tokenCount,
+        byChain: dbStatus.byChain,
+      },
+      jsonSnapshot: {
+        active: !dbConfigured || !dbStatus.connected,
+        tokensInMemory: seeder.uniqueMints,
+      },
+      bootstrap: {
+        ready: isBootstrapReady(),
+        totalSeeded: seeder.totalTokensSeeded,
+      },
+      persistenceLevel: dbConfigured && dbStatus.connected
+        ? 'DURABLE — PostgreSQL, survives Railway restarts'
+        : 'EPHEMERAL — JSON snapshot only, lost on Railway restart',
+    }));
+  },
 };
 
 // ── IPFS Gateway Pool (cf-ipfs primary, fast + no rate-limit) ──
@@ -1116,15 +1157,20 @@ const cachedTokenRoutes: Record<string, (req: IncomingMessage, res: ServerRespon
 
 async function initDatabase(): Promise<void> {
   if (!isDbConfigured()) {
-    log('warn', 'DATABASE_URL not set — PostgreSQL disabled. Reward processing unavailable.');
+    log('warn', '═══════════════════════════════════════════════════════════════');
+    log('warn', '  DATABASE_URL not set — PostgreSQL DISABLED');
+    log('warn', '  Market data will use JSON snapshot fallback only.');
+    log('warn', '  Tokens will NOT survive Railway restarts.');
+    log('warn', '  Add DATABASE_URL in Railway Variables to enable persistence.');
+    log('warn', '═══════════════════════════════════════════════════════════════');
     return;
   }
 
   log('info', 'PostgreSQL configured — checking connection...');
   const reachable = await pingDb();
   if (!reachable) {
-    log('error', 'PostgreSQL unreachable — reward processing will be unavailable');
-    log('error', 'Server will start but /ready will report not-ready for reward processing');
+    log('error', 'PostgreSQL unreachable — market data will NOT persist across restarts');
+    log('error', 'Check DATABASE_URL in Railway Variables');
     return;
   }
 
@@ -1139,9 +1185,12 @@ async function initDatabase(): Promise<void> {
     }
     const status = await getMigrationStatus();
     log('info', `Schema status: ${status.applied}/${status.total} migrations applied, ${status.pending} pending`);
+    log('info', '═══ PostgreSQL PERSISTENCE ACTIVE ═══');
+    log('info', '  Market tokens, trades, and rewards will survive restarts.');
+    log('info', '═════════════════════════════════════');
   } catch (err: any) {
     log('error', `Migration failed: ${err.message}`);
-    log('error', 'Reward processing will NOT be available until migrations succeed');
+    log('error', 'Market data will NOT persist until migrations succeed');
   }
 }
 

@@ -131,6 +131,10 @@ function log(level: 'info' | 'warn' | 'error', msg: string) {
 // Loads tokens from PostgreSQL into the in-memory store.
 // This is the primary persistence layer — survives restarts/deploys.
 (async () => {
+  if (!isDbConfigured()) {
+    log('warn', 'PostgreSQL not configured — using JSON snapshot fallback only');
+    return;
+  }
   try {
     await ensureMarketTokensTable();
     const dbTokens = await loadAllTokens(500);

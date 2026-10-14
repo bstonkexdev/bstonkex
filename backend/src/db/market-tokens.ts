@@ -173,6 +173,25 @@ export async function getTokenCount(): Promise<number> {
 }
 
 /**
+ * Get token counts grouped by chain (for persistence diagnostics).
+ */
+export async function getTokensByChain(): Promise<Record<string, number>> {
+  if (!isDbConfigured()) return {};
+  try {
+    const result = await query(
+      'SELECT chain, COUNT(*)::text as count FROM market_tokens GROUP BY chain ORDER BY count DESC'
+    );
+    const counts: Record<string, number> = {};
+    for (const row of result.rows as any[]) {
+      counts[row.chain] = parseInt(row.count);
+    }
+    return counts;
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Ensure the market_tokens table exists (idempotent migration).
  */
 export async function ensureMarketTokensTable(): Promise<boolean> {
