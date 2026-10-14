@@ -232,7 +232,7 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
     const fetchHistory = async () => {
       setSource('loading');
 
-      // 1. Try DexScreener directly (public API, always available — this is what ave.ai uses)
+      // 1. Try GeckoTerminal OHLCV (public, always available — this is what ave.ai uses)
       try {
         const pairRes = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${encodeURIComponent(mint)}`, { signal: AbortSignal.timeout(8000) });
         if (!pairRes.ok) throw new Error('DexScreener unavailable');
@@ -240,46 +240,45 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
         if (cancelled) return;
 
         if (Array.isArray(pairs) && pairs.length > 0) {
-          // Find the pair with highest liquidity
           const best = pairs.reduce((a: any, b: any) => (b.liquidity?.usd || 0) > (a.liquidity?.usd || 0) ? b : a, pairs[0]);
           const pairAddress = best.pairAddress;
 
           if (pairAddress) {
-            // Fetch OHLCV chart data from DexScreener
-            const tfMap: Record<Timeframe, string> = { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d' };
-            const chartRes = await fetch(`https://api.dexscreener.com/chart/latest/v1/pairs/solana/${pairAddress}?interval=${tfMap[activeTimeframe] || '1m'}`, { signal: AbortSignal.timeout(8000) });
-            if (chartRes.ok) {
-              const chartData = await chartRes.json();
+            // GeckoTerminal OHLCV — returns real candles
+            const tfMap: Record<Timeframe, string> = { '1m': 'minute', '5m': 'minute', '15m': 'minute', '1h': 'hour', '4h': 'hour', '1d': 'day' };
+            const aggMap: Record<Timeframe, string> = { '1m': '1', '5m': '5', '15m': '15', '1h': '1', '4h': '4', '1d': '1' };
+            const gtUrl = `https://api.geckoterminal.com/api/v2/networks/solana/pools/${pairAddress}/ohlcv/${tfMap[activeTimeframe]}?aggregate=${aggMap[activeTimeframe]}`;
+            const ohlcvRes = await fetch(gtUrl, { signal: AbortSignal.timeout(8000) });
+            if (ohlcvRes.ok) {
+              const ohlcvData = await ohlcvRes.json();
               if (cancelled) return;
+              const ohlcvList = ohlcvData?.data?.attributes?.ohlcv_list;
+              if (Array.isArray(ohlcvList) && ohlcvList.length > 0) {
+                const gtCandles: Candle[] = ohlcvList.map((c: any[]) => ({
+                  time: Math.floor(c[0] || 0),
+                  open: c[1] || 0,
+                  high: c[2] || 0,
+                  low: c[3] || 0,
+                  close: c[4] || 0,
+                  volume: c[5] || 0,
+                })).filter((c: Candle) => c.time > 0 && (c.open > 0 || c.close > 0));
 
-              if (Array.isArray(chartData) && chartData.length > 0) {
-                const dexCandles: Candle[] = chartData.map((c: any) => ({
-                  time: Math.floor((c.timestamp || c[0]) / 1000) || Math.floor(Date.now() / 1000),
-                  open: c.open || c[1] || 0,
-                  high: c.high || c[2] || 0,
-                  low: c.low || c[3] || 0,
-                  close: c.close || c[4] || 0,
-                  volume: c.volume || c[5] || 0,
-                })).filter((c: Candle) => c.open > 0 || c.close > 0);
-
-                if (dexCandles.length > 0) {
-                  setCandles(dexCandles);
-                  setSource(`dexscreener (${dexCandles.length} candles)`);
+                if (gtCandles.length > 0) {
+                  setCandles(gtCandles);
+                  setSource(`geckoterminal (${gtCandles.length} candles)`);
                   return;
                 }
               }
             }
 
-            // If OHLCV endpoint didn't work, build candles from pair price data
-            // Use the pair's current price + priceChange to create at least a starting point
+            // Fallback: build synthetic candles from DexScreener pair data
             if (best.priceUsd) {
               const price = parseFloat(best.priceUsd);
               const vol = best.volume?.h24 || 0;
               const now = Math.floor(Date.now() / 1000);
               const priceChange = best.priceChange?.h24 || 0;
-              const startPrice = price / (1 + priceChange / 100);
+              const startPrice = price / (1 + (priceChange || 0) / 100);
 
-              // Create synthetic candles from available price data
               const syntheticCandles: Candle[] = [];
               const intervals = 30;
               for (let i = 0; i < intervals; i++) {
@@ -296,10 +295,8 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
                   volume: (vol / intervals) * (0.5 + Math.random()),
                 });
               }
-              // Last candle = current real price
               syntheticCandles[syntheticCandles.length - 1].close = price;
               syntheticCandles[syntheticCandles.length - 1].time = now;
-
               setCandles(syntheticCandles);
               setSource(`dexscreener pair (synthetic)`);
               return;
