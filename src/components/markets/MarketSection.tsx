@@ -91,15 +91,19 @@ export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { c
     const chainMap: Record<string, string> = { SOL: 'sol', ETH: 'eth', BSC: 'bsc', BASE: 'base' };
     const targetChain = chainMap[chain] || chain.toLowerCase();
     fetchBootstrapTokens(true).then(bootstrapTokens => {
-      if (cancelled || bootstrapTokens.length === 0) return;
+      if (cancelled) return;
       const filtered = bootstrapTokens
         .filter(t => targetChain === 'all' || t.chain === targetChain)
         .map(mapToken);
       if (filtered.length > 0) {
         setTokens(filtered);
-        setLoading(false);
       }
-    }).catch(() => {});
+      setLoading(false); // Always stop loading after bootstrapper returns
+    }).catch((err) => {
+      if (cancelled) return;
+      console.warn('[MarketSection] Bootstrapper failed:', err);
+      setLoading(false); // Stop loading even on failure
+    });
 
     // Step 2: Fetch from backend API (enriches bootstrapper data)
     async function fetchBackend(retryCount = 0) {
