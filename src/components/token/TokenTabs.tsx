@@ -2,16 +2,16 @@
 // Both bars switch the same data panel; only real, functional views are listed.
 
 export type PanelTab =
-  | 'markets' | 'detail' | 'history' | 'risk'
+  | 'markets' | 'detail' | 'history' | 'risk' | 'holders'
   | 'trade' | 'liquidity' | 'orders' | 'activity' | 'info';
 
 export interface TabDef { id: PanelTab; label: string; }
 
-// Bar A — info views. HOLDERS is intentionally absent: the holder indexer returns
-// no data today, and the spec forbids fake holder counts.
+// Bar A — info views. HOLDERS uses real Solana/GoPlus holder data.
 export const TABS_A: TabDef[] = [
   { id: 'markets', label: 'MARKETS' },
   { id: 'detail', label: 'DETAIL' },
+  { id: 'holders', label: 'HOLDERS' },
   { id: 'history', label: 'HISTORY' },
   { id: 'risk', label: 'RISK' },
 ];

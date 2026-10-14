@@ -65,6 +65,8 @@ export interface HolderData {
   balance: string;
   pctSupply: number;
   value: number | null;
+  amount: number;
+  label: string | null;
 }
 
 function mapDexChain(id: string): ChainId | null {
@@ -275,9 +277,64 @@ export async function getRecentTrades(chainId: ChainId, pairAddress: string): Pr
   }
 }
 
-// Holder data — requires chain-specific indexer
-export async function getHolders(_chainId: ChainId, _address: string): Promise<HolderData[]> {
-  return [];
+// Holder data — real chain data via RPC (Solana) and GoPlus (EVM)
+export async function getHolders(chainId: ChainId, address: string): Promise<HolderData[]> {
+  if (isSandboxed() || !address) return [];
+  return cacheGetOrCompute(`holders:${chainId}:${address}`, async () => {
+    try {
+      if (chainId === 'solana') {
+        // Solana: getTokenLargestAccounts returns top 20 token accounts
+        const rpc = import.meta.env.VITE_SOLANA_RPC || 'https://api.mainnet-beta.solana.com';
+        const res = await fetch(rpc, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0', id: 1,
+            method: 'getTokenLargestAccounts',
+            params: [address],
+          }),
+        });
+        const json = await res.json();
+        const accounts: any[] = json?.result?.value || [];
+        if (accounts.length === 0) return [];
+        const totalSupply = accounts.reduce((s, a) => s + (parseFloat(a.uiAmountString || a.amount) || 0), 0) || 1;
+        return accounts.slice(0, 20).map((a, i) => {
+          const amt = parseFloat(a.uiAmountString || '0') || 0;
+          return {
+            rank: i + 1,
+            address: a.address || '',
+            balance: a.uiAmountString || '0',
+            value: null,
+            amount: amt,
+            pctSupply: (amt / totalSupply) * 100,
+            label: null,
+          };
+        });
+      }
+
+      // EVM chains: GoPlus token security API includes top holders
+      const goplusChainMap: Record<string, string> = {
+        bsc: '56', eth: '1', base: '8453', robinhood: '4663', solana: '0',
+      };
+      const goplusChain = goplusChainMap[chainId];
+      if (!goplusChain || goplusChain === '0') return [];
+      const res = await fetch(`https://api.gopluslabs.io/api/v1/token_security/${goplusChain}?contract_addresses=${address.toLowerCase()}`);
+      const json = await res.json();
+      const token = json?.result?.[address.toLowerCase()];
+      if (!token?.holders) return [];
+      return (token.holders as any[]).slice(0, 20).map((h, i) => ({
+        rank: i + 1,
+        address: h.address || '',
+        balance: h.amount || '0',
+        value: null,
+        amount: parseFloat(h.amount || '0') || 0,
+        pctSupply: parseFloat(h.percent || '0') * 100,
+        label: h.tag || h.name || null,
+      }));
+    } catch {
+      return [];
+    }
+  }, TTL.TOKEN_META);
 }
 
 // ── Price Validation ─────────────────────────────────────────

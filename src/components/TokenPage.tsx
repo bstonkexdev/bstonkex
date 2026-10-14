@@ -309,7 +309,7 @@ export default function TokenPage() {
 
         <div ref={panelRef} className="token-data-panel">
           <TokenDataPanel
-            tab={panelTab} chainId={activeChain} symbol={displaySymbol}
+            tab={panelTab} chainId={activeChain} tokenAddress={tradeToken.address || majorRoute?.address || ''} symbol={displaySymbol}
             token={t} safety={safety}
             trades={tradeFeed.rows} tradeFreshness={tradeFeed.freshness}
             myTrades={myTrades.trades} myTradesLoaded={myTrades.loaded}

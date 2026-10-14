@@ -5,13 +5,16 @@ import type { TokenData } from '../../lib/market';
 import type { SafetyReport } from '../../lib/engine/token-safety';
 import type { TrackedTrade } from '../../lib/engine/tx-tracker';
 import { formatRelativeTime, type TokenTradeRow } from '../../lib/token-page-data';
-import { BuySellPressure, LiquidityPanel, RiskPanel, ContractPanel } from '../TokenProfile';
+import { BuySellPressure, LiquidityPanel, RiskPanel, ContractPanel, HolderConcentration } from '../TokenProfile';
+import { getHolders, type HolderData } from '../../lib/market';
+import { useState, useEffect } from 'react';
 import TradeList from './TradeList';
 import type { PanelTab } from './TokenTabs';
 
 interface Props {
   tab: PanelTab;
   chainId: ChainId;
+  tokenAddress: string;
   symbol: string;
   token: TokenData | null;
   safety: SafetyReport | null;
@@ -80,6 +83,64 @@ function MyTradesTable({ trades }: { trades: TrackedTrade[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function HoldersPanel({ chainId, address }: { chainId: ChainId; address: string }) {
+  const [holders, setHolders] = useState<HolderData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [source, setSource] = useState<string>('');
+
+  useEffect(() => {
+    if (!address) { setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    getHolders(chainId, address).then(data => {
+      if (cancelled) return;
+      setHolders(data);
+      setSource(chainId === 'solana' ? 'Solana RPC' : 'GoPlus Security API');
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [chainId, address]);
+
+  if (loading) return <Empty title="LOADING HOLDERS…" hint="Fetching on-chain holder distribution data." />;
+  if (holders.length === 0) return <Empty title="HOLDER DATA UNAVAILABLE" hint={`No holder data available for this token via ${source || 'on-chain APIs'}.`} />;
+
+  return (
+    <div style={{ padding: 10 }}>
+      <div style={{ fontSize: 7, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '0.06em' }}>
+        SOURCE: {source} · {holders.length} HOLDERS INDEXED
+      </div>
+      <HolderConcentration holders={holders} />
+      <div style={{ marginTop: 12 }}>
+        <table className="trade-table">
+          <thead>
+            <tr>
+              <th style={{ fontSize: 7, color: 'var(--text-muted)', padding: '3px 6px', textAlign: 'left' }}>#</th>
+              <th style={{ fontSize: 7, color: 'var(--text-muted)', padding: '3px 6px', textAlign: 'left' }}>WALLET</th>
+              <th style={{ fontSize: 7, color: 'var(--text-muted)', padding: '3px 6px', textAlign: 'right' }}>AMOUNT</th>
+              <th style={{ fontSize: 7, color: 'var(--text-muted)', padding: '3px 6px', textAlign: 'right' }}>%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {holders.map(h => (
+              <tr key={h.rank}>
+                <td style={{ fontSize: 8, color: 'var(--text-dim)', padding: '2px 6px' }}>{h.rank}</td>
+                <td style={{ fontSize: 8, color: 'var(--text)', padding: '2px 6px', fontFamily: 'monospace' }}>
+                  {shortenAddress(h.address, 4)}
+                  {h.label && <span style={{ marginLeft: 4, fontSize: 7, color: 'var(--cyan)', fontWeight: 700 }}>{h.label}</span>}
+                </td>
+                <td style={{ fontSize: 8, color: 'var(--text)', padding: '2px 6px', textAlign: 'right' }}>{formatNum(h.amount)}</td>
+                <td style={{ fontSize: 8, color: h.pctSupply > 5 ? 'var(--amber)' : 'var(--text)', padding: '2px 6px', textAlign: 'right' }}>
+                  {h.pctSupply.toFixed(2)}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -169,6 +230,9 @@ export default function TokenDataPanel(p: Props) {
       return p.myTradesLoaded && p.myTrades.length === 0
         ? <Empty title="NO TRADE HISTORY" hint={p.walletAddress ? 'Your confirmed trades on this token will appear here.' : 'Connect a wallet to see your trade history on this token.'} />
         : <MyTradesTable trades={p.myTrades} />;
+
+    case 'holders':
+      return <HoldersPanel chainId={p.chainId} address={t?.address || p.tokenAddress} />;
 
     case 'risk':
       return p.safety ? (

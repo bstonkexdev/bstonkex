@@ -17,7 +17,8 @@ import { runMigrations, getMigrationStatus } from './db/migrate.js';
 import { routeRewards } from './reward-routes.js';
 import { LAUNCHPAD_CONFIG, getAllLaunchpads, getLaunchpad } from './config/launchpads.js';
 import { startMultiChainListeners, getListenerHealth, stopMultiChainListeners } from './multi-chain-listener.js';
-import { upsertMarketToken } from './db/market-tokens.js';
+import { upsertMarketToken, getTokenCount, getTokensByChain } from './db/market-tokens.js';
+import { hsetAll, hgetall, zadd, zrevrange, getStoreStats } from './trenches-store.js';
 import { startBootstrapSeed, getSeederHealth, isBootstrapReady, waitForBootstrap } from './bootstrap-seed.js';
 
 // ── Configuration ────────────────────────────────────────────
@@ -811,7 +812,6 @@ const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
   // GET /api/tokens/trenches/:platform — serve stored tokens (Redis-compatible sorted-set + hash)
   'GET /api/tokens/trenches/pumpfun': (_req, res) => {
     try {
-      const { zrevrange, hgetall } = require('./trenches-store.js');
       const mints: string[] = zrevrange('trenches:pumpfun', 0, 49);
       if (!mints || mints.length === 0) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -833,7 +833,6 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
   // GET /api/launchpads — full registry with chain context
   'GET /api/launchpads': (_req, res) => {
     const launchpads = getAllLaunchpads();
-    const { getStoreStats } = require('./trenches-store.js');
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({
       launchpads,
@@ -849,7 +848,6 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
 
   // GET /api/launchpads/status — per-chain readiness + token counts + listener health
   'GET /api/launchpads/status': (_req, res) => {
-    const { zrevrange } = require('./trenches-store.js');
     const health = getListenerHealth();
     const healthMap = new Map<string, typeof health[number]>();
     for (const h of health) healthMap.set(`${h.chain}:${h.launchpad}`, h);
@@ -888,7 +886,6 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
     try {
       const url = new URL(req.url || '/', `http://${req.headers.host}`);
       const lp = (url.searchParams.get('launchpad') || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-      const { zrevrange, hgetall } = require('./trenches-store.js');
       const mints = zrevrange(`trenches:${lp}`, 0, 49) || [];
       const tokens = mints.map((m: string) => hgetall(`token:${m}`)).filter((t: any) => t && t.mint);
       res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
@@ -925,8 +922,6 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
 
     if (dbConfigured) {
       try {
-        const { pingDb } = require('./db/pool.js');
-        const { getTokenCount, getTokensByChain } = require('./db/market-tokens.js');
         const connected = await pingDb();
         const tokenCount = connected ? await getTokenCount() : 0;
         const byChain = connected ? await getTokensByChain() : {};
@@ -1004,7 +999,6 @@ async function fetchMetadataAndEnrich(mint: string, uri: string) {
     const meta = await fetchWithGatewayRotation(urls);
     if (!meta) return;
 
-    const { hsetAll } = require('./trenches-store.js');
     const rawImage = meta.image || meta.image_uri || meta.image_url || '';
 
     // Always store as cf-ipfs.com HTTPS URL (fast, non-rate-limited)
@@ -1029,7 +1023,6 @@ function ingestTokenEvent(event: {
   const { mint, symbol, name, uri, chain, launchpad, price, icon } = event;
   const ch = (chain || 'sol').toLowerCase();
   const lp = (launchpad || 'pumpfun').toLowerCase();
-  const { hsetAll, zadd } = require('./trenches-store.js');
 
   // Resolve image: use direct icon if provided, else sanitize from IPFS URI
   const directImage = icon ? sanitizeUri(icon) : '';
@@ -1093,8 +1086,6 @@ const cachedTokenRoutes: Record<string, (req: IncomingMessage, res: ServerRespon
       const chain = norm(url.searchParams.get('chain'), 'sol');
       const launchpad = norm(url.searchParams.get('launchpad'), 'pumpfun');
       const filter = norm(url.searchParams.get('subFilter'), 'trending');
-
-      const { zrevrange, hgetall } = require('./trenches-store.js');
 
       // Priority 1: trenches:{chain}:{launchpad}:{filter}
       let mints: string[] = zrevrange(`trenches:${chain}:${launchpad}:${filter}`, 0, 49) || [];
