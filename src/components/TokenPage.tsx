@@ -7,6 +7,7 @@ import { getTokenByAddress, validatePrice, type TokenData, type PriceValidation 
 import { getMajorAsset, getMajorRoute, fetchMajorQuotes, type MajorQuote, type ProviderStatus } from '../lib/major-assets';
 import { CHAINS, PLATFORM_FEE_BPS, formatUsd, formatPct } from '../lib/config';
 import { checkTokenSafety, type SafetyReport } from '../lib/engine/token-safety';
+import { auditSolanaToken, type ExternalAuditResult } from '../lib/engine/external-safety';
 import { checkChainReadiness, type ChainReadiness } from '../lib/engine/chain-readiness';
 import { subscribeToken, onMarketEvent, getDataFreshness, type MarketStreamEvent } from '../lib/engine/market-stream';
 import { processTrade } from '../lib/engine/candle-engine';
@@ -35,6 +36,7 @@ export default function TokenPage() {
   const [loading, setLoading] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
   const [safety, setSafety] = useState<SafetyReport | null>(null);
+  const [extAudit, setExtAudit] = useState<ExternalAuditResult | null>(null);
   const [priceValidation, setPriceValidation] = useState<PriceValidation | null>(null);
   const [readiness, setReadiness] = useState<ChainReadiness | null>(null);
   const [fullscreenChart, setFullscreenChart] = useState(false);
@@ -87,6 +89,10 @@ export default function TokenPage() {
     setLoading(true);
     getTokenByAddress(tradeToken.chainId, tradeToken.address).then(data => { setToken(data); setLoading(false); }).catch(() => setLoading(false));
     checkTokenSafety(tradeToken.chainId, tradeToken.address).then(setSafety).catch(() => {});
+    // RugCheck/GoPlus external audit (real contract analysis)
+    if (tradeToken.chainId === 'solana') {
+      auditSolanaToken(tradeToken.address).then(setExtAudit).catch(() => {});
+    }
     validatePrice(tradeToken.chainId, tradeToken.address).then(setPriceValidation).catch(() => {});
     const unsub = subscribeToken(tradeToken.chainId, tradeToken.address, tradeToken.symbol);
     return unsub;
@@ -332,6 +338,14 @@ export default function TokenPage() {
     if (safety.checks.liquidityOk) badges.push({ label: 'LIQ CHECK', value: 'PASS', tone: 'green' });
   }
   if (priceValidation?.tradeable) badges.push({ label: 'MARKET', value: 'ACTIVE', tone: 'green' });
+  // RugCheck/GoPlus external audit badges
+  if (extAudit?.checked) {
+    badges.push({ label: 'AUDIT', value: extAudit.source.toUpperCase(), tone: extAudit.riskLevel === 'low' ? 'green' : extAudit.riskLevel === 'medium' ? 'amber' : 'red' });
+    if (extAudit.dangerFlags.length > 0) {
+      badges.push({ label: 'FLAGS', value: `${extAudit.dangerFlags.length} RISK`, tone: 'red' });
+    }
+    if (extAudit.score != null) badges.push({ label: 'SCORE', value: String(extAudit.score), tone: extAudit.score < 500 ? 'green' : extAudit.score < 1000 ? 'amber' : 'red' });
+  }
 
   return (
     <div className="token-page">
@@ -386,6 +400,19 @@ export default function TokenPage() {
                 border: `1px solid ${w.level === 'critical' ? 'var(--red)' : 'var(--amber, #FFD700)'}`,
                 color: w.level === 'critical' ? 'var(--red)' : 'var(--amber, #FFD700)',
               }}>⚠ {w.label}</span>
+            ))}
+          </div>
+        )}
+        {/* RugCheck/GoPlus External Audit Flags */}
+        {extAudit?.checked && extAudit.dangerFlags.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, padding: '4px 12px', flexWrap: 'wrap', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--text-dim)' }}>AUDIT</span>
+            {extAudit.dangerFlags.map((f, i) => (
+              <span key={i} style={{
+                fontSize: 7, fontWeight: 800, padding: '1px 3px',
+                border: `1px solid ${f.severity === 'critical' ? 'var(--red)' : f.severity === 'high' ? '#FF6B35' : 'var(--amber, #FFD700)'}`,
+                color: f.severity === 'critical' ? 'var(--red)' : f.severity === 'high' ? '#FF6B35' : 'var(--amber, #FFD700)',
+              }} title={f.detail}>⚠ {f.label}</span>
             ))}
           </div>
         )}
