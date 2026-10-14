@@ -28,6 +28,7 @@ import PriceStats, { type DataStatus } from './token/PriceStats';
 import MetaBadges, { type MetaBadge } from './token/MetaBadges';
 import TokenDataPanel from './token/TokenDataPanel';
 import MobileTradeBar from './token/MobileTradeBar';
+import OrderPanel from './token/OrderPanel';
 import { gitlawb } from '../lib/gitlawb';
 
 export default function TokenPage() {
@@ -496,6 +497,12 @@ export default function TokenPage() {
           </div>
         ) : (
           <TradePanel tokenAddress={displayAddress} tokenSymbol={displaySymbol} tokenPrice={displayPrice} />
+        )}
+        {/* TP/SL Order Panel */}
+        {!isMajor && displayAddress && (
+          <div style={{ padding: '0 0 8px 0' }}>
+            <OrderPanel chainId={activeChain} tokenAddress={displayAddress} tokenSymbol={displaySymbol} currentPrice={displayPrice} />
+          </div>
         )}
       </aside>
 
