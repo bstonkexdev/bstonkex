@@ -33,10 +33,72 @@ export function hdel(key: string, field: string): void {
   delete hashes.get(key)?.[field];
 }
 
+/** Set field only if it does not exist (Redis HSETNX). */
+export function hsetnx(key: string, field: string, value: string): boolean {
+  if (!hashes.has(key)) hashes.set(key, {});
+  const h = hashes.get(key)!;
+  if (field in h) return false;
+  h[field] = value;
+  return true;
+}
+
+/** Increment a hash field by a float value (Redis HINCRBYFLOAT). */
+export function hincrbyfloat(key: string, field: string, increment: number): number {
+  if (!hashes.has(key)) hashes.set(key, {});
+  const h = hashes.get(key)!;
+  const current = parseFloat(h[field] || '0') || 0;
+  const next = current + increment;
+  h[field] = String(next);
+  return next;
+}
+
 export function del(key: string): void {
   hashes.delete(key);
   zsets.delete(key);
   cache.delete(key);
+}
+
+// ── Pipeline (batched atomic operations) ─────────────────────
+
+type PipelineOp = () => void;
+
+class Pipeline {
+  private ops: PipelineOp[] = [];
+
+  hset(key: string, field: string, value: string): this {
+    this.ops.push(() => hset(key, field, value));
+    return this;
+  }
+
+  hsetnx(key: string, field: string, value: string): this {
+    this.ops.push(() => hsetnx(key, field, value));
+    return this;
+  }
+
+  hincrbyfloat(key: string, field: string, increment: number): this {
+    this.ops.push(() => hincrbyfloat(key, field, increment));
+    return this;
+  }
+
+  hsetAll(key: string, obj: Record<string, string>): this {
+    this.ops.push(() => hsetAll(key, obj));
+    return this;
+  }
+
+  zadd(key: string, score: number, member: string): this {
+    this.ops.push(() => zadd(key, score, member));
+    return this;
+  }
+
+  exec(): void {
+    for (const op of this.ops) op();
+    this.ops = [];
+  }
+}
+
+/** Create a pipeline for batched atomic operations (mirrors Redis pipeline). */
+export function pipeline(): Pipeline {
+  return new Pipeline();
 }
 
 // ── Sorted Set Operations ───────────────────────────────────
