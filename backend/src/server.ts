@@ -724,6 +724,7 @@ function connectPumpPortal(): void {
       pumpLastError = null;
       log('info', 'PumpPortal WebSocket connected');
       pumpWs!.send(JSON.stringify({ method: 'subscribeNewToken' }));
+      pumpWs!.send(JSON.stringify({ method: 'subscribeTokenTrade' })); // ← feeds chart engine!
     });
 
     pumpWs.on('message', (raw: Buffer) => {
@@ -772,6 +773,31 @@ function connectPumpPortal(): void {
               client.send(tokenData);
             }
           });
+        }
+
+        // ── Real buy/sell trades → chart engine ──────────────
+        if ((data.txType === 'buy' || data.txType === 'sell') && data.mint) {
+          const solUsd = 200; // Approximate SOL price (updated by sol-price module)
+          const spotPrice = (data.vSolInBondingCurve || 0) / (data.vTokensInBondingCurve || 1);
+          const tradeUsd = (data.solAmount || 0) * solUsd;
+          const priceUsd = spotPrice * solUsd;
+
+          ingestTrade({
+            mint: data.mint,
+            chain: 'solana',
+            priceUsd,
+            volumeUsd: tradeUsd,
+            side: data.txType,
+            timestamp: data.timestamp ? data.timestamp * 1000 : Date.now(),
+          });
+
+          // Update server token cache with latest price
+          const cached = serverTokens.get(data.mint);
+          if (cached) {
+            cached.spotPrice = spotPrice;
+            cached.virtualSol = data.vSolInBondingCurve || 0;
+            cached.virtualTokens = data.vTokensInBondingCurve || 0;
+          }
         }
       } catch { /* malformed */ }
     });

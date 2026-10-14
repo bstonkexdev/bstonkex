@@ -94,6 +94,25 @@ let stats = {
 type CreateListener = (token: TokenIndexRecord) => void;
 const createListeners = new Set<CreateListener>();
 
+// ── Trade Listeners ────────────────────────────────────────────
+
+export interface TokenTradeRecord {
+  mint: string;
+  side: 'buy' | 'sell';
+  priceUsd: number;
+  volumeUsd: number;
+  timestamp: number;
+  txType: string;
+}
+
+type TradeListener = (trade: TokenTradeRecord) => void;
+const tradeListeners = new Set<TradeListener>();
+
+export function onTokenTrade(listener: TradeListener): () => void {
+  tradeListeners.add(listener);
+  return () => tradeListeners.delete(listener);
+}
+
 // ── Public API ───────────────────────────────────────────────
 
 /** Subscribe to real-time new token creation events. */
@@ -332,6 +351,21 @@ function handleMessage(data: string): void {
         bondingCurveProgress: progress,
       });
       bondingProgress.set(event.mint, progress);
+
+      // Emit real trade event to listeners (candle engine, chart engine, etc.)
+      const tradeUsd = (event.solAmount || 0) * (_solUsd || 200);
+      const priceUsd = spotPrice * (_solUsd || 200);
+      const tradeRecord: TokenTradeRecord = {
+        mint: event.mint,
+        side: event.txType,
+        priceUsd,
+        volumeUsd: tradeUsd,
+        timestamp: event.timestamp ? event.timestamp * 1000 : Date.now(),
+        txType: event.txType,
+      };
+      for (const listener of tradeListeners) {
+        try { listener(tradeRecord); } catch { /* listener error shouldn't break stream */ }
+      }
 
       stats.tradesProcessed++;
       stats.lastTradeAt = Date.now();

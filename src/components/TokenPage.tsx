@@ -10,6 +10,7 @@ import { checkTokenSafety, type SafetyReport } from '../lib/engine/token-safety'
 import { checkChainReadiness, type ChainReadiness } from '../lib/engine/chain-readiness';
 import { subscribeToken, onMarketEvent, getDataFreshness, type MarketStreamEvent } from '../lib/engine/market-stream';
 import { processTrade } from '../lib/engine/candle-engine';
+import { onTokenTrade } from '../lib/engine/discovery/pumpportal-stream';
 import { useTokenTradeFeed, useMyTrades, useTokenAlert, formatAge } from '../lib/token-page-data';
 import PriceChart, { ChartErrorBoundary } from './PriceChart';
 import AveTokenHeader from './token/AveTokenHeader';
@@ -96,7 +97,7 @@ export default function TokenPage() {
       if (e.tokenAddress !== tradeToken.address || e.chainId !== tradeToken.chainId) return;
       if (e.type === 'price' && e.data.price != null) {
         setToken(prev => prev ? { ...prev, price: e.data.price, priceChange24h: e.data.change24h ?? prev.priceChange24h } : prev);
-        processTrade(e.chainId, e.tokenAddress, { price: e.data.price, amountUsd: e.data.volume24h ?? 0, timestamp: e.timestamp, side: 'buy' });
+        // Note: do NOT feed price snapshots into candle engine — only real trades (onTokenTrade) move candles
       }
       if (e.type === 'stats') {
         setToken(prev => prev ? {
@@ -170,6 +171,20 @@ export default function TokenPage() {
       });
     });
     return unsub;
+  }, [activeChain, displayAddress]);
+
+  // Real-time buy/sell trades from PumpPortal → candle engine (moves the chart!)
+  useEffect(() => {
+    if (!displayAddress || activeChain !== 'solana') return;
+    return onTokenTrade((trade) => {
+      if (trade.mint !== displayAddress) return;
+      processTrade('solana', trade.mint, {
+        price: trade.priceUsd,
+        amountUsd: trade.volumeUsd,
+        timestamp: trade.timestamp,
+        side: trade.side,
+      });
+    });
   }, [activeChain, displayAddress]);
 
   // ── No token selected ──
