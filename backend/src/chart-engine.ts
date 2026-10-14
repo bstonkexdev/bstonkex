@@ -179,6 +179,12 @@ export function ingestTrade(trade: RawTrade): void {
     const isNew = activeCandles.get(key) !== candle;
     emitTick({ mint, interval, candle: { ...candle }, isNew });
   }
+
+  // Check limit/TP/SL orders against this price tick (1m interval only to avoid duplicate triggers)
+  try {
+    const { processPriceTickForOrders } = require('./limit-order-engine.js');
+    processPriceTickForOrders(mint, priceUsd).catch(() => {});
+  } catch { /* limit-order-engine may not be loaded */ }
 }
 
 // ── Public API: Query candles ──────────────────────────────────
