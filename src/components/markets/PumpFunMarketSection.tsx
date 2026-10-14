@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { onTokenCreate, getStreamHealth, getLivePrice } from '../../lib/engine/discovery/pumpportal-stream';
+import { fetchBootstrapTokens } from '../../lib/engine/market-bootstrapper';
 import type { TokenIndexRecord } from '../../lib/engine/discovery/types';
 
 interface PumpToken {
@@ -54,32 +55,67 @@ export default function PumpFunMarketSection({ subFilter, launchpad }: Props) {
   const [connected, setConnected] = useState(false);
   const [loadingCached, setLoadingCached] = useState(true);
 
-  // 1. Fetch cached tokens on mount + launchpad change — instant population
+  // 1. Fetch tokens: bootstrapper FIRST (instant), then backend enriches
   useEffect(() => {
     let cancelled = false;
-    async function fetchCached() {
-      setLoadingCached(true);
+
+    const mapPump = (t: any): PumpToken => ({
+      mint: t.mint || '',
+      name: t.name || 'Unknown',
+      symbol: t.symbol || '???',
+      image: t.image || t.icon || null,
+      progress: parseFloat(t.bondingCurveProgress) || 0,
+      mcap: parseFloat(t.virtualMcap) || parseFloat(t.spotPrice || '0') * 1e9,
+      holders: parseInt(t.holders) || 0,
+      priceUsd: parseFloat(t.spotPrice) || 0,
+      priceChange24h: parseFloat(t.priceChange24h) || 0,
+      createdAt: parseInt(t.createdAt) || Date.now(),
+    });
+
+    // Step 1: Bootstrapper IMMEDIATELY (DexScreener + GeckoTerminal + PumpPortal)
+    fetchBootstrapTokens(true).then(bootstrapTokens => {
+      if (cancelled || bootstrapTokens.length === 0) return;
+      // Filter to Solana tokens (PumpFun is Solana-only)
+      const solTokens = bootstrapTokens.filter(t => t.chain === 'sol');
+      if (solTokens.length > 0) {
+        setTokens(solTokens.map(mapPump));
+      }
+      setLoadingCached(false);
+    }).catch(() => { if (!cancelled) setLoadingCached(false); });
+
+    // Step 2: Backend API (enriches bootstrapper data)
+    async function fetchBackend() {
       try {
         const res = await fetch(`${API_BASE}/api/tokens/trenches/${launchpad}`);
         const data = await res.json();
         if (!cancelled && Array.isArray(data) && data.length > 0) {
-          setTokens(data.map((t: any) => ({
-            mint: t.mint || '',
-            name: t.name || 'Unknown',
-            symbol: t.symbol || '???',
-            image: t.image || t.icon || null,
-            progress: parseFloat(t.bondingCurveProgress) || 0,
-            mcap: parseFloat(t.virtualMcap) || parseFloat(t.spotPrice || '0') * 1e9,
-            holders: parseInt(t.holders) || 0,
-            priceUsd: parseFloat(t.spotPrice) || 0,
-            priceChange24h: parseFloat(t.priceChange24h) || 0,
-            createdAt: parseInt(t.createdAt) || Date.now(),
-          })));
+          const backendTokens = data.map(mapPump);
+          setTokens(prev => {
+            if (prev.length === 0) return backendTokens;
+            // Merge: backend enriches bootstrapper, keeps bootstrapper-only tokens
+            const byMint = new Map(prev.map(t => [t.mint, t]));
+            for (const t of backendTokens) {
+              const existing = byMint.get(t.mint);
+              if (existing) {
+                if (t.mcap > 0) existing.mcap = t.mcap;
+                if (t.holders > 0) existing.holders = t.holders;
+                if (t.priceUsd > 0) existing.priceUsd = t.priceUsd;
+                if (t.priceChange24h !== 0) existing.priceChange24h = t.priceChange24h;
+                if (t.progress > 0) existing.progress = t.progress;
+                if (t.name !== 'Unknown') existing.name = t.name;
+                if (t.symbol !== '???') existing.symbol = t.symbol;
+                if (t.image) existing.image = t.image;
+              } else {
+                byMint.set(t.mint, t);
+              }
+            }
+            return [...byMint.values()];
+          });
         }
-      } catch { /* offline — live feed will populate */ }
-      finally { if (!cancelled) setLoadingCached(false); }
+      } catch { /* offline — bootstrapper data already shown */ }
     }
-    fetchCached();
+    fetchBackend();
+
     return () => { cancelled = true; };
   }, [launchpad]);
 
