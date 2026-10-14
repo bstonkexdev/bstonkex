@@ -128,11 +128,24 @@ async function fetchDexScreenerTrending(): Promise<BootstrapToken[]> {
     }
   }
 
-  // 3. Fetch full pair data for top tokens (price, volume, liquidity)
-  const topMints = tokens.slice(0, 30).map(t => t.mint);
-  if (topMints.length > 0) {
-    // Batch fetch: DexScreener supports comma-separated addresses (max 30)
-    const batchUrl = `${DEXSCREENER}/tokens/v1/solana/${topMints.join(',')}`;
+  // 3. Fetch full pair data for top tokens (price, volume, liquidity) — ALL chains
+  // Group tokens by chain for DexScreener batch calls
+  const byChain = new Map<string, BootstrapToken[]>();
+  for (const t of tokens) {
+    const group = byChain.get(t.chain) || [];
+    group.push(t);
+    byChain.set(t.chain, group);
+  }
+
+  // DexScreener uses chain IDs: solana, bsc, base, ethereum, arbitrum
+  const chainIdMap: Record<string, string> = { sol: 'solana', bsc: 'bsc', base: 'base', eth: 'ethereum', arbitrum: 'arbitrum' };
+
+  for (const [chain, chainTokens] of byChain) {
+    const dsChain = chainIdMap[chain] || chain;
+    const topMints = chainTokens.slice(0, 30).map(t => t.mint);
+    if (topMints.length === 0) continue;
+
+    const batchUrl = `${DEXSCREENER}/tokens/v1/${dsChain}/${topMints.join(',')}`;
     const pairsData = await fetchJson(batchUrl);
     if (Array.isArray(pairsData)) {
       for (const pair of pairsData) {
