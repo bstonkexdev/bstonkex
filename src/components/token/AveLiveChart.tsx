@@ -224,14 +224,92 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
     onTimeframeChange?.(tf);
   }, [onTimeframeChange]);
 
-  // Fetch historical candles from backend chart engine
+  // Fetch historical candles — tries DexScreener first (public API), then backend, then fallback
   useEffect(() => {
     if (!mint) return;
     let cancelled = false;
 
     const fetchHistory = async () => {
+      setSource('loading');
+
+      // 1. Try DexScreener directly (public API, always available — this is what ave.ai uses)
       try {
-        setSource('loading');
+        const pairRes = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${encodeURIComponent(mint)}`, { signal: AbortSignal.timeout(8000) });
+        if (!pairRes.ok) throw new Error('DexScreener unavailable');
+        const pairs = await pairRes.json();
+        if (cancelled) return;
+
+        if (Array.isArray(pairs) && pairs.length > 0) {
+          // Find the pair with highest liquidity
+          const best = pairs.reduce((a: any, b: any) => (b.liquidity?.usd || 0) > (a.liquidity?.usd || 0) ? b : a, pairs[0]);
+          const pairAddress = best.pairAddress;
+
+          if (pairAddress) {
+            // Fetch OHLCV chart data from DexScreener
+            const tfMap: Record<Timeframe, string> = { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d' };
+            const chartRes = await fetch(`https://api.dexscreener.com/chart/latest/v1/pairs/solana/${pairAddress}?interval=${tfMap[activeTimeframe] || '1m'}`, { signal: AbortSignal.timeout(8000) });
+            if (chartRes.ok) {
+              const chartData = await chartRes.json();
+              if (cancelled) return;
+
+              if (Array.isArray(chartData) && chartData.length > 0) {
+                const dexCandles: Candle[] = chartData.map((c: any) => ({
+                  time: Math.floor((c.timestamp || c[0]) / 1000) || Math.floor(Date.now() / 1000),
+                  open: c.open || c[1] || 0,
+                  high: c.high || c[2] || 0,
+                  low: c.low || c[3] || 0,
+                  close: c.close || c[4] || 0,
+                  volume: c.volume || c[5] || 0,
+                })).filter((c: Candle) => c.open > 0 || c.close > 0);
+
+                if (dexCandles.length > 0) {
+                  setCandles(dexCandles);
+                  setSource(`dexscreener (${dexCandles.length} candles)`);
+                  return;
+                }
+              }
+            }
+
+            // If OHLCV endpoint didn't work, build candles from pair price data
+            // Use the pair's current price + priceChange to create at least a starting point
+            if (best.priceUsd) {
+              const price = parseFloat(best.priceUsd);
+              const vol = best.volume?.h24 || 0;
+              const now = Math.floor(Date.now() / 1000);
+              const priceChange = best.priceChange?.h24 || 0;
+              const startPrice = price / (1 + priceChange / 100);
+
+              // Create synthetic candles from available price data
+              const syntheticCandles: Candle[] = [];
+              const intervals = 30;
+              for (let i = 0; i < intervals; i++) {
+                const t = now - (intervals - i) * 60;
+                const progress = i / intervals;
+                const p = startPrice + (price - startPrice) * progress;
+                const jitter = p * 0.02 * Math.sin(i * 2.5);
+                syntheticCandles.push({
+                  time: t,
+                  open: p - jitter,
+                  high: p + Math.abs(jitter) * 1.5,
+                  low: p - Math.abs(jitter) * 1.5,
+                  close: p + jitter,
+                  volume: (vol / intervals) * (0.5 + Math.random()),
+                });
+              }
+              // Last candle = current real price
+              syntheticCandles[syntheticCandles.length - 1].close = price;
+              syntheticCandles[syntheticCandles.length - 1].time = now;
+
+              setCandles(syntheticCandles);
+              setSource(`dexscreener pair (synthetic)`);
+              return;
+            }
+          }
+        }
+      } catch { /* DexScreener failed — try backend */ }
+
+      // 2. Try backend chart engine
+      try {
         const res = await fetch(`${API_BASE}/api/v1/chart/history?mint=${encodeURIComponent(mint)}&interval=${activeTimeframe}&limit=500`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -240,17 +318,14 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
         if (data.candles && data.candles.length > 0) {
           setCandles(data.candles);
           setSource(`backend (${data.count} candles)`);
-        } else {
-          // Backend has no data — use fallback from local candle engine
-          setCandles(fallbackCandles);
-          setSource(fallbackCandles.length > 0 ? `local engine (${fallbackCandles.length})` : 'no data');
+          return;
         }
-      } catch {
-        if (cancelled) return;
-        // Backend unreachable — use fallback
-        setCandles(fallbackCandles);
-        setSource(fallbackCandles.length > 0 ? `local engine (${fallbackCandles.length})` : 'offline');
-      }
+      } catch { /* backend unreachable — use fallback */ }
+
+      // 3. Fallback to local candle engine
+      if (cancelled) return;
+      setCandles(fallbackCandles);
+      setSource(fallbackCandles.length > 0 ? `local engine (${fallbackCandles.length})` : 'no data');
     };
 
     fetchHistory();
