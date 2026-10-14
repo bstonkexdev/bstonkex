@@ -60,7 +60,7 @@ export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { c
     setChainDrawerOpen(false);
   }
 
-  // 1. Fetch cached tokens instantly; retry if bootstrap hasn't finished
+  // 1. Fetch tokens: bootstrapper FIRST (instant), then backend enriches
   useEffect(() => {
     if (!launchpad) { setLoading(false); return; }
     let cancelled = false;
@@ -87,9 +87,23 @@ export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { c
       };
     }
 
-    async function fetchCached(retryCount = 0) {
+    // Step 1: Fetch from bootstrapper IMMEDIATELY (DexScreener + GeckoTerminal + PumpPortal)
+    const chainMap: Record<string, string> = { SOL: 'sol', ETH: 'eth', BSC: 'bsc', BASE: 'base' };
+    const targetChain = chainMap[chain] || chain.toLowerCase();
+    fetchBootstrapTokens(true).then(bootstrapTokens => {
+      if (cancelled || bootstrapTokens.length === 0) return;
+      const filtered = bootstrapTokens
+        .filter(t => targetChain === 'all' || t.chain === targetChain)
+        .map(mapToken);
+      if (filtered.length > 0) {
+        setTokens(filtered);
+        setLoading(false);
+      }
+    }).catch(() => {});
+
+    // Step 2: Fetch from backend API (enriches bootstrapper data)
+    async function fetchBackend(retryCount = 0) {
       if (cancelled) return;
-      setLoading(true);
       try {
         const query = `chain=${chain.toLowerCase()}&launchpad=${launchpad.toLowerCase()}&subFilter=${subFilter}`;
         const res = await fetch(`${API}/api/tokens/cached?${query}`);
@@ -97,78 +111,48 @@ export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { c
         if (cancelled) return;
 
         if (Array.isArray(data) && data.length > 0) {
-          // Got backend data — set tokens immediately, but ALSO enrich with bootstrapper
-          setTokens(data.map(mapToken));
-          // Always enrich: fetch DexScreener/GeckoTerminal data and merge into existing tokens
-          if (retryCount === 0) {
-            fetchBootstrapTokens(true).then(bootstrapTokens => {
-              if (cancelled || bootstrapTokens.length === 0) return;
-              const chainMap: Record<string, string> = { SOL: 'sol', ETH: 'eth', BSC: 'bsc', BASE: 'base' };
-              const targetChain = chainMap[chain] || chain.toLowerCase();
-              const enriched = bootstrapTokens
-                .filter(t => targetChain === 'all' || t.chain === targetChain)
-                .map(mapToken);
-              if (enriched.length > 0) {
-                // Merge: keep backend tokens, add new ones from bootstrapper, enrich existing
-                setTokens(prev => {
-                  const byMint = new Map(prev.map(t => [t.mint, t]));
-                  for (const t of enriched) {
-                    const existing = byMint.get(t.mint);
-                    if (existing) {
-                      // Enrich: fill in volume/mcap/holders if backend had zeros
-                      if (t.volume24h > existing.volume24h) existing.volume24h = t.volume24h;
-                      if (t.mcap > existing.mcap) existing.mcap = t.mcap;
-                      if (t.liquidity > existing.liquidity) existing.liquidity = t.liquidity;
-                      if (t.holders > existing.holders) existing.holders = t.holders;
-                      if (t.buys24h > existing.buys24h) existing.buys24h = t.buys24h;
-                      if (t.sells24h > existing.sells24h) existing.sells24h = t.sells24h;
-                      if (t.priceUsd > 0 && existing.priceUsd === 0) existing.priceUsd = t.priceUsd;
-                      if (t.change24h !== 0 && existing.change24h === 0) existing.change24h = t.change24h;
-                    } else {
-                      byMint.set(t.mint, t);
-                    }
-                  }
-                  return [...byMint.values()];
-                });
+          // Backend has data — merge with existing (bootstrapper) tokens
+          const backendTokens = data.map(mapToken);
+          setTokens(prev => {
+            if (prev.length === 0) return backendTokens;
+            // Merge: backend tokens take priority, keep bootstrapper-only tokens
+            const byMint = new Map(prev.map(t => [t.mint, t]));
+            for (const t of backendTokens) {
+              const existing = byMint.get(t.mint);
+              if (existing) {
+                // Backend data enriches bootstrapper data
+                if (t.volume24h > 0) existing.volume24h = t.volume24h;
+                if (t.mcap > 0) existing.mcap = t.mcap;
+                if (t.liquidity > 0) existing.liquidity = t.liquidity;
+                if (t.holders > 0) existing.holders = t.holders;
+                if (t.buys24h > 0) existing.buys24h = t.buys24h;
+                if (t.sells24h > 0) existing.sells24h = t.sells24h;
+                if (t.priceUsd > 0) existing.priceUsd = t.priceUsd;
+                if (t.change24h !== 0) existing.change24h = t.change24h;
+                if (t.name !== 'Unknown') existing.name = t.name;
+                if (t.symbol !== '???') existing.symbol = t.symbol;
+                if (t.image) existing.image = t.image;
+              } else {
+                byMint.set(t.mint, t);
               }
-            }).catch(() => {});
-          }
-        } else if (retryCount < 6) {
-          // Empty response — fetch from DexScreener + GeckoTerminal + PumpPortal in parallel
-          // (this is how ave.ai/GMGN populate instantly — don't wait for backend)
-          if (retryCount === 0) {
-            fetchBootstrapTokens(true).then(bootstrapTokens => {
-              if (cancelled || bootstrapTokens.length === 0) return;
-              // Filter by current chain selection
-              const chainMap: Record<string, string> = { SOL: 'sol', ETH: 'eth', BSC: 'bsc', BASE: 'base' };
-              const targetChain = chainMap[chain] || chain.toLowerCase();
-              const filtered = bootstrapTokens
-                .filter(t => targetChain === 'all' || t.chain === targetChain)
-                .map(mapToken);
-              if (filtered.length > 0) {
-                setTokens(filtered);
-              }
-            }).catch(() => {});
-          }
-
-          // Also try backend ready check + retry
-          try {
-            const readyRes = await fetch(`${API}/api/launchpads/ready`);
-            const readyData = await readyRes.json();
-            if (!cancelled && readyData?.ready && readyData?.tokensSeeded > 0) {
-              // Bootstrap done — retry immediately for backend data (may be better than DexScreener)
-              fetchCached(retryCount + 1);
-              return;
             }
-          } catch { /* ready endpoint unreachable */ }
-          // Bootstrap still running — retry after delay
-          retryTimer = setTimeout(() => fetchCached(retryCount + 1), 2000);
+            return [...byMint.values()];
+          });
+          setLoading(false);
+        } else if (retryCount < 3) {
+          // Backend empty — retry after delay (bootstrap may still be running)
+          retryTimer = setTimeout(() => fetchBackend(retryCount + 1), 3000);
         }
-      } catch { /* offline */ }
+      } catch {
+        // Offline — bootstrapper data is already shown
+        if (retryCount < 2) {
+          retryTimer = setTimeout(() => fetchBackend(retryCount + 1), 5000);
+        }
+      }
       finally { if (!cancelled && !retryTimer) setLoading(false); }
     }
 
-    fetchCached();
+    fetchBackend();
     return () => {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
