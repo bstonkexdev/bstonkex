@@ -3,6 +3,8 @@
 import type { ChainId } from '../../lib/config';
 import { formatUsd, formatPrice, shortenAddress, explorerTxUrl } from '../../lib/config';
 import { clockTime, NA, type TokenTradeRow } from '../../lib/token-page-data';
+import WalletTagBadge from '../activity/WalletTagBadge';
+import { evaluateWalletTags } from '../../lib/engine/wallet-profiler';
 
 interface Props {
   rows: TokenTradeRow[];
@@ -77,7 +79,13 @@ export default function TradeList({ rows, chainId, freshness, loading, emptyLabe
                     <td className="right">{r.tokenAmount > 0 ? r.tokenAmount.toLocaleString(undefined, { maximumFractionDigits: 4 }) : NA}</td>
                     <td className="right" style={{ color: buy ? 'var(--green)' : 'var(--red)' }}>{formatUsd(r.amountUsd)}</td>
                     <td className="text-dim" title={r.wallet}>
-                      {r.wallet && r.wallet !== 'NOT INDEXED' ? shortenAddress(r.wallet, 3) : 'NOT INDEXED'}
+                      {r.wallet && r.wallet !== 'NOT INDEXED' ? (
+                        <WalletTagBadge
+                          tags={evaluateWalletTags(r.wallet, '', r.time || Date.now())}
+                          trader={shortenAddress(r.wallet, 3)}
+                          compact
+                        />
+                      ) : 'NOT INDEXED'}
                     </td>
                     <td>
                       {r.txHash ? (
