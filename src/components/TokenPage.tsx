@@ -11,6 +11,8 @@ import { checkChainReadiness, type ChainReadiness } from '../lib/engine/chain-re
 import { subscribeToken, onMarketEvent, getDataFreshness, type MarketStreamEvent } from '../lib/engine/market-stream';
 import { processTrade } from '../lib/engine/candle-engine';
 import { onTokenTrade } from '../lib/engine/discovery/pumpportal-stream';
+import { trackIndexedTrade } from '../lib/engine/activity-engine';
+import { fetchHistoricalTrades, type HistoricalTrade } from '../lib/engine/trade-history';
 import { useTokenTradeFeed, useMyTrades, useTokenAlert, formatAge } from '../lib/token-page-data';
 import PriceChart, { ChartErrorBoundary } from './PriceChart';
 import AveTokenHeader from './token/AveTokenHeader';
@@ -173,19 +175,67 @@ export default function TokenPage() {
     return unsub;
   }, [activeChain, displayAddress]);
 
-  // Real-time buy/sell trades from PumpPortal → candle engine (moves the chart!)
+  // Historical trade backfill — fetch past trades from Solana RPC to populate chart + feed
+  useEffect(() => {
+    if (!displayAddress) return;
+    let cancelled = false;
+    fetchHistoricalTrades(activeChain, displayAddress, t?.pairAddress ?? undefined, 50).then((trades: HistoricalTrade[]) => {
+      if (cancelled || trades.length === 0) return;
+      // Feed historical trades oldest-first so candles build correctly
+      const sorted = [...trades].sort((a, b) => a.timestamp - b.timestamp);
+      for (const trade of sorted) {
+        processTrade(activeChain, displayAddress, {
+          price: trade.priceUsd,
+          amountUsd: trade.volumeUsd,
+          timestamp: trade.timestamp * 1000,
+          side: trade.side,
+        });
+        // Also emit top 20 into activity feed (newest first)
+      }
+      const latest = trades.slice(0, 20);
+      for (const trade of latest) {
+        trackIndexedTrade({
+          chainId: activeChain,
+          tokenSymbol: displaySymbol,
+          tokenAddress: displayAddress,
+          side: trade.side,
+          amountUsd: trade.volumeUsd,
+          priceUsd: trade.priceUsd,
+          wallet: trade.wallet || 'on-chain',
+          txHash: trade.txHash,
+          dex: trade.dex,
+        });
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeChain, displayAddress, t?.pairAddress, displaySymbol]);
+
+  // Real-time buy/sell trades from PumpPortal → candle engine + activity feed
   useEffect(() => {
     if (!displayAddress || activeChain !== 'solana') return;
     return onTokenTrade((trade) => {
       if (trade.mint !== displayAddress) return;
+      // Feed candle engine (moves the chart!)
       processTrade('solana', trade.mint, {
         price: trade.priceUsd,
         amountUsd: trade.volumeUsd,
         timestamp: trade.timestamp,
         side: trade.side,
       });
+      // Feed activity engine (populates TradeList with real individual trades)
+      trackIndexedTrade({
+        chainId: 'solana',
+        tokenSymbol: displaySymbol,
+        tokenAddress: displayAddress,
+        side: trade.side,
+        amountUsd: trade.volumeUsd,
+        priceUsd: trade.priceUsd,
+        wallet: 'PumpPortal', // Real wallet available in PumpPortal event if needed
+        txHash: `pump-${trade.mint}-${trade.timestamp}`,
+        dex: 'pumpfun',
+      });
     });
-  }, [activeChain, displayAddress]);
+  }, [activeChain, displayAddress, displaySymbol]);
 
   // ── No token selected ──
   if (!tradeToken) {
