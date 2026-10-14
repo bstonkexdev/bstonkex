@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { onTokenCreate, getStreamHealth, getLivePrice } from '../../lib/engine/discovery/pumpportal-stream';
 import { CHAIN_LIST, LAUNCHPADS_BY_CHAIN, FILTER_TABS, getChainInfo } from './ChainLaunchpads';
 import TokenAvatar from './TokenAvatar';
+import { fetchBootstrapTokens, type BootstrapToken } from '../../lib/engine/market-bootstrapper';
 
 interface Token {
   mint: string; name: string; symbol: string; image: string | null;
@@ -99,13 +100,29 @@ export default function MarketSection() {
           // Got data — set tokens immediately
           setTokens(data.map(mapToken));
         } else if (retryCount < 6) {
-          // Empty response — bootstrap may still be running
-          // Check ready endpoint, then retry after delay
+          // Empty response — fetch from DexScreener + GeckoTerminal + PumpPortal in parallel
+          // (this is how ave.ai/GMGN populate instantly — don't wait for backend)
+          if (retryCount === 0) {
+            fetchBootstrapTokens(true).then(bootstrapTokens => {
+              if (cancelled || bootstrapTokens.length === 0) return;
+              // Filter by current chain selection
+              const chainMap: Record<string, string> = { SOL: 'sol', ETH: 'eth', BSC: 'bsc', BASE: 'base' };
+              const targetChain = chainMap[chain] || chain.toLowerCase();
+              const filtered = bootstrapTokens
+                .filter(t => targetChain === 'all' || t.chain === targetChain)
+                .map(mapToken);
+              if (filtered.length > 0) {
+                setTokens(filtered);
+              }
+            }).catch(() => {});
+          }
+
+          // Also try backend ready check + retry
           try {
             const readyRes = await fetch(`${API}/api/launchpads/ready`);
             const readyData = await readyRes.json();
             if (!cancelled && readyData?.ready && readyData?.tokensSeeded > 0) {
-              // Bootstrap done — retry immediately
+              // Bootstrap done — retry immediately for backend data (may be better than DexScreener)
               fetchCached(retryCount + 1);
               return;
             }
