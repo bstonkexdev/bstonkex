@@ -43,9 +43,13 @@ export interface BootstrapToken {
 async function fetchJson(url: string, timeout = 8000): Promise<any | null> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[bootstrapper] HTTP ${res.status}: ${url}`);
+      return null;
+    }
     return await res.json();
-  } catch {
+  } catch (e) {
+    console.warn(`[bootstrapper] Fetch failed: ${url}`, e);
     return null;
   }
 }
@@ -263,6 +267,54 @@ async function fetchPumpPortalTrending(): Promise<BootstrapToken[]> {
 let cachedTokens: BootstrapToken[] | null = null;
 let lastFetch = 0;
 
+/** Convert DexScreener pair data to BootstrapToken (reliable fallback). */
+function pairToToken(p: any): BootstrapToken {
+  return {
+    mint: p.baseToken?.address || p.pairAddress || '',
+    chain: mapChain(p.chainId || ''),
+    launchpad: p.dexId || 'dexscreener',
+    symbol: p.baseToken?.symbol || '???',
+    name: p.baseToken?.name || 'Unknown',
+    image: p.info?.imageUrl || '',
+    spotPrice: p.priceUsd || '0',
+    virtualMcap: String(p.marketCap || p.fdv || 0),
+    priceChange24h: String(p.priceChange?.h24 || 0),
+    volume24h: String(p.volume?.h24 || 0),
+    liquidity: String(p.liquidity?.usd || 0),
+    buys24h: String(p.txns?.h24?.buys || 0),
+    sells24h: String(p.txns?.h24?.sells || 0),
+    bondingCurveProgress: '100',
+    holders: '0',
+    pairAddress: p.pairAddress || '',
+    dexId: p.dexId || '',
+    createdAt: String(p.pairCreatedAt || Date.now()),
+    source: 'dexscreener',
+  };
+}
+
+/** Fallback: fetch trending tokens via DexScreener search (most reliable). */
+async function fetchDexScreenerSearchFallback(): Promise<BootstrapToken[]> {
+  const queries = ['solana', 'pump', 'trending', 'meme'];
+  const allTokens: BootstrapToken[] = [];
+  const seen = new Set<string>();
+
+  const results = await Promise.allSettled(
+    queries.map(q => fetchJson(`${DEXSCREENER}/latest/dex/search?q=${q}`))
+  );
+
+  for (const result of results) {
+    if (result.status !== 'fulfilled' || !result.value?.pairs) continue;
+    for (const pair of result.value.pairs.slice(0, 50)) {
+      const mint = pair.baseToken?.address;
+      if (!mint || seen.has(mint)) continue;
+      seen.add(mint);
+      allTokens.push(pairToToken(pair));
+    }
+  }
+
+  return allTokens;
+}
+
 /**
  * Fetch trending tokens from all sources in parallel.
  * Returns merged + deduplicated token list sorted by volume/liquidity.
@@ -275,10 +327,11 @@ export async function fetchBootstrapTokens(forceRefresh = false): Promise<Bootst
   }
 
   // Fetch all sources in parallel (like ave.ai does)
-  const [dexScreener, geckoTerminal, pumpPortal] = await Promise.allSettled([
+  const [dexScreener, geckoTerminal, pumpPortal, searchFallback] = await Promise.allSettled([
     fetchDexScreenerTrending(),
     fetchGeckoTerminalTrending(),
     fetchPumpPortalTrending(),
+    fetchDexScreenerSearchFallback(),
   ]);
 
   const allTokens: BootstrapToken[] = [];
@@ -289,6 +342,7 @@ export async function fetchBootstrapTokens(forceRefresh = false): Promise<Bootst
     dexScreener.status === 'fulfilled' ? dexScreener.value : [],
     geckoTerminal.status === 'fulfilled' ? geckoTerminal.value : [],
     pumpPortal.status === 'fulfilled' ? pumpPortal.value : [],
+    searchFallback.status === 'fulfilled' ? searchFallback.value : [],
   ];
 
   for (const source of sources) {
