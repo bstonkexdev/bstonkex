@@ -4,6 +4,7 @@ import WhaleActivity from './activity/WhaleActivity';
 import LargeTrades from './activity/LargeTrades';
 import MarketEvents from './activity/MarketEvents';
 import AlertManager from './activity/AlertManager';
+import RealTimeTradeFeed from './activity/RealTimeTradeFeed';
 import { getStreamState } from '../lib/engine/market-stream';
 import { getActivityStatus } from '../lib/engine/activity-engine';
 
@@ -85,7 +86,7 @@ export default function ActivityPage() {
 
       {/* Content */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
-        {tab === 'live' && <TradeTape />}
+        {tab === 'live' && <RealTimeTradeFeed maxItems={100} />}
         {tab === 'large' && <LargeTrades />}
         {tab === 'whales' && <WhaleActivity />}
         {tab === 'market' && <MarketEvents />}
