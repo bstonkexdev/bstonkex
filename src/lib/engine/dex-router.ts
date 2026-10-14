@@ -100,6 +100,31 @@ export async function buildSwap(
   }
 }
 
+/**
+ * Submit a signed transaction through MEV-protected routing.
+ * Uses Jito bundles for Solana, Flashbots for EVM, with public RPC fallback.
+ */
+export async function submitSwap(
+  chainId: string,
+  serializedTx: string | string[],
+): Promise<{ success: boolean; txHash?: string; protected: boolean; provider: string }> {
+  try {
+    const { routeTransaction } = await import('./mev-router');
+    const result = await routeTransaction(
+      Array.isArray(serializedTx) ? serializedTx[0] : serializedTx,
+      chainId,
+    );
+    return {
+      success: !!result.bundleId,
+      txHash: result.bundleId,
+      protected: result.protected,
+      provider: result.provider,
+    };
+  } catch {
+    return { success: false, protected: false, provider: 'error' };
+  }
+}
+
 /** Estimate gas for a transaction. */
 export async function estimateSwapGas(
   chainId: ChainId,
