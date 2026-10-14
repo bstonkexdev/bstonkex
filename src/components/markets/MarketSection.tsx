@@ -3,6 +3,7 @@ import { onTokenCreate, getStreamHealth, getLivePrice } from '../../lib/engine/d
 import { CHAIN_LIST, LAUNCHPADS_BY_CHAIN, FILTER_TABS, getChainInfo } from './ChainLaunchpads';
 import TokenAvatar from './TokenAvatar';
 import { fetchBootstrapTokens, type BootstrapToken } from '../../lib/engine/market-bootstrapper';
+import { queryTokens, onTrenchToken, type QueryOptions } from '../../lib/engine/frontend-trenches';
 
 interface Token {
   mint: string; name: string; symbol: string; image: string | null;
@@ -87,22 +88,54 @@ export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { c
       };
     }
 
-    // Step 1: Fetch from bootstrapper IMMEDIATELY (DexScreener + GeckoTerminal + PumpPortal)
+    // Step 0: Read from local trenches store INSTANTLY (mirrors Redis pipeline)
     const chainMap: Record<string, string> = { SOL: 'sol', ETH: 'eth', BSC: 'bsc', BASE: 'base' };
     const targetChain = chainMap[chain] || chain.toLowerCase();
+    const opts: QueryOptions = { chain: targetChain, launchpad: launchpad.toLowerCase(), filter: subFilter as any, limit: 50 };
+    const localTokens = queryTokens(opts).map(mapToken);
+    if (localTokens.length > 0) {
+      setTokens(localTokens);
+      setLoading(false);
+    }
+
+    // Step 1: Fetch from bootstrapper IMMEDIATELY (DexScreener + GeckoTerminal + PumpPortal)
     fetchBootstrapTokens(true).then(bootstrapTokens => {
       if (cancelled) return;
       const filtered = bootstrapTokens
         .filter(t => targetChain === 'all' || t.chain === targetChain)
         .map(mapToken);
       if (filtered.length > 0) {
-        setTokens(filtered);
+        setTokens(prev => {
+          if (prev.length === 0) return filtered;
+          // Merge: keep existing, add new
+          const byMint = new Map(prev.map(t => [t.mint, t]));
+          for (const t of filtered) {
+            if (!byMint.has(t.mint)) byMint.set(t.mint, t);
+          }
+          return [...byMint.values()];
+        });
       }
-      setLoading(false); // Always stop loading after bootstrapper returns
+      setLoading(false);
     }).catch((err) => {
       if (cancelled) return;
       console.warn('[MarketSection] Bootstrapper failed:', err);
-      setLoading(false); // Stop loading even on failure
+      setLoading(false);
+    });
+
+    // Step 1.5: Subscribe to real-time trench store updates
+    const unsubTrench = onTrenchToken((token, action) => {
+      if (cancelled) return;
+      if (token.chain !== targetChain) return;
+      setTokens(prev => {
+        const idx = prev.findIndex(t => t.mint === token.mint);
+        const mapped = mapToken(token);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = { ...updated[idx], ...mapped };
+          return updated;
+        }
+        return [mapped, ...prev].slice(0, 100);
+      });
     });
 
     // Step 2: Fetch from backend API (enriches bootstrapper data)
@@ -159,6 +192,7 @@ export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { c
     fetchBackend();
     return () => {
       cancelled = true;
+      unsubTrench();
       if (retryTimer) clearTimeout(retryTimer);
     };
   }, [chain, launchpad, subFilter]);

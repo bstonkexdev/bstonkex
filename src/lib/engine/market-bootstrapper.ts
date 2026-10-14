@@ -378,6 +378,22 @@ export async function fetchBootstrapTokens(forceRefresh = false): Promise<Bootst
 
   cachedTokens = allTokens;
   lastFetch = now;
+
+  // Feed frontend trenches store (HSET token:<mint> + ZADD sorted sets)
+  try {
+    const { bulkIngest } = await import('./frontend-trenches');
+    bulkIngest(allTokens.map(t => ({
+      mint: t.mint, chain: t.chain, launchpad: t.launchpad,
+      symbol: t.symbol, name: t.name, image: t.image,
+      spotPrice: t.spotPrice, virtualMcap: t.virtualMcap,
+      priceChange24h: t.priceChange24h, bondingCurveProgress: t.bondingCurveProgress,
+      holders: t.holders, volume24h: t.volume24h, liquidity: t.liquidity,
+      buys24h: t.buys24h, sells24h: t.sells24h,
+      pairAddress: t.pairAddress, dexId: t.dexId,
+      source: t.source,
+    })));
+  } catch { /* non-critical */ }
+
   return allTokens;
 }
 
