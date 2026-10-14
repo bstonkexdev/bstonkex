@@ -29,6 +29,7 @@ import MetaBadges, { type MetaBadge } from './token/MetaBadges';
 import TokenDataPanel from './token/TokenDataPanel';
 import MobileTradeBar from './token/MobileTradeBar';
 import OrderPanel from './token/OrderPanel';
+import RealTimeTradeFeed from './activity/RealTimeTradeFeed';
 import { gitlawb } from '../lib/gitlawb';
 
 export default function TokenPage() {
@@ -502,6 +503,12 @@ export default function TokenPage() {
         {!isMajor && displayAddress && (
           <div style={{ padding: '0 0 8px 0' }}>
             <OrderPanel chainId={activeChain} tokenAddress={displayAddress} tokenSymbol={displaySymbol} currentPrice={displayPrice} />
+          </div>
+        )}
+        {/* Real-Time Trade Feed with Wallet Tags */}
+        {!isMajor && displayAddress && (
+          <div style={{ padding: '0 0 8px 0' }}>
+            <RealTimeTradeFeed mint={displayAddress} compact maxItems={30} />
           </div>
         )}
       </aside>
