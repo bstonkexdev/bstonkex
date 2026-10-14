@@ -17,6 +17,7 @@ import { runMigrations, getMigrationStatus } from './db/migrate.js';
 import { routeRewards } from './reward-routes.js';
 import { LAUNCHPAD_CONFIG, getAllLaunchpads, getLaunchpad } from './config/launchpads.js';
 import { startMultiChainListeners, getListenerHealth, stopMultiChainListeners } from './multi-chain-listener.js';
+import { upsertMarketToken } from './db/market-tokens.js';
 import { startBootstrapSeed, getSeederHealth, isBootstrapReady, waitForBootstrap } from './bootstrap-seed.js';
 
 // ── Configuration ────────────────────────────────────────────
@@ -1019,7 +1020,19 @@ function ingestTokenEvent(event: {
   zadd(`tokens:${ch}`, now, mint);
   zadd('trenches:pumpfun', now, mint);
 
-  // C. Async metadata enrichment (only if no direct icon)
+  // C. Persist to PostgreSQL (durable — survives restarts)
+  upsertMarketToken({
+    mint, name: name || 'Unknown Token', symbol: symbol || 'TOKEN',
+    image: directImage, chain: ch, launchpad: lp,
+    spotPrice: price || '0', virtualMcap: price ? String(parseFloat(price) * 1e9) : '6000',
+    priceChange24h: '0', bondingCurveProgress: '0', holders: '0',
+    volume24h: '0', liquidity: '0', buys24h: '0', sells24h: '0',
+    uri: sanitizeUri(uri), twitter: '', telegram: '', website: '',
+    dexId: '', pairAddress: '', txHash: '', source: 'live',
+    createdAt: String(Date.now()),
+  }).catch(() => {}); // non-blocking
+
+  // D. Async metadata enrichment (only if no direct icon)
   if (!directImage) {
     const cleanUri = sanitizeUri(uri);
     if (cleanUri) {

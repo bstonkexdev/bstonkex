@@ -21,6 +21,8 @@
  */
 
 import { hsetAll, zadd, hgetall } from './trenches-store.js';
+import { upsertMarketToken, upsertMarketTokensBatch, loadAllTokens, ensureMarketTokensTable } from './db/market-tokens.js';
+import { isDbConfigured } from './db/pool.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -125,32 +127,59 @@ function log(level: 'info' | 'warn' | 'error', msg: string) {
   console[level](`[BootstrapSeed] ${msg}`);
 }
 
-// ── Synchronous Snapshot Preload (runs on import) ──────────────
-// This loads cached data into the trenches-store BEFORE any API
-// endpoint can serve — eliminates the race condition.
+// ── PostgreSQL Preload (runs async on import) ──────────────────
+// Loads tokens from PostgreSQL into the in-memory store.
+// This is the primary persistence layer — survives restarts/deploys.
+(async () => {
+  try {
+    await ensureMarketTokensTable();
+    const dbTokens = await loadAllTokens(500);
+    let pgCount = 0;
+    for (const t of dbTokens) {
+      if (!t.mint || seededMints.has(t.mint)) continue;
+      hsetAll(`token:${t.mint}`, {
+        mint: t.mint, chain: t.chain, launchpad: t.launchpad,
+        name: t.name, symbol: t.symbol, image: t.image || '',
+        spotPrice: t.spotPrice, virtualMcap: t.virtualMcap,
+        priceChange24h: t.priceChange24h,
+        bondingCurveProgress: t.bondingCurveProgress,
+        holders: t.holders, volume24h: t.volume24h,
+        liquidity: t.liquidity, buys24h: t.buys24h,
+        sells24h: t.sells24h,
+        createdAt: t.createdAt,
+        uri: t.uri, twitter: t.twitter, telegram: t.telegram,
+        website: t.website, dexId: t.dexId, pairAddress: t.pairAddress,
+      });
+      const ts = parseInt(t.createdAt) || Date.now();
+      zadd(`trenches:${t.chain}:${t.launchpad}:trending`, ts, t.mint);
+      zadd(`trenches:${t.chain}:${t.launchpad}:new`, ts, t.mint);
+      zadd(`trenches:${t.chain}:${t.launchpad}`, ts, t.mint);
+      zadd(`trenches:${t.launchpad}`, ts, t.mint);
+      zadd(`tokens:${t.chain}`, ts, t.mint);
+      seededMints.add(t.mint);
+      seedCount++;
+      pgCount++;
+    }
+    if (pgCount > 0) {
+      bootstrapReady = true;
+      log('info', `POSTGRESQL PRELOAD: ${pgCount} tokens loaded from database`);
+    }
+  } catch (err: any) {
+    log('warn', `PostgreSQL preload skipped: ${err.message}`);
+  }
+})();
+
+// ── Synchronous Preload (runs at import time, before API serves) ──
+// Loads JSON snapshot into trenches-store INSTANTLY — no async needed.
+// PostgreSQL load happens async in runSeedCycle but JSON provides <1ms startup.
 try {
   if (fs.existsSync(SNAPSHOT_PATH)) {
     const raw = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, 'utf-8'));
     if (raw?.tokens && Array.isArray(raw.tokens) && (Date.now() - (raw.savedAt || 0)) < SNAPSHOT_TTL_MS) {
-      let preloadCount = 0;
-      for (const t of raw.tokens) {
-        if (!t.mint || seededMints.has(t.mint)) continue;
-        hsetAll(`token:${t.mint}`, t);
-        const chain = t.chain || 'sol';
-        const lp = t.launchpad || 'pumpfun';
-        const ts = parseInt(t.createdAt) || Date.now();
-        zadd(`trenches:${chain}:${lp}:trending`, ts, t.mint);
-        zadd(`trenches:${chain}:${lp}:new`, ts, t.mint);
-        zadd(`trenches:${chain}:${lp}`, ts, t.mint);
-        zadd(`trenches:${lp}`, ts, t.mint);
-        zadd(`tokens:${chain}`, ts, t.mint);
-        seededMints.add(t.mint);
-        seedCount++;
-        preloadCount++;
-      }
+      const preloadCount = seedTokensToStore(raw.tokens);
       if (preloadCount > 0) {
         bootstrapReady = true;
-        log('info', `SYNCHRONOUS PRELOAD: ${preloadCount} tokens loaded before API starts`);
+        log('info', `SYNCHRONOUS PRELOAD: ${preloadCount} tokens from JSON snapshot`);
       }
     }
   }
@@ -223,6 +252,20 @@ function ingestPair(pair: DexPair): void {
 
   seededMints.add(address);
   seedCount++;
+
+  // Persist to PostgreSQL (non-blocking, best-effort)
+  upsertMarketToken({
+    mint: address, chain, launchpad,
+    name: pair.baseToken?.name, symbol: pair.baseToken?.symbol,
+    image: imageUrl,
+    spotPrice: String(price), virtualMcap: String(marketCap),
+    priceChange24h: String(change24h),
+    bondingCurveProgress: liquidity > 0 ? '100' : '0',
+    volume24h: String(volume24h), liquidity: String(liquidity),
+    buys24h: String(txns.buys || 0), sells24h: String(txns.sells || 0),
+    dexId: pair.dexId, pairAddress: pair.pairAddress,
+    source: 'dexscreener',
+  }).catch(() => {});
 }
 
 /**
@@ -342,6 +385,17 @@ async function seedFromGeckoTerminal(): Promise<number> {
         seededMints.add(address);
         seedCount++;
         count++;
+
+        // Persist to PostgreSQL (non-blocking)
+        upsertMarketToken({
+          mint: address, chain, launchpad,
+          name, symbol,
+          spotPrice: String(price), virtualMcap: String(marketCap),
+          bondingCurveProgress: liquidity > 100 ? '100' : '0',
+          volume24h: String(volume24h), liquidity: String(liquidity),
+          dexId, pairAddress: attrs.address,
+          source: 'geckoterminal',
+        }).catch(() => {});
       } catch { /* skip malformed pool */ }
     }
   }
@@ -351,57 +405,122 @@ async function seedFromGeckoTerminal(): Promise<number> {
 
 // ── Snapshot Persistence (crash recovery) ───────────────────────
 
-function saveSnapshot(): void {
+/**
+ * Persist all tokens to PostgreSQL (durable) and local JSON file (fast fallback).
+ */
+async function persistTokens(): Promise<void> {
+  // Collect all token records from trenches-store
+  const tokens: any[] = [];
+  for (const mint of seededMints) {
+    const t = hgetall(`token:${mint}`);
+    if (t && t.mint) tokens.push(t);
+  }
+  if (tokens.length === 0) return;
+
+  // Primary: PostgreSQL (survives Railway restarts)
+  if (isDbConfigured()) {
+    try {
+      const dbTokens = tokens.map(t => ({
+        mint: t.mint, name: t.name || 'Unknown', symbol: t.symbol || '???',
+        image: t.image || '', chain: t.chain || 'sol', launchpad: t.launchpad || 'pumpfun',
+        spotPrice: t.spotPrice || '0', virtualMcap: t.virtualMcap || '0',
+        priceChange24h: t.priceChange24h || '0', bondingCurveProgress: t.bondingCurveProgress || '0',
+        holders: t.holders || '0', volume24h: t.volume24h || '0', liquidity: t.liquidity || '0',
+        buys24h: t.buys24h || '0', sells24h: t.sells24h || '0',
+        uri: t.uri || '', twitter: t.twitter || '', telegram: t.telegram || '', website: t.website || '',
+        dexId: t.dexId || '', pairAddress: t.pairAddress || '', txHash: t.txHash || '',
+        source: 'bootstrap', createdAt: t.createdAt || String(Date.now()),
+      }));
+      const saved = await upsertMarketTokensBatch(dbTokens);
+      log('info', `PostgreSQL: persisted ${saved}/${dbTokens.length} tokens`);
+    } catch (err: any) {
+      log('warn', `PostgreSQL persist failed: ${err.message}`);
+    }
+  }
+
+  // Fallback: JSON snapshot file (fast local recovery if PG is down)
   try {
     const dir = path.dirname(SNAPSHOT_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    // Save all seeded mints + their full token data
-    const tokens: Record<string, string>[] = [];
-    for (const mint of seededMints) {
-      const t = hgetall(`token:${mint}`);
-      if (t && t.mint) tokens.push(t);
-    }
     fs.writeFileSync(SNAPSHOT_PATH, JSON.stringify({
       savedAt: Date.now(),
       count: tokens.length,
       tokens,
     }));
-    log('info', `Snapshot saved: ${tokens.length} tokens`);
+    log('info', `JSON snapshot: ${tokens.length} tokens`);
   } catch (err: any) {
-    log('warn', `Snapshot save failed: ${err.message}`);
+    log('warn', `JSON snapshot save failed: ${err.message}`);
   }
 }
 
-function loadSnapshot(): number {
+/**
+ * Load previously discovered tokens into trenches-store.
+ * Priority: PostgreSQL (durable) → JSON snapshot (fallback).
+ */
+async function loadPersistedTokens(): Promise<number> {
+  let loaded = 0;
+
+  // Priority 1: PostgreSQL (always survives restarts)
+  if (isDbConfigured()) {
+    try {
+      await ensureMarketTokensTable();
+      const dbTokens = await loadAllTokens(500);
+      if (dbTokens.length > 0) {
+        loaded = seedTokensToStore(dbTokens.map(t => ({
+          mint: t.mint, name: t.name, symbol: t.symbol, image: t.image,
+          chain: t.chain, launchpad: t.launchpad, spotPrice: t.spotPrice,
+          virtualMcap: t.virtualMcap, priceChange24h: t.priceChange24h,
+          bondingCurveProgress: t.bondingCurveProgress, holders: t.holders,
+          volume24h: t.volume24h, liquidity: t.liquidity,
+          buys24h: t.buys24h, sells24h: t.sells24h,
+          uri: t.uri, twitter: t.twitter, telegram: t.telegram, website: t.website,
+          createdAt: t.createdAt,
+        })));
+        log('info', `PostgreSQL: loaded ${loaded} tokens`);
+        return loaded;
+      }
+    } catch (err: any) {
+      log('warn', `PostgreSQL load failed: ${err.message}`);
+    }
+  }
+
+  // Priority 2: JSON snapshot file (fast local fallback)
   try {
     if (!fs.existsSync(SNAPSHOT_PATH)) return 0;
     const raw = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, 'utf-8'));
     if (!raw?.tokens || !Array.isArray(raw.tokens)) return 0;
     if (Date.now() - (raw.savedAt || 0) > SNAPSHOT_TTL_MS) {
-      log('info', 'Snapshot expired, will refetch');
+      log('info', 'JSON snapshot expired, will refetch');
       return 0;
     }
-    let loaded = 0;
-    for (const t of raw.tokens) {
-      if (!t.mint || seededMints.has(t.mint)) continue;
-      hsetAll(`token:${t.mint}`, t);
-      const chain = t.chain || 'sol';
-      const lp = t.launchpad || 'pumpfun';
-      const ts = parseInt(t.createdAt) || Date.now();
-      zadd(`trenches:${chain}:${lp}:trending`, ts, t.mint);
-      zadd(`trenches:${chain}:${lp}:new`, ts, t.mint);
-      zadd(`trenches:${chain}:${lp}`, ts, t.mint);
-      zadd(`trenches:${lp}`, ts, t.mint);
-      zadd(`tokens:${chain}`, ts, t.mint);
-      seededMints.add(t.mint);
-      loaded++;
-    }
-    log('info', `Snapshot loaded: ${loaded} tokens from ${new Date(raw.savedAt).toISOString()}`);
+    loaded = seedTokensToStore(raw.tokens);
+    log('info', `JSON snapshot: loaded ${loaded} tokens`);
     return loaded;
   } catch (err: any) {
-    log('warn', `Snapshot load failed: ${err.message}`);
+    log('warn', `JSON snapshot load failed: ${err.message}`);
     return 0;
   }
+}
+
+/** Seed an array of token records into trenches-store (deduplicates). */
+function seedTokensToStore(tokens: any[]): number {
+  let loaded = 0;
+  for (const t of tokens) {
+    if (!t.mint || seededMints.has(t.mint)) continue;
+    hsetAll(`token:${t.mint}`, t);
+    const chain = t.chain || 'sol';
+    const lp = t.launchpad || 'pumpfun';
+    const ts = parseInt(t.createdAt) || Date.now();
+    zadd(`trenches:${chain}:${lp}:trending`, ts, t.mint);
+    zadd(`trenches:${chain}:${lp}:new`, ts, t.mint);
+    zadd(`trenches:${chain}:${lp}`, ts, t.mint);
+    zadd(`trenches:${lp}`, ts, t.mint);
+    zadd(`tokens:${chain}`, ts, t.mint);
+    seededMints.add(t.mint);
+    seedCount++;
+    loaded++;
+  }
+  return loaded;
 }
 
 // ── PumpPortal REST API (recent Solana bonding-curve tokens) ───
@@ -458,6 +577,19 @@ async function seedFromPumpPortal(): Promise<number> {
           seededMints.add(mint);
           seedCount++;
           count++;
+
+          // Persist to PostgreSQL (non-blocking)
+          upsertMarketToken({
+            mint, chain: 'sol', launchpad: 'pumpfun',
+            name: item.name, symbol: item.symbol,
+            image: item.image || '',
+            spotPrice: String(price), virtualMcap: String(price * 1e9),
+            bondingCurveProgress: item.vSolInBondingCurve
+              ? String(Math.min(100, (item.vSolInBondingCurve / 85) * 100))
+              : '0',
+            uri: item.uri || '',
+            source: 'pumpportal',
+          }).catch(() => {});
         }
       } catch { /* skip */ }
     }
@@ -479,11 +611,16 @@ async function runSeedCycle(): Promise<void> {
   try {
     log('info', 'Starting bootstrap seed cycle...');
 
-    // Phase 1: Load snapshot for instant display (first boot only)
-    if (seedCount === 0) {
-      const snapshotLoaded = loadSnapshot();
-      if (snapshotLoaded > 0) {
-        log('info', `Instant display: ${snapshotLoaded} tokens from snapshot`);
+    // Phase 1: Load from PostgreSQL/JSON if in-memory store is empty
+    if (seedCount === 0 || seededMints.size === 0) {
+      const persisted = await loadPersistedTokens();
+      if (persisted > 0) {
+        log('info', `Loaded ${persisted} persisted tokens`);
+        if (!bootstrapReady && seededMints.size > 0) {
+          bootstrapReady = true;
+          for (const cb of bootstrapReadyCallbacks) cb();
+          bootstrapReadyCallbacks = [];
+        }
       }
     }
 
@@ -499,8 +636,8 @@ async function runSeedCycle(): Promise<void> {
     const elapsed = Date.now() - start;
     lastSeedAt = Date.now();
 
-    // Save snapshot for crash recovery
-    saveSnapshot();
+    // Persist to PostgreSQL + JSON snapshot (durable storage)
+    await persistTokens();
 
     log('info', `Seed cycle complete: ${totalHashes} total tokens, ${elapsed}ms elapsed`);
 
