@@ -237,6 +237,36 @@ export default function TokenPage() {
     });
   }, [activeChain, displayAddress, displaySymbol]);
 
+  // Native on-chain trades (Solana DEX logs) → candle engine + activity feed
+  useEffect(() => {
+    if (!displayAddress || activeChain !== 'solana') return;
+    let unsub: (() => void) | undefined;
+    import('../lib/engine/solana-trade-stream').then(m => {
+      unsub = m.onNativeTrade(displayAddress, (trade) => {
+        if (trade.priceUsd > 0) {
+          processTrade('solana', trade.mint, {
+            price: trade.priceUsd,
+            amountUsd: trade.amountUsd,
+            timestamp: trade.timestamp * 1000,
+            side: trade.side,
+          });
+        }
+        trackIndexedTrade({
+          chainId: 'solana',
+          tokenSymbol: displaySymbol,
+          tokenAddress: displayAddress,
+          side: trade.side,
+          amountUsd: trade.amountUsd,
+          priceUsd: trade.priceUsd,
+          wallet: trade.wallet || trade.dex,
+          txHash: trade.txHash,
+          dex: trade.dex,
+        });
+      });
+    }).catch(() => {});
+    return () => { unsub?.(); };
+  }, [activeChain, displayAddress, displaySymbol]);
+
   // ── No token selected ──
   if (!tradeToken) {
     return (

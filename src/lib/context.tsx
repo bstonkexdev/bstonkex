@@ -104,6 +104,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Discovery runs on-demand via refresh-controller when user visits market pages.
   useEffect(() => {
     import('./engine/discovery/init').then(m => m.initDiscoveryPipeline()).catch(() => {});
+    // Start native Solana trade stream (on-chain DEX log ingestion)
+    import('./engine/solana-trade-stream').then(m => m.startSolanaTradeStream()).catch(() => {});
   }, []);
 
   // Listen for wallet account / chain changes
