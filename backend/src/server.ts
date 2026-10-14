@@ -1215,6 +1215,13 @@ function ingestTokenEvent(event: {
       enqueueMetadata(mint, cleanUri, ch);
     }
   }
+
+  // F. Async security audit (RugCheck honeypot/LP/dev holding check)
+  try {
+    import('./security-auditor.js').then(({ auditTokenSecurity }) => {
+      auditTokenSecurity(mint, ch).catch(() => {});
+    }).catch(() => {});
+  } catch { /* non-critical */ }
 }
 
 // ── Cached Token Hydration Endpoint ────────────────────────────
