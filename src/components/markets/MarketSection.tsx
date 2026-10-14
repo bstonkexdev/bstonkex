@@ -7,6 +7,7 @@ interface Token {
   mint: string; name: string; symbol: string; image: string | null;
   progress: number; mcap: number; holders: number;
   priceUsd: number; change24h: number; createdAt: number;
+  volume24h: number; liquidity: number; buys24h: number; sells24h: number;
 }
 
 function age(ts: number): string {
@@ -58,40 +59,69 @@ export default function MarketSection() {
     setChainDrawerOpen(false);
   }
 
-  // 1. Fetch cached tokens instantly
+  // 1. Fetch cached tokens instantly; retry if bootstrap hasn't finished
   useEffect(() => {
     if (!launchpad) { setLoading(false); return; }
     let cancelled = false;
-    async function fetchCached() {
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function mapToken(t: any) {
+      let img = (t.image || t.icon || '').trim();
+      if (img.startsWith('ipfs://')) {
+        img = 'https://cf-ipfs.com/ipfs/' + img.replace('ipfs://', '').replace(/^ipfs\//, '');
+      }
+      return {
+        mint: t.mint || '', name: t.name || 'Unknown', symbol: t.symbol || '???',
+        image: img || null,
+        progress: parseFloat(t.bondingCurveProgress) || 0,
+        mcap: parseFloat(t.virtualMcap) || 0,
+        holders: parseInt(t.holders) || 0,
+        priceUsd: parseFloat(t.spotPrice || t.price) || 0,
+        change24h: parseFloat(t.priceChange24h || t.change24h) || 0,
+        createdAt: parseInt(t.createdAt) || Date.now(),
+        volume24h: parseFloat(t.volume24h) || 0,
+        liquidity: parseFloat(t.liquidity) || 0,
+        buys24h: parseInt(t.buys24h) || 0,
+        sells24h: parseInt(t.sells24h) || 0,
+      };
+    }
+
+    async function fetchCached(retryCount = 0) {
+      if (cancelled) return;
       setLoading(true);
       try {
         const query = `chain=${chain.toLowerCase()}&launchpad=${launchpad.toLowerCase()}&subFilter=${subFilter}`;
         const res = await fetch(`${API}/api/tokens/cached?${query}`);
         const data = await res.json();
-        if (!cancelled && Array.isArray(data)) {
-          setTokens(data.map((t: any) => {
-            // Normalize image: prefer direct URL, convert ipfs:// to cf-ipfs.com
-            let img = (t.image || t.icon || '').trim();
-            if (img.startsWith('ipfs://')) {
-              img = 'https://cf-ipfs.com/ipfs/' + img.replace('ipfs://', '').replace(/^ipfs\//, '');
+        if (cancelled) return;
+
+        if (Array.isArray(data) && data.length > 0) {
+          // Got data — set tokens immediately
+          setTokens(data.map(mapToken));
+        } else if (retryCount < 6) {
+          // Empty response — bootstrap may still be running
+          // Check ready endpoint, then retry after delay
+          try {
+            const readyRes = await fetch(`${API}/api/launchpads/ready`);
+            const readyData = await readyRes.json();
+            if (!cancelled && readyData?.ready && readyData?.tokensSeeded > 0) {
+              // Bootstrap done — retry immediately
+              fetchCached(retryCount + 1);
+              return;
             }
-            return {
-              mint: t.mint || '', name: t.name || 'Unknown', symbol: t.symbol || '???',
-              image: img || null,
-              progress: parseFloat(t.bondingCurveProgress) || 0,
-              mcap: parseFloat(t.virtualMcap) || parseFloat(t.spotPrice || t.price || '0') * 1e9,
-              holders: parseInt(t.holders) || 0,
-              priceUsd: parseFloat(t.spotPrice || t.price) || 0,
-              change24h: parseFloat(t.priceChange24h || t.change24h) || 0,
-              createdAt: parseInt(t.createdAt) || Date.now(),
-            };
-          }));
+          } catch { /* ready endpoint unreachable */ }
+          // Bootstrap still running — retry after delay
+          retryTimer = setTimeout(() => fetchCached(retryCount + 1), 2000);
         }
       } catch { /* offline */ }
-      finally { if (!cancelled) setLoading(false); }
+      finally { if (!cancelled && !retryTimer) setLoading(false); }
     }
+
     fetchCached();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [chain, launchpad, subFilter]);
 
   // 2. Live WS merge — handles both new tokens AND metadata-resolved updates
@@ -115,9 +145,11 @@ export default function MarketSection() {
         return [{
           mint: r.address, name: r.name || 'Unknown', symbol: r.symbol || '???',
           image: r.icon || null, progress: r.bondingCurveProgress ?? 0,
-          mcap: (r.price || 0) * 1e9, holders: r.holders || 0,
-          priceUsd: r.price || 0, change24h: r.priceChange24h ?? 0,
+          mcap: r.marketCap || (r.price || 0) * 1e9, holders: 0,
+          priceUsd: r.price || 0, change24h: 0,
           createdAt: r.createdAt || Date.now(),
+          volume24h: 0, liquidity: r.liquidity || 0,
+          buys24h: 0, sells24h: 0,
         }, ...prev].slice(0, 300);
       });
     });
@@ -131,15 +163,24 @@ export default function MarketSection() {
     return () => { unsub(); clearInterval(iv); };
   }, []);
 
-  // 3. Client-side filter
+  // 3. Client-side filter + sort
   const filtered = tokens.filter(t => {
     switch (subFilter) {
       case 'bonding': return t.progress < 100;
       case 'migrated': return t.progress >= 100;
       case 'gainers': return t.change24h > 0;
       case 'losers': return t.change24h < 0;
-      case 'trending': return t.holders > 50 || t.mcap > 50000;
+      case 'trending': return t.holders > 50 || t.mcap > 50000 || t.volume24h > 1000;
+      case 'volume': return t.volume24h > 0;
       default: return true;
+    }
+  }).sort((a, b) => {
+    switch (subFilter) {
+      case 'volume': return b.volume24h - a.volume24h;
+      case 'gainers': return b.change24h - a.change24h;
+      case 'losers': return a.change24h - b.change24h;
+      case 'trending': return (b.volume24h + b.mcap) - (a.volume24h + a.mcap);
+      default: return b.createdAt - a.createdAt; // newest first
     }
   });
 
@@ -351,7 +392,7 @@ export default function MarketSection() {
                       }}>{chain.toLowerCase()}</span>
                     </div>
                     <div style={{ fontSize: 10, color: MID_TEXT, marginTop: 2 }}>
-                      {t.name} • {fmtMcap(t.mcap)} MCAP
+                      {t.name} • {fmtMcap(t.mcap)} MCAP{t.volume24h > 0 ? ` • ${fmtMcap(t.volume24h)} VOL` : ''}
                     </div>
                   </div>
                 </div>

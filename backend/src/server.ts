@@ -17,6 +17,7 @@ import { runMigrations, getMigrationStatus } from './db/migrate.js';
 import { routeRewards } from './reward-routes.js';
 import { LAUNCHPAD_CONFIG, getAllLaunchpads, getLaunchpad } from './config/launchpads.js';
 import { startMultiChainListeners, getListenerHealth, stopMultiChainListeners } from './multi-chain-listener.js';
+import { startBootstrapSeed, getSeederHealth, isBootstrapReady, waitForBootstrap } from './bootstrap-seed.js';
 
 // ── Configuration ────────────────────────────────────────────
 
@@ -759,6 +760,10 @@ function connectPumpPortal(): void {
   }
 }
 
+// Bootstrap existing market data from DexScreener + GeckoTerminal
+// Runs non-blocking: populates trenches-store immediately so /api/tokens/cached returns data
+startBootstrapSeed();
+
 // Start PumpPortal stream on server boot
 connectPumpPortal();
 
@@ -874,7 +879,7 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-    res.end(JSON.stringify({ status, timestamp: Date.now() }));
+    res.end(JSON.stringify({ status, seeder: getSeederHealth(), timestamp: Date.now() }));
   },
 
   // GET /api/tokens/trenches/:launchpadId — generic launchpad token lookup
@@ -891,6 +896,22 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
       res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
       res.end(JSON.stringify({ error: err.message }));
     }
+  },
+
+  // GET /api/launchpads/ready — bootstrap readiness (200=ready, 503=loading)
+  'GET /api/launchpads/ready': (_req, res) => {
+    const ready = isBootstrapReady();
+    const health = getSeederHealth();
+    res.writeHead(ready ? 200 : 503, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-cache',
+    });
+    res.end(JSON.stringify({
+      ready,
+      tokensSeeded: health.totalTokensSeeded,
+      uniqueMints: health.uniqueMints,
+    }));
   },
 };
 
