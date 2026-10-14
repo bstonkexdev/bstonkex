@@ -1095,7 +1095,35 @@ async function fetchWithGatewayRotation(urls: string[], timeoutMs = 4000): Promi
 }
 
 // ── Async Metadata Enrichment (multi-gateway IPFS + Socials) ───
-async function fetchMetadataAndEnrich(mint: string, uri: string) {
+// Matches BullMQ metadata-enrichment worker pattern with concurrency control
+const metadataQueue: Array<{ mint: string; uri: string; chain: string; attempts: number }> = [];
+let metadataInFlight = 0;
+const METADATA_CONCURRENCY = 10;
+const METADATA_MAX_ATTEMPTS = 3;
+
+function enqueueMetadata(mint: string, uri: string, chain: string): void {
+  if (!uri) return;
+  metadataQueue.push({ mint, uri, chain, attempts: 0 });
+  drainMetadataQueue();
+}
+
+async function drainMetadataQueue(): Promise<void> {
+  while (metadataQueue.length > 0 && metadataInFlight < METADATA_CONCURRENCY) {
+    const job = metadataQueue.shift()!;
+    metadataInFlight++;
+    fetchMetadataAndEnrich(job.mint, job.uri, job.chain)
+      .catch(() => {
+        // Retry on failure
+        if (job.attempts < METADATA_MAX_ATTEMPTS) {
+          job.attempts++;
+          metadataQueue.push(job);
+        }
+      })
+      .finally(() => { metadataInFlight--; drainMetadataQueue(); });
+  }
+}
+
+async function fetchMetadataAndEnrich(mint: string, uri: string, _chain?: string) {
   try {
     const urls = buildGatewayUrls(uri);
     const meta = await fetchWithGatewayRotation(urls);
@@ -1184,7 +1212,7 @@ function ingestTokenEvent(event: {
   if (!directImage) {
     const cleanUri = sanitizeUri(uri);
     if (cleanUri) {
-      setTimeout(() => fetchMetadataAndEnrich(mint, cleanUri), 50);
+      enqueueMetadata(mint, cleanUri, ch);
     }
   }
 }
