@@ -1,9 +1,13 @@
 // Cupcak8 Swap — Ave.ai-style Live Chart (Canvas-based, zero dependencies)
 // Candlestick + Volume histogram + High/Low markers + Current price line
+// Fetches historical OHLCV from backend REST + subscribes to WS chart channels
 // Dark theme, green/red candles, timeframe selector
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { microPrice } from '../../lib/micro-price';
+
+const API_BASE = (import.meta as any).env?.VITE_API_URL || 'https://api.bstonkex.xyz';
+const WS_URL = (import.meta as any).env?.VITE_WS_URL || 'wss://api.bstonkex.xyz/ws';
 
 type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
 
@@ -12,9 +16,15 @@ interface Candle {
 }
 
 interface Props {
-  candles: Candle[];
+  /** Token mint address (used to fetch from backend chart engine) */
+  mint: string;
+  /** Fallback candles from local candle engine (if backend has no data yet) */
+  fallbackCandles?: Candle[];
+  /** Current live price */
   currentPrice: number | null;
+  /** Chain for color theme */
   chainColor?: string;
+  /** Called when timeframe changes */
   onTimeframeChange?: (tf: Timeframe) => void;
 }
 
@@ -45,7 +55,6 @@ function drawChart(
   canvas.height = H * dpr;
   ctx.scale(dpr, dpr);
 
-  // Clear
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, W, H);
 
@@ -60,7 +69,6 @@ function drawChart(
   const sorted = [...candles].sort((a, b) => a.time - b.time);
   const pad = { top: 20, right: 60, bottom: 30, left: 10 };
 
-  // Price range
   let hi = -Infinity, lo = Infinity;
   for (const c of sorted) {
     if (c.high > hi) hi = c.high;
@@ -71,7 +79,6 @@ function drawChart(
   hi += pricePad;
   lo -= pricePad;
 
-  // Volume range
   let maxVol = 0;
   for (const c of sorted) {
     if (c.volume > maxVol) maxVol = c.volume;
@@ -97,7 +104,6 @@ function drawChart(
     ctx.lineTo(W - pad.right, y);
     ctx.stroke();
 
-    // Price labels
     const price = hi - ((hi - lo) / gridLines) * i;
     ctx.fillStyle = TEXT_DIM;
     ctx.font = '9px monospace';
@@ -120,12 +126,11 @@ function drawChart(
     const color = isBull ? GREEN : RED;
 
     // Wick
-    const wickX = x;
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(wickX, priceToY(c.high));
-    ctx.lineTo(wickX, priceToY(c.low));
+    ctx.moveTo(x, priceToY(c.high));
+    ctx.lineTo(x, priceToY(c.low));
     ctx.stroke();
 
     // Body
@@ -154,7 +159,6 @@ function drawChart(
     ctx.font = 'bold 8px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(label, x, y);
-    // Small circle
     ctx.beginPath();
     ctx.arc(x, priceToY(sorted[idx].high) - 3, 2, 0, Math.PI * 2);
     ctx.fill();
@@ -185,7 +189,6 @@ function drawChart(
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Price label
     ctx.fillStyle = '#3b82f6';
     ctx.fillRect(W - pad.right, y - 8, pad.right, 16);
     ctx.fillStyle = '#fff';
@@ -194,7 +197,7 @@ function drawChart(
     ctx.fillText(microPrice(currentPrice, ''), W - pad.right + 4, y + 3);
   }
 
-  // Time labels (every ~8 candles)
+  // Time labels
   const step = Math.max(1, Math.floor(sorted.length / 8));
   ctx.fillStyle = TEXT_DIM;
   ctx.font = '8px monospace';
@@ -207,9 +210,12 @@ function drawChart(
   }
 }
 
-export default function AveLiveChart({ candles, currentPrice, onTimeframeChange }: Props) {
+export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice, onTimeframeChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('5m');
+  const wsRef = useRef<WebSocket | null>(null);
+  const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('1m');
+  const [candles, setCandles] = useState<Candle[]>([]);
+  const [source, setSource] = useState<string>('loading');
   const [highPrice, setHighPrice] = useState<number | null>(null);
   const [lowPrice, setLowPrice] = useState<number | null>(null);
 
@@ -218,12 +224,123 @@ export default function AveLiveChart({ candles, currentPrice, onTimeframeChange 
     onTimeframeChange?.(tf);
   }, [onTimeframeChange]);
 
-  // Draw chart
+  // Fetch historical candles from backend chart engine
+  useEffect(() => {
+    if (!mint) return;
+    let cancelled = false;
+
+    const fetchHistory = async () => {
+      try {
+        setSource('loading');
+        const res = await fetch(`${API_BASE}/api/v1/chart/history?mint=${encodeURIComponent(mint)}&interval=${activeTimeframe}&limit=500`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+
+        if (data.candles && data.candles.length > 0) {
+          setCandles(data.candles);
+          setSource(`backend (${data.count} candles)`);
+        } else {
+          // Backend has no data — use fallback from local candle engine
+          setCandles(fallbackCandles);
+          setSource(fallbackCandles.length > 0 ? `local engine (${fallbackCandles.length})` : 'no data');
+        }
+      } catch {
+        if (cancelled) return;
+        // Backend unreachable — use fallback
+        setCandles(fallbackCandles);
+        setSource(fallbackCandles.length > 0 ? `local engine (${fallbackCandles.length})` : 'offline');
+      }
+    };
+
+    fetchHistory();
+    return () => { cancelled = true; };
+  }, [mint, activeTimeframe, fallbackCandles]);
+
+  // Subscribe to WS chart channel for real-time candle ticks
+  useEffect(() => {
+    if (!mint) return;
+
+    const wsUrl = WS_URL || `ws://${window.location.host}/ws`;
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout>;
+
+    function connect() {
+      try {
+        ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          // Subscribe to chart channel for this mint + interval
+          ws?.send(JSON.stringify({
+            type: 'subscribe',
+            channel: `chart:${mint}:${activeTimeframe}`,
+          }));
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+
+            // Handle chart_snapshot (initial data on subscribe)
+            if (msg.type === 'chart_snapshot' && msg.candles?.length > 0) {
+              setCandles(prev => {
+                // Merge: use snapshot if longer than current
+                if (msg.candles.length > prev.length) return msg.candles;
+                return prev;
+              });
+              return;
+            }
+
+            // Handle candle_tick (real-time update)
+            if (msg.type === 'event' && msg.event === 'candle_tick') {
+              const tick = msg as { time: number; open: number; high: number; low: number; close: number; volume: number };
+              setCandles(prev => {
+                const idx = prev.findIndex(c => c.time === tick.time);
+                const updated: Candle = { time: tick.time, open: tick.open, high: tick.high, low: tick.low, close: tick.close, volume: tick.volume };
+                if (idx >= 0) {
+                  const next = [...prev];
+                  next[idx] = updated;
+                  return next;
+                }
+                // New candle
+                return [...prev, updated].sort((a, b) => a.time - b.time).slice(-500);
+              });
+            }
+          } catch { /* ignore parse errors */ }
+        };
+
+        ws.onclose = () => {
+          reconnectTimer = setTimeout(connect, 5000);
+        };
+
+        ws.onerror = () => {
+          ws?.close();
+        };
+      } catch { /* ignore connection errors */ }
+    }
+
+    connect();
+
+    return () => {
+      clearTimeout(reconnectTimer);
+      // Unsubscribe before closing
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'unsubscribe',
+          channel: `chart:${mint}:${activeTimeframe}`,
+        }));
+      }
+      ws?.close();
+      wsRef.current = null;
+    };
+  }, [mint, activeTimeframe]);
+
+  // Draw chart whenever candles or price changes
   useEffect(() => {
     if (!canvasRef.current) return;
     drawChart(canvasRef.current, candles, currentPrice);
 
-    // Compute high/low for badge display
     if (candles.length > 0) {
       let hi = -Infinity, lo = Infinity;
       for (const c of candles) {
@@ -280,11 +397,11 @@ export default function AveLiveChart({ candles, currentPrice, onTimeframeChange 
       {/* Data footer */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px', background: BG2, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <span style={{ fontSize: 8, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-          {candles.length} candles
+          {candles.length} candles · {source}
         </span>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>
-          Canvas-based · Zero dependencies
+          WS: chart:{mint}:{activeTimeframe}
         </span>
       </div>
     </div>

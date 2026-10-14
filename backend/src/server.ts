@@ -20,6 +20,7 @@ import { startMultiChainListeners, getListenerHealth, stopMultiChainListeners } 
 import { upsertMarketToken, getTokenCount, getTokensByChain } from './db/market-tokens.js';
 import { hsetAll, hgetall, zadd, zrevrange, getStoreStats } from './trenches-store.js';
 import { startBootstrapSeed, getSeederHealth, isBootstrapReady, waitForBootstrap } from './bootstrap-seed.js';
+import { ingestTrade, getCandles, getLatestCandle, getChartEngineStats, onCandleTick, ALL_INTERVALS, type CandleInterval, type CandleTick } from './chart-engine.js';
 
 // ── Configuration ────────────────────────────────────────────
 
@@ -524,6 +525,19 @@ function handleMessage(client: Client, msg: Record<string, unknown>) {
         }
       }
 
+      // Chart channel: send initial candle snapshot on subscribe
+      if (channel.startsWith('chart:')) {
+        const parts = channel.split(':');
+        if (parts.length >= 3) {
+          const mint = parts[1];
+          const interval = parts[2] as CandleInterval;
+          if (ALL_INTERVALS.includes(interval)) {
+            const history = getCandles(mint, interval, 200);
+            send(client.ws, { type: 'chart_snapshot', channel, candles: history, timestamp: Date.now() });
+          }
+        }
+      }
+
       // Confirm subscription
       send(client.ws, { type: 'subscribed', channel, timestamp: Date.now() });
       break;
@@ -598,6 +612,26 @@ function send(ws: WebSocket, data: Record<string, unknown>) {
     ws.send(JSON.stringify(data));
   }
 }
+
+// ── Chart Engine: Broadcast candle ticks to subscribed clients ──
+
+onCandleTick((tick: CandleTick) => {
+  const channel = `chart:${tick.mint}:${tick.interval}`;
+  broadcast(channel, {
+    event: 'candle_tick',
+    time: tick.candle.time,
+    open: tick.candle.open,
+    high: tick.candle.high,
+    low: tick.candle.low,
+    close: tick.candle.close,
+    volume: tick.candle.volume,
+    buyVolume: tick.candle.buyVolume,
+    sellVolume: tick.candle.sellVolume,
+    trades: tick.candle.trades,
+    status: tick.candle.status,
+    isNew: tick.isNew,
+  });
+});
 
 // ── Heartbeat ────────────────────────────────────────────────
 
@@ -950,9 +984,51 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
         : 'EPHEMERAL — JSON snapshot only, lost on Railway restart',
     }));
   },
-};
 
-// ── IPFS Gateway Pool (cf-ipfs primary, fast + no rate-limit) ──
+  // GET /api/v1/chart/history — Historical OHLCV candles
+  'GET /api/v1/chart/history': (req, res) => {
+    const url = new URL(req.url || '/', `http://${req.headers.host}`);
+    const mint = url.searchParams.get('mint') || '';
+    const interval = (url.searchParams.get('interval') || '1m') as CandleInterval;
+    const limit = Math.min(1000, Math.max(1, parseInt(url.searchParams.get('limit') || '500') || 500));
+
+    if (!mint) {
+      res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: 'Missing required parameter: mint' }));
+      return;
+    }
+
+    if (!ALL_INTERVALS.includes(interval)) {
+      res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: `Invalid interval. Valid: ${ALL_INTERVALS.join(', ')}` }));
+      return;
+    }
+
+    const candles = getCandles(mint, interval, limit);
+    const latest = getLatestCandle(mint, interval);
+
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=5' });
+    res.end(JSON.stringify({
+      mint,
+      interval,
+      candles,
+      latest,
+      count: candles.length,
+      engine: 'chart-engine-v1',
+    }));
+  },
+
+  // GET /api/v1/chart/stats — Chart engine diagnostics
+  'GET /api/v1/chart/stats': (_req, res) => {
+    const stats = getChartEngineStats();
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({
+      ...stats,
+      memoryFormatted: `${(stats.memoryBytes / 1024 / 1024).toFixed(2)} MB`,
+      intervals: ALL_INTERVALS,
+    }));
+  },
+};
 const IPFS_GATEWAYS = [
   'https://cf-ipfs.com/ipfs/',
   'https://gateway.pinata.cloud/ipfs/',
@@ -1066,7 +1142,19 @@ function ingestTokenEvent(event: {
     createdAt: String(Date.now()),
   }).catch(() => {}); // non-blocking
 
-  // D. Async metadata enrichment (only if no direct icon)
+  // D. Feed chart engine with initial price point (generates seed candles)
+  const priceNum = parseFloat(price || '0');
+  if (priceNum > 0 && isFinite(priceNum)) {
+    ingestTrade({
+      mint, chain: ch,
+      priceUsd: priceNum,
+      volumeUsd: priceNum * 1e3, // Synthetic volume for initial candle
+      side: 'buy',
+      timestamp: Math.floor(Date.now() / 1000),
+    });
+  }
+
+  // E. Async metadata enrichment (only if no direct icon)
   if (!directImage) {
     const cleanUri = sanitizeUri(uri);
     if (cleanUri) {

@@ -153,7 +153,7 @@ export default function TokenPage() {
   const myTrades = useMyTrades(wallet.address, [displaySymbol, tradeToken?.symbol ?? '']);
   const alert = useTokenAlert(activeChain, displayAddress, displaySymbol);
 
-  // Live candle data for AveLiveChart (mapped from candle-engine to chart format)
+  // Live candle data for AveLiveChart fallback (from local candle engine)
   const [aveCandles, setAveCandles] = useState<Array<{ time: number; open: number; high: number; low: number; close: number; volume: number }>>([]);
   useEffect(() => {
     if (!displayAddress) { setAveCandles([]); return; }
@@ -320,10 +320,10 @@ export default function TokenPage() {
 
         <MetaBadges badges={badges} />
 
-        {/* Chart — primary visual element: AveLiveChart for tokens, PriceChart for majors */}
+        {/* Chart — primary visual element: AveLiveChart fetches from backend chart engine */}
         <div className="chart-region">
-          {!isMajor && aveCandles.length > 0 ? (
-            <AveLiveChart candles={aveCandles} currentPrice={displayPrice} />
+          {!isMajor ? (
+            <AveLiveChart mint={displayAddress} fallbackCandles={aveCandles} currentPrice={displayPrice} />
           ) : (
             <ChartErrorBoundary tokenSymbol={displaySymbol}>
               <PriceChart
