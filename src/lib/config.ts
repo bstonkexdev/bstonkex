@@ -142,10 +142,25 @@ export function formatUsd(n: number | null | undefined): string {
 }
 
 export function formatPrice(n: number | null | undefined): string {
-  if (n === null || n === undefined || isNaN(n)) return 'N/A';
-  if (n >= 1) return n.toFixed(2);
-  if (n >= 0.0001) return n.toFixed(6);
-  return n.toExponential(2);
+  if (n === null || n === undefined || isNaN(n) || n === 0) return '$0.00';
+  const num = Number(n);
+
+  if (num >= 1) return `${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // Convert to fixed decimal string for micro-cap tokens
+  const str = num.toFixed(12);
+  const match = str.match(/^0\.(0+)(\d{2,4})/);
+
+  if (match) {
+    const zeroCount = match[1].length;
+    const sigDigits = match[2];
+    if (zeroCount >= 3) {
+      // Formats 0.0000000280 as $0.0{7}280
+      return `$0.0{${zeroCount}}${sigDigits}`;
+    }
+  }
+
+  return `${num.toFixed(6)}`;
 }
 
 export function formatPct(n: number | null | undefined): string {
