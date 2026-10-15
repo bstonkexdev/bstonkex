@@ -3,7 +3,7 @@
 // Data: GeckoTerminal OHLCV → DexScreener → backend WS → PumpPortal → fallback
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, HistogramData, Time } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, HistogramData, Time, ColorType } from 'lightweight-charts';
 import { microPrice } from '../../lib/micro-price';
 
 type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
@@ -119,7 +119,7 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
     if (!containerRef.current) return;
 
     const chart = createChart(containerRef.current, {
-      layout: { background: { type: 'solid' as const, color: BG }, textColor: '#d1d4dc' },
+      layout: { background: { type: ColorType.Solid, color: BG }, textColor: '#d1d4dc' },
       grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
       timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#1f2937' },
       rightPriceScale: { borderColor: '#1f2937' },

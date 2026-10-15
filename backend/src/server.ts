@@ -142,6 +142,26 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     return;
   }
 
+  // Dynamic route: /api/tokens/trenches/:launchpadId
+  // Handles any launchpad (bags, stonkfun, flap, fourmeme, etc.)
+  if (req.method === 'GET' && url.pathname.startsWith('/api/tokens/trenches/')) {
+    const launchpadId = url.pathname.split('/').pop() || '';
+    const lp = launchpadId.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    // Skip if already handled by exact-match routes
+    if (lp !== 'pumpfun' && lp !== 'generic') {
+      try {
+        const mints = zrevrange(`trenches:${lp}`, 0, 49) || [];
+        const tokens = mints.map((m: string) => hgetall(`token:${m}`)).filter((t: any) => t && t.mint);
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify(tokens));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
+  }
+
   // ── 0x Quote Proxy ─────────────────────────────────────────
   // Proxies 0x Swap API v2 quote requests with server-side ZERO_EX_API_KEY.
   // Supports chains: 56 (BSC), 8453 (Base).
