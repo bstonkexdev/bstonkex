@@ -538,6 +538,21 @@ function handleMessage(client: Client, msg: Record<string, unknown>) {
         }
       }
 
+      // Trade channel: send recent trade history on subscribe
+      if (channel.startsWith('trades:')) {
+        const mint = channel.split(':')[1];
+        if (mint) {
+          const tokenData = hgetall(`token:${mint}`);
+          send(client.ws, {
+            type: 'trades_snapshot',
+            channel,
+            mint,
+            token: tokenData,
+            timestamp: Date.now(),
+          });
+        }
+      }
+
       // Confirm subscription
       send(client.ws, { type: 'subscribed', channel, timestamp: Date.now() });
       break;
@@ -630,6 +645,23 @@ onCandleTick((tick: CandleTick) => {
     trades: tick.candle.trades,
     status: tick.candle.status,
     isNew: tick.isNew,
+  });
+
+  // Also broadcast individual trade_tick to trades:<mint> subscribers
+  broadcast(`trades:${tick.mint}`, {
+    type: 'trade_tick',
+    channel: `trades:${tick.mint}`,
+    mint: tick.mint,
+    interval: tick.interval,
+    time: tick.candle.time,
+    open: tick.candle.open,
+    high: tick.candle.high,
+    low: tick.candle.low,
+    close: tick.candle.close,
+    volume: tick.candle.volume,
+    side: tick.candle.buyVolume > tick.candle.sellVolume ? 'buy' : 'sell',
+    priceUsd: tick.candle.close,
+    timestamp: Date.now(),
   });
 });
 
