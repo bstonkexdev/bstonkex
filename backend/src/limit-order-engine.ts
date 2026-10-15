@@ -8,6 +8,7 @@
 //   → sendJitoBundle(signedTx) → remove from book → PubSub notify
 
 import { hset, hget, zadd, zrem, zrange, pipeline } from './trenches-store.js';
+import { persistOrder, updateOrderStatus, loadActiveOrders, ensureLimitOrdersTable } from './db/limit-orders.js';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -68,6 +69,15 @@ export function placeOrder(order: Omit<LimitOrder, 'status' | 'createdAt'>): Lim
   hset(`order:${order.id}`, 'type', order.type);
   hset(`order:${order.id}`, 'targetPrice', String(order.targetPrice));
   hset(`order:${order.id}`, 'userAddress', order.userAddress);
+
+  // Persist to PostgreSQL (survives restarts)
+  persistOrder({
+    id: order.id, type: order.type, orderType: order.orderType,
+    mint: order.mint, chain: order.chain || 'sol', symbol: order.symbol,
+    userAddress: order.userAddress, targetPrice: order.targetPrice,
+    amountSol: order.amountSol, amountTokens: order.amountTokens,
+    slippageBps: order.slippageBps || 500,
+  }).catch(() => {}); // Fire-and-forget, in-memory is primary
 
   return full;
 }
@@ -219,4 +229,69 @@ export function getOrderEngineStats(): OrderEngineStats {
     totalSellOrders: totalSell,
     trackedMints: mints.size,
   };
+}
+
+// ── Boot Recovery ─────────────────────────────────────────────
+// On server start, load active orders from PostgreSQL into in-memory engine.
+// This ensures SL/TP orders survive server restarts.
+
+/**
+ * Initialize the limit order engine: ensure table exists and load active orders.
+ * Call this during server boot (after DB connection established).
+ */
+export async function initLimitOrderEngine(): Promise<{ loaded: number; errors: number }> {
+  let loaded = 0, errors = 0;
+  
+  // Ensure table exists
+  const tableReady = await ensureLimitOrdersTable();
+  if (!tableReady) {
+    console.warn('[limit-order-engine] PostgreSQL not available — orders will be in-memory only');
+    return { loaded: 0, errors: 0 };
+  }
+
+  // Load active orders from PostgreSQL
+  try {
+    const orders = await loadActiveOrders();
+    for (const order of orders) {
+      try {
+        const book = getOrderBook(order.mint, order.type as 'buy' | 'sell');
+        const full: LimitOrder = {
+          id: order.id,
+          type: order.type as 'buy' | 'sell',
+          orderType: order.orderType,
+          mint: order.mint,
+          chain: order.chain,
+          symbol: order.symbol,
+          userAddress: order.userAddress,
+          targetPrice: order.targetPrice,
+          amountSol: order.amountSol,
+          amountTokens: order.amountTokens,
+          slippageBps: order.slippageBps,
+          status: 'active',
+          createdAt: new Date(order.createdAt).getTime(),
+        };
+        book.push(full);
+        loaded++;
+      } catch (err: any) {
+        errors++;
+      }
+    }
+    
+    // Sort all order books
+    for (const [, book] of buyOrders) {
+      book.sort((a, b) => a.targetPrice - b.targetPrice);
+    }
+    for (const [, book] of sellOrders) {
+      book.sort((a, b) => b.targetPrice - a.targetPrice);
+    }
+    
+    if (loaded > 0) {
+      console.log(`[limit-order-engine] Boot recovery: ${loaded} active orders loaded from PostgreSQL`);
+    }
+  } catch (err: any) {
+    console.error(`[limit-order-engine] Boot recovery failed: ${err.message}`);
+    errors++;
+  }
+
+  return { loaded, errors };
 }
