@@ -628,6 +628,14 @@ function send(ws: WebSocket, data: Record<string, unknown>) {
   }
 }
 
+function formatMcap(n: number): string {
+  if (!n || isNaN(n)) return '0';
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+  return n.toFixed(0);
+}
+
 // ── Chart Engine: Broadcast candle ticks to subscribed clients ──
 
 onCandleTick((tick: CandleTick) => {
@@ -913,6 +921,36 @@ const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
       const tokens = mints.map((mint: string) => hgetall(`token:${mint}`)).filter((t: any) => t && t.mint);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(tokens));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+  },
+  // GET /api/v1/tokens/trending — unified trending endpoint for frontend
+  'GET /api/v1/tokens/trending': (_req, res) => {
+    try {
+      const mints: string[] = zrevrange('trenches:pumpfun', 0, 49);
+      if (!mints || mints.length === 0) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, data: [] }));
+        return;
+      }
+      const tokens = mints.map((mint: string) => hgetall(`token:${mint}`)).filter((t: any) => t && t.mint);
+      const formatted = tokens.map((t: any) => ({
+        mint: t.mint,
+        chain: t.chain || 'solana',
+        name: t.name || 'Unknown',
+        symbol: t.symbol || '???',
+        image: t.image || t.logo || null,
+        priceUsd: parseFloat(t.priceUsd) || 0,
+        priceChange24h: parseFloat(t.priceChange24h) || 0,
+        volume24h: parseFloat(t.volume24h) || 0,
+        mcapFormatted: t.mcapFormatted || formatMcap(parseFloat(t.mcap) || 0),
+        mcap: parseFloat(t.mcap) || 0,
+        bondingCurveProgress: parseFloat(t.bondingCurveProgress) || 0,
+      }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, data: formatted }));
     } catch (err: any) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
