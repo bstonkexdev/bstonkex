@@ -15,6 +15,9 @@ const WS_URL = 'wss://pumpportal.fun/api/data';
 const RECONNECT_DELAY_MS = 5000;
 const MAX_RECONNECT_DELAY_MS = 30000;
 
+// Mints we actively subscribe to for trade events
+const trackedTradeMints = new Set<string>();
+
 interface PumpPortalCreateEvent {
   txType: 'create';
   mint: string;
@@ -119,6 +122,30 @@ export function onTokenTrade(listener: TradeListener): () => void {
 export function onTokenCreate(listener: CreateListener): () => void {
   createListeners.add(listener);
   return () => createListeners.delete(listener);
+}
+
+/**
+ * Subscribe to real-time trade events for a specific token mint.
+ * Sends subscribeTokenTrade to PumpPortal for the given mint.
+ * Call unsubscribeTokenTrades(mint) when no longer needed.
+ */
+export function subscribeTokenTrades(mint: string): void {
+  if (!mint) return;
+  trackedTradeMints.add(mint);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ method: 'subscribeTokenTrade', keys: [mint] }));
+  }
+}
+
+/** Unsubscribe from trade events for a specific mint. */
+export function unsubscribeTokenTrades(mint: string): void {
+  trackedTradeMints.delete(mint);
+  // PumpPortal doesn't have an unsubscribe method — just stop tracking
+}
+
+/** Get the set of currently tracked trade mints. */
+export function getTrackedTradeMints(): string[] {
+  return [...trackedTradeMints];
 }
 
 /** Get live bonding curve price for a token (updated by trade events). */
@@ -388,10 +415,11 @@ function connect(): void {
 
       // Subscribe to new token creation events
       ws!.send(JSON.stringify({ method: 'subscribeNewToken' }));
-      // Note: subscribeTokenTrade requires specific token keys.
-      // Trade updates for tracked tokens are received via the create event's
-      // bonding curve data, plus periodic enrichment. Avoid subscribing to
-      // ALL trades (no keys) — it floods the connection and causes disconnects.
+
+      // Re-subscribe to tracked token trades on reconnect
+      if (trackedTradeMints.size > 0) {
+        ws!.send(JSON.stringify({ method: 'subscribeTokenTrade', keys: [...trackedTradeMints] }));
+      }
     };
 
     ws.onmessage = (e: MessageEvent) => {

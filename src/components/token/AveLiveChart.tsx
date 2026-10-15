@@ -319,6 +319,36 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
     return () => { unsub?.(); };
   }, [mint, activeTimeframe]);
 
+  // Subscribe to PumpPortal trade events for this specific mint (feeds real-time data)
+  useEffect(() => {
+    if (!mint) return;
+    let unsubTrade: (() => void) | undefined;
+    import('../../lib/engine/discovery/pumpportal-stream').then(({ subscribeTokenTrades, unsubscribeTokenTrades, onTokenTrade }) => {
+      subscribeTokenTrades(mint);
+      // Listen for PumpPortal trades and update candles in real-time
+      unsubTrade = onTokenTrade((trade: any) => {
+        if (trade.mint !== mint) return;
+        const priceUsd = trade.priceUsd || 0;
+        if (priceUsd <= 0) return;
+        setCandles(prev => {
+          if (prev.length === 0) return prev;
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          updated[updated.length - 1] = {
+            ...last,
+            high: Math.max(last.high, priceUsd),
+            low: Math.min(last.low, priceUsd),
+            close: priceUsd,
+            volume: last.volume + (trade.volumeUsd || 0),
+          };
+          return updated;
+        });
+      });
+      return () => { unsubscribeTokenTrades(mint); };
+    }).catch(() => {});
+    return () => { unsubTrade?.(); };
+  }, [mint]);
+
   // Update candles when fallbackCandles changes (real-time trades)
   useEffect(() => {
     if (source.startsWith('local engine') && fallbackCandles.length > 0) {

@@ -10,6 +10,10 @@ import {
   type UniversalTradePayload,
 } from '../../lib/engine/trade-stream';
 import {
+  subscribeTokenTrades,
+  unsubscribeTokenTrades,
+} from '../../lib/engine/discovery/pumpportal-stream';
+import {
   updateWalletProfile,
   evaluateWalletTags,
   checkCabal,
@@ -43,6 +47,13 @@ export default function RealTimeTradeFeed({ mint, maxItems = 50, compact }: Prop
   useEffect(() => {
     initTradeStream();
   }, []);
+
+  // Subscribe to PumpPortal trade events for this specific mint
+  useEffect(() => {
+    if (!mint) return;
+    subscribeTokenTrades(mint);
+    return () => { unsubscribeTokenTrades(mint); };
+  }, [mint]);
 
   // Subscribe to trades
   useEffect(() => {
