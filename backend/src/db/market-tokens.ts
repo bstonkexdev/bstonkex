@@ -211,6 +211,7 @@ export interface PaginatedResult {
   offset: number;
   limit: number;
   hasMore: boolean;
+  error?: string;
 }
 
 export async function queryTokensPaginated(opts: PaginatedQueryOpts = {}): Promise<PaginatedResult> {
@@ -242,14 +243,13 @@ export async function queryTokensPaginated(opts: PaginatedQueryOpts = {}): Promi
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Count total matching rows
-    const countResult = await query(`SELECT COUNT(*) as count FROM market_tokens ${whereClause}`, params);
+    const countSql = `SELECT COUNT(*) as count FROM market_tokens ${whereClause}`;
+    const countResult = await query(countSql, params);
     const total = parseInt(countResult.rows[0]?.count) || 0;
 
     // Fetch page
-    const dataResult = await query(
-      `SELECT * FROM market_tokens ${whereClause} ORDER BY ${safeSortBy} ${sortDir} LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
-      [...params, safeLimit, safeOffset]
-    );
+    const dataSql = `SELECT * FROM market_tokens ${whereClause} ORDER BY ${safeSortBy} ${sortDir} LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+    const dataResult = await query(dataSql, [...params, safeLimit, safeOffset]);
 
     const tokens: MarketTokenRecord[] = dataResult.rows.map((row: any) => ({
       mint: row.mint,
@@ -280,8 +280,8 @@ export async function queryTokensPaginated(opts: PaginatedQueryOpts = {}): Promi
 
     return { tokens, total, offset: safeOffset, limit: safeLimit, hasMore: safeOffset + safeLimit < total };
   } catch (err: any) {
-    log('warn', `Paginated query failed: ${err.message}`);
-    return { tokens: [], total: 0, offset: 0, limit: safeLimit, hasMore: false };
+    log('error', `Paginated query failed: ${err.message} (SQL params: chain=${chain || 'any'}, launchpad=${launchpad || 'any'}, sortBy=${safeSortBy})`);
+    return { tokens: [], total: 0, offset: 0, limit: safeLimit, hasMore: false, error: err.message };
   }
 }
 

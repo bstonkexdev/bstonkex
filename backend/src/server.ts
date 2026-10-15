@@ -992,14 +992,15 @@ const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
       const result = await queryTokensPaginated({ chain, launchpad, sortBy, sortDir, offset, limit });
 
       // Diagnostics: log query params and result summary (no secrets)
-      log('info', `[tokens/all] chain=${chain || 'any'} launchpad=${launchpad || 'any'} sortBy=${sortBy} offset=${offset} limit=${limit} → total=${result.total} returned=${result.tokens.length} hasMore=${result.hasMore}`);
+      log('info', `[tokens/all] chain=${chain || 'any'} launchpad=${launchpad || 'any'} sortBy=${sortBy} offset=${offset} limit=${limit} → total=${result.total} returned=${result.tokens.length} hasMore=${result.hasMore}${result.error ? ' ERROR: ' + result.error : ''}`);
 
-      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      const status = result.error ? 207 : 200; // 207 = partial success (query failed but endpoint didn't crash)
+      res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
       res.end(JSON.stringify({ success: true, ...result }));
     } catch (err: any) {
       log('error', `[tokens/all] Request failed: ${err.message}`);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: err.message }));
+      res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
     }
   },
 };
