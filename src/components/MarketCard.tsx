@@ -1,4 +1,4 @@
-import { CHAINS, formatUsd, shortenAddress } from '../lib/config';
+import { CHAINS, formatUsd, formatPrice, shortenAddress, resolveTokenLogo } from '../lib/config';
 import type { ChainId } from '../lib/config';
 import type { MarketToken } from '../lib/market-discovery';
 import { useApp } from '../lib/context';
@@ -61,7 +61,7 @@ export default function MarketCard({ token, compact }: Props) {
     <div className="market-card" onClick={handleClick}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-        {token.icon && <img src={token.icon} alt="" style={{ width: 14, height: 14, borderRadius: '50%' }} onError={e => (e.currentTarget.style.display = 'none')} />}
+        {<img src={resolveTokenLogo(token.icon, token.symbol)} alt="" style={{ width: 14, height: 14, borderRadius: '50%', objectFit: 'cover', background: '#2d124d' }} onError={e => (e.currentTarget.src = resolveTokenLogo('', token.symbol))} />}
         <span style={{ fontWeight: 800, fontSize: 10, color: 'var(--text-bright)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{token.symbol}</span>
         <ChainIcon chainId={token.chainId as ChainId} size={11} />
         <span style={{ fontSize: 7, color: chain?.color, fontWeight: 700 }}>{chain?.shortName}</span>
