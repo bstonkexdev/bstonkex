@@ -198,7 +198,9 @@ class WebSocketManager {
 
 // ── Singleton — try to connect, gracefully handle failure ──
 
-const WS_URL = (import.meta as any).env?.VITE_WS_URL || 'wss://api.bstonkex.xyz/ws';
+import { WS_BASE } from '../config';
+
+const WS_URL = WS_BASE;
 
 export const wsManager = new WebSocketManager({ url: WS_URL });
 

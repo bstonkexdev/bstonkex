@@ -23,7 +23,8 @@ function fmtPrice(p: number): string {
   return p === 0 ? '$0.0000' : p < 0.000001 ? `$${p.toExponential(2)}` : `$${p.toFixed(4)}`;
 }
 
-const API = 'https://api.bstonkex.xyz';
+import { API_BASE } from '../../lib/config';
+const API = API_BASE;
 
 // Sky blue palette
 const SKY_BG = '#E0F2FE';

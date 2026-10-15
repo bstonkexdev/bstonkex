@@ -1,5 +1,12 @@
 // Cupcak8 Swap Configuration
 
+// ── Backend API & WebSocket URLs ─────────────────────────────
+// These are PUBLIC values bundled into client JavaScript.
+// Set via VITE_API_URL and VITE_WS_URL env vars, or use defaults.
+
+export const API_BASE: string = (import.meta as any).env?.VITE_API_URL || 'https://api.bstonkex.xyz';
+export const WS_BASE: string = (import.meta as any).env?.VITE_WS_URL || 'wss://api.bstonkex.xyz/ws';
+
 export type ChainId = 'bsc' | 'solana' | 'base' | 'robinhood';
 
 export interface ChainConfig {
