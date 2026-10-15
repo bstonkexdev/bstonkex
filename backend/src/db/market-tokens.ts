@@ -231,11 +231,11 @@ export async function queryTokensPaginated(opts: PaginatedQueryOpts = {}): Promi
     let paramIdx = 1;
 
     if (chain) {
-      conditions.push(`chain = ${paramIdx++}`);
+      conditions.push(`chain = $${paramIdx++}`);
       params.push(chain);
     }
     if (launchpad) {
-      conditions.push(`launchpad = ${paramIdx++}`);
+      conditions.push(`launchpad = $${paramIdx++}`);
       params.push(launchpad);
     }
 
@@ -247,7 +247,7 @@ export async function queryTokensPaginated(opts: PaginatedQueryOpts = {}): Promi
 
     // Fetch page
     const dataResult = await query(
-      `SELECT * FROM market_tokens ${whereClause} ORDER BY ${safeSortBy} ${sortDir} LIMIT ${paramIdx++} OFFSET ${paramIdx++}`,
+      `SELECT * FROM market_tokens ${whereClause} ORDER BY ${safeSortBy} ${sortDir} LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
       [...params, safeLimit, safeOffset]
     );
 
