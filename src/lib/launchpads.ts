@@ -14,6 +14,8 @@ export interface Launchpad {
   dataSource: string; // e.g. 'launchpad-indexer', 'dex-pair-tracking'
   trackingMethod: string; // e.g. 'pair-creation', 'token-mint', 'factory-contract'
   status: 'active' | 'indexing_delayed' | 'offline' | 'not_configured';
+  factoryAddress?: string; // on-chain factory contract address
+  badgeColor?: string; // UI badge color
   factoryNote?: string; // verification status note
 }
 
@@ -33,6 +35,8 @@ export const LAUNCHPAD_REGISTRY: Record<string, ChainLaunchpads> = {
         chainId: 'bsc', enabled: false, verified: false,
         dataSource: 'launchpad-indexer', trackingMethod: 'factory-contract',
         status: 'not_configured',
+        factoryAddress: '0x1de460f363af910f51726def188f9004276bf4bc',
+        badgeColor: '#EF4444',
         factoryNote: 'STAGE2 FAIL: Portal + VaultPortal deployed and active, but registered Launched topic 0x714aa393 not found in 1M blocks. Event ABI incorrect.',
       },
       {
@@ -40,6 +44,8 @@ export const LAUNCHPAD_REGISTRY: Record<string, ChainLaunchpads> = {
         chainId: 'bsc', enabled: false, verified: false,
         dataSource: 'launchpad-indexer', trackingMethod: 'factory-contract',
         status: 'not_configured',
+        factoryAddress: '0x5c952063c7fc8610ffdb798152d69f0b9550762b',
+        badgeColor: '#F59E0B',
         factoryNote: 'STAGE2 FAIL: V1+V2 are proxy contracts (170 bytes). Zero TokenCreated events in 1M blocks. Need implementation addresses.',
       },
       {
@@ -47,6 +53,7 @@ export const LAUNCHPAD_REGISTRY: Record<string, ChainLaunchpads> = {
         chainId: 'bsc', enabled: false, verified: false,
         dataSource: 'launchpad-indexer', trackingMethod: 'factory-contract',
         status: 'not_configured',
+        badgeColor: '#10B981',
         factoryNote: 'GENIUS FACTORY NOT VERIFIED — cannot independently verify from available sources',
       },
     ],
@@ -60,6 +67,7 @@ export const LAUNCHPAD_REGISTRY: Record<string, ChainLaunchpads> = {
         chainId: 'base', enabled: false, verified: false,
         dataSource: 'launchpad-indexer', trackingMethod: 'factory-contract',
         status: 'not_configured',
+        badgeColor: '#8B5CF6',
         factoryNote: 'O1 EXCHANGE FACTORY NOT VERIFIED — cannot independently verify from available sources',
       },
       {
@@ -67,6 +75,7 @@ export const LAUNCHPAD_REGISTRY: Record<string, ChainLaunchpads> = {
         chainId: 'base', enabled: false, verified: false,
         dataSource: 'launchpad-indexer', trackingMethod: 'factory-contract',
         status: 'not_configured',
+        badgeColor: '#3B82F6',
         factoryNote: 'BASESTONK MAINNET FACTORY NOT VERIFIED',
       },
       {
@@ -74,6 +83,7 @@ export const LAUNCHPAD_REGISTRY: Record<string, ChainLaunchpads> = {
         chainId: 'base', enabled: false, verified: false,
         dataSource: 'launchpad-indexer', trackingMethod: 'factory-contract',
         status: 'not_configured',
+        badgeColor: '#3B82F6',
         factoryNote: 'B20 MAINNET FACTORY NOT VERIFIED — Base Sepolia only',
       },
       {
@@ -81,6 +91,7 @@ export const LAUNCHPAD_REGISTRY: Record<string, ChainLaunchpads> = {
         chainId: 'base', enabled: true, verified: true,
         dataSource: 'openlaunch-adapter', trackingMethod: 'factory-contract',
         status: 'active',
+        badgeColor: '#EC4899',
         factoryNote: 'STAGE2 PASS: Real Launched event at block 52340723 (tx 0x5ccac465...). Token 0xdb4702eb..., creator 0x00000000002fa9a0. Topic 0xda18b133 verified.',
       },
     ],
@@ -94,6 +105,8 @@ export const LAUNCHPAD_REGISTRY: Record<string, ChainLaunchpads> = {
         chainId: 'solana', enabled: true, verified: true,
         dataSource: 'launchpad-indexer', trackingMethod: 'token-mint',
         status: 'active',
+        factoryAddress: '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
+        badgeColor: '#10B981',
         factoryNote: 'STAGE2 PASS: Real tx at slot 454680764. Mint 2vVexEfR...pump, creator 26VenY5V... Program 6EF8r...6P.',
       },
       {
@@ -101,7 +114,17 @@ export const LAUNCHPAD_REGISTRY: Record<string, ChainLaunchpads> = {
         chainId: 'solana', enabled: false, verified: false,
         dataSource: 'launchpad-indexer', trackingMethod: 'token-mint',
         status: 'not_configured',
+        factoryAddress: '6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx',
+        badgeColor: '#3B82F6',
         factoryNote: 'STONKFUN PROGRAM NOT VERIFIED',
+      },
+      {
+        id: 'bags', name: 'BAGS', shortName: 'BAGS', officialUrl: 'https://bags.fm/',
+        chainId: 'solana', enabled: false, verified: false,
+        dataSource: 'launchpad-indexer', trackingMethod: 'token-mint',
+        status: 'not_configured',
+        badgeColor: '#F97316',
+        factoryNote: 'BAGS FACTORY NOT VERIFIED',
       },
     ],
   },
