@@ -3,6 +3,7 @@
 
 export type PanelTab =
   | 'markets' | 'detail' | 'history' | 'risk' | 'holders'
+  | 'whales' | 'bundles'
   | 'trade' | 'liquidity' | 'orders' | 'activity' | 'info';
 
 export interface TabDef { id: PanelTab; label: string; }
@@ -12,6 +13,8 @@ export const TABS_A: TabDef[] = [
   { id: 'markets', label: 'MARKETS' },
   { id: 'detail', label: 'DETAIL' },
   { id: 'holders', label: 'HOLDERS' },
+  { id: 'whales', label: 'WHALES' },
+  { id: 'bundles', label: 'BUNDLES' },
   { id: 'history', label: 'HISTORY' },
   { id: 'risk', label: 'RISK' },
 ];

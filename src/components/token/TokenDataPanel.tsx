@@ -145,6 +145,119 @@ function HoldersPanel({ chainId, address }: { chainId: ChainId; address: string 
   );
 }
 
+function WhalesPanel({ address }: { address: string }) {
+  const [whales, setWhales] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!address) { setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    import('../../lib/engine/whale-tracker').then(({ getRecentWhaleTrades, getWhaleStats }) => {
+      if (cancelled) return;
+      const trades = getRecentWhaleTrades(20);
+      const filtered = trades.filter(t => t.mint === address);
+      setWhales(filtered);
+      setStats(getWhaleStats(address));
+      setLoading(false);
+    }).catch(() => setLoading(false));
+    return () => { cancelled = true; };
+  }, [address]);
+
+  if (loading) return <Empty title="LOADING WHALE DATA…" hint="Scanning for large transactions." />;
+  if (whales.length === 0) return <Empty title="NO WHALE ACTIVITY" hint="No large transactions (>10 SOL) detected for this token yet." />;
+
+  return (
+    <div style={{ padding: 10 }}>
+      <div style={{ fontSize: 7, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '0.06em' }}>
+        WHALE ACTIVITY · {whales.length} TRADES · NET FLOW: {stats?.netFlow?.toFixed(2) || '0'} SOL
+      </div>
+      <table className="trade-table">
+        <thead>
+          <tr>
+            <th style={{ fontSize: 7, color: 'var(--text-muted)', padding: '3px 6px', textAlign: 'left' }}>TIME</th>
+            <th style={{ fontSize: 7, color: 'var(--text-muted)', padding: '3px 6px', textAlign: 'left' }}>SIDE</th>
+            <th style={{ fontSize: 7, color: 'var(--text-muted)', padding: '3px 6px', textAlign: 'right' }}>SOL</th>
+            <th style={{ fontSize: 7, color: 'var(--text-muted)', padding: '3px 6px', textAlign: 'left' }}>WALLET</th>
+          </tr>
+        </thead>
+        <tbody>
+          {whales.map((w, i) => (
+            <tr key={i}>
+              <td style={{ fontSize: 8, color: 'var(--text-dim)', padding: '2px 6px' }}>
+                {w.blockTime ? new Date(w.blockTime).toLocaleTimeString() : 'N/A'}
+              </td>
+              <td style={{ fontSize: 8, padding: '2px 6px' }}>
+                <span style={{
+                  fontSize: 7, fontWeight: 800, padding: '1px 4px',
+                  border: `1px solid ${w.side === 'buy' ? 'var(--green)' : 'var(--red)'}`,
+                  color: w.side === 'buy' ? 'var(--green)' : 'var(--red)',
+                }}>{w.side.toUpperCase()}</span>
+              </td>
+              <td style={{ fontSize: 8, color: 'var(--text)', padding: '2px 6px', textAlign: 'right', fontWeight: 700 }}>
+                {w.amountSol.toFixed(2)}
+              </td>
+              <td style={{ fontSize: 8, color: 'var(--text)', padding: '2px 6px', fontFamily: 'monospace' }}>
+                {shortenAddress(w.wallet, 4)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function BundlesPanel({ address }: { address: string }) {
+  const [bundles, setBundles] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!address) { setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    import('../../lib/engine/bundle-detector').then(({ detectBundles }) => {
+      if (cancelled) return;
+      detectBundles(address).then(data => {
+        if (!cancelled) {
+          setBundles(data);
+          setLoading(false);
+        }
+      });
+    }).catch(() => setLoading(false));
+    return () => { cancelled = true; };
+  }, [address]);
+
+  if (loading) return <Empty title="SCANNING FOR BUNDLES…" hint="Analyzing wallet coordination patterns." />;
+  if (!bundles) return <Empty title="BUNDLE ANALYSIS FAILED" hint="Could not analyze this token for bundle activity." />;
+  if (!bundles.isBundle) return <Empty title="NO BUNDLES DETECTED" hint="No suspicious multi-wallet coordination found for this token." />;
+
+  return (
+    <div style={{ padding: 10 }}>
+      <div style={{ fontSize: 7, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '0.06em' }}>
+        BUNDLE SCORE: {bundles.bundleScore}/100 · {bundles.totalBundleWallets} WALLETs · {bundles.totalBundleVolume.toFixed(2)} SOL VOLUME
+      </div>
+      {bundles.walletClusters.map((cluster: any, i: number) => (
+        <div key={i} style={{
+          padding: 8, marginBottom: 8, borderRadius: 8,
+          background: 'var(--surface-2)', border: '1px solid var(--border)',
+        }}>
+          <div style={{ fontSize: 8, fontWeight: 700, color: 'var(--red)', marginBottom: 4 }}>
+            CLUSTER {i + 1} · {cluster.wallets.length} WALLETs · {cluster.totalVolumeSol.toFixed(2)} SOL
+          </div>
+          <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>
+            {cluster.wallets.map((w: string) => shortenAddress(w, 4)).join(', ')}
+          </div>
+          <div style={{ fontSize: 7, color: 'var(--text-muted)', marginTop: 4 }}>
+            SIMILARITY: {(cluster.similarity * 100).toFixed(0)}% · TIME WINDOW: {cluster.timeWindowMs}ms
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function TokenDataPanel(p: Props) {
   const chain = CHAINS[p.chainId];
   const t = p.token;
@@ -233,6 +346,12 @@ export default function TokenDataPanel(p: Props) {
 
     case 'holders':
       return <HoldersPanel chainId={p.chainId} address={t?.address || p.tokenAddress} />;
+
+    case 'whales':
+      return <WhalesPanel address={t?.address || p.tokenAddress} />;
+
+    case 'bundles':
+      return <BundlesPanel address={t?.address || p.tokenAddress} />;
 
     case 'risk':
       return p.safety ? (
