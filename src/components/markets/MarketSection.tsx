@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { onTokenCreate, getStreamHealth, getLivePrice } from '../../lib/engine/discovery/pumpportal-stream';
 import { CHAIN_LIST, LAUNCHPADS_BY_CHAIN, FILTER_TABS, getChainInfo } from './ChainLaunchpads';
 import TokenAvatar from './TokenAvatar';
@@ -10,6 +10,7 @@ interface Token {
   progress: number; mcap: number; holders: number;
   priceUsd: number; change24h: number; createdAt: number;
   volume24h: number; liquidity: number; buys24h: number; sells24h: number;
+  source?: string;
 }
 
 function age(ts: number): string {
@@ -45,6 +46,15 @@ export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { c
   const [loading, setLoading] = useState(true);
   const [chainDrawerOpen, setChainDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
+
+  // Paginated PostgreSQL state
+  const [dbOffset, setDbOffset] = useState(0);
+  const [dbHasMore, setDbHasMore] = useState(true);
+  const [dbTotal, setDbTotal] = useState(0);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
+  const dbFetchingRef = useRef(false);
+  const DB_PAGE_SIZE = 50;
 
   // Close chain drawer on outside click
   useEffect(() => {
@@ -197,6 +207,88 @@ export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { c
       if (retryTimer) clearTimeout(retryTimer);
     };
   }, [chain, launchpad, subFilter]);
+
+  // 1.5. Paginated PostgreSQL fetch — loads historical tokens beyond in-memory store
+  const fetchDbPage = useCallback(async (reset: boolean) => {
+    if (dbFetchingRef.current) return;
+    dbFetchingRef.current = true;
+    setDbLoading(true);
+    setDbError(null);
+
+    const chainMap: Record<string, string> = { SOL: 'sol', ETH: 'eth', BSC: 'bsc', BASE: 'base' };
+    const targetChain = chainMap[chain] || chain.toLowerCase();
+    const offset = reset ? 0 : dbOffset;
+
+    // Map subFilter to sortBy
+    const sortMap: Record<string, string> = {
+      volume: 'volume_24h', gainers: 'price_change_24h', losers: 'price_change_24h',
+      trending: 'updated_at', bonding: 'updated_at', migrated: 'updated_at', newest: 'created_at',
+    };
+    const sortBy = sortMap[subFilter] || 'updated_at';
+    const sortDir = subFilter === 'losers' ? 'ASC' : 'DESC';
+
+    try {
+      const params = new URLSearchParams({
+        chain: targetChain,
+        launchpad: launchpad.toLowerCase(),
+        sortBy, sortDir,
+        offset: String(offset),
+        limit: String(DB_PAGE_SIZE),
+      });
+      const res = await fetch(`${API}/api/v1/tokens/all?${params}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (!data.success || !Array.isArray(data.tokens)) throw new Error('Invalid response');
+
+      const dbTokens: Token[] = data.tokens.map((t: any) => {
+        let img = (t.image || '').trim();
+        if (img.startsWith('ipfs://')) img = 'https://cf-ipfs.com/ipfs/' + img.replace('ipfs://', '').replace(/^ipfs\//, '');
+        return {
+          mint: t.mint || '', name: t.name || 'Unknown', symbol: t.symbol || '???',
+          image: img || null,
+          progress: parseFloat(t.bondingCurveProgress) || 0,
+          mcap: parseFloat(t.virtualMcap) || 0,
+          holders: parseInt(t.holders) || 0,
+          priceUsd: parseFloat(t.spotPrice) || 0,
+          change24h: parseFloat(t.priceChange24h) || 0,
+          createdAt: parseInt(t.createdAt) || 0,
+          volume24h: parseFloat(t.volume24h) || 0,
+          liquidity: parseFloat(t.liquidity) || 0,
+          buys24h: parseInt(t.buys24h) || 0,
+          sells24h: parseInt(t.sells24h) || 0,
+          source: 'db',
+        };
+      });
+
+      setTokens(prev => {
+        const seen = new Set(prev.map(t => t.mint));
+        const newTokens = dbTokens.filter(t => t.mint && !seen.has(t.mint));
+        return reset ? [...prev, ...newTokens] : [...prev, ...newTokens];
+      });
+      setDbOffset(offset + DB_PAGE_SIZE);
+      setDbHasMore(data.hasMore === true);
+      setDbTotal(data.total || 0);
+    } catch (err: any) {
+      setDbError(err?.message || 'Failed to load database tokens');
+    } finally {
+      setDbLoading(false);
+      dbFetchingRef.current = false;
+    }
+  }, [chain, launchpad, subFilter, dbOffset]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setDbOffset(0);
+    setDbHasMore(true);
+    setDbError(null);
+  }, [chain, launchpad, subFilter]);
+
+  // Auto-load first DB page after initial render (non-blocking)
+  useEffect(() => {
+    const timer = setTimeout(() => fetchDbPage(true), 500);
+    return () => clearTimeout(timer);
+  }, [chain, launchpad, subFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 2. Live WS merge — handles both new tokens AND metadata-resolved updates
   useEffect(() => {
@@ -482,6 +574,71 @@ export default function MarketSection({ onTokenClick }: { onTokenClick?: (t: { c
               </div>
             );
           })
+        )}
+
+        {/* ═══ LOAD MORE — paginated PostgreSQL ═══ */}
+        {!loading && filtered.length > 0 && dbHasMore && (
+          <button
+            onClick={() => fetchDbPage(false)}
+            disabled={dbLoading}
+            style={{
+              padding: '12px 16px', borderRadius: 14, cursor: dbLoading ? 'wait' : 'pointer',
+              background: dbLoading ? SKY_BG_MED : SKY_BG_LIGHT,
+              border: `2px dashed ${SKY_BORDER}`,
+              fontSize: 12, fontWeight: 700, color: DARK_TEXT,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { if (!dbLoading) e.currentTarget.style.borderColor = SKY_ACCENT; }}
+            onMouseLeave={e => { if (!dbLoading) e.currentTarget.style.borderColor = SKY_BORDER; }}
+          >
+            {dbLoading ? (
+              <>
+                <div style={{
+                  width: 16, height: 16, borderRadius: 8,
+                  border: `2px solid ${SKY_BORDER}`, borderTopColor: SKY_ACCENT,
+                  animation: 'spin 0.8s linear infinite',
+                }} />
+                Loading database tokens...
+              </>
+            ) : (
+              <>
+                Load More Tokens
+                <span style={{ fontSize: 10, color: MID_TEXT, fontWeight: 400 }}>
+                  ({tokens.length} shown{dbTotal > 0 ? ` of ${dbTotal.toLocaleString()}` : ''})
+                </span>
+              </>
+            )}
+          </button>
+        )}
+
+        {/* DB load error */}
+        {dbError && (
+          <div style={{
+            textAlign: 'center', padding: '12px 16px', borderRadius: 14,
+            background: '#FEF2F2', border: '1px solid #FECACA',
+            fontSize: 11, color: '#DC2626',
+          }}>
+            Database load failed: {dbError}
+            <button
+              onClick={() => fetchDbPage(false)}
+              style={{
+                marginLeft: 8, padding: '4px 10px', borderRadius: 8, border: 'none',
+                background: '#DC2626', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer',
+              }}
+            >Retry</button>
+          </div>
+        )}
+
+        {/* All loaded indicator */}
+        {!loading && filtered.length > 0 && !dbHasMore && dbTotal > 0 && (
+          <div style={{
+            textAlign: 'center', padding: '12px 16px', borderRadius: 14,
+            background: SKY_BG_LIGHT, border: `1px solid ${SKY_BORDER}`,
+            fontSize: 10, color: MID_TEXT,
+          }}>
+            All {dbTotal.toLocaleString()} database tokens loaded
+          </div>
         )}
       </div>
 
