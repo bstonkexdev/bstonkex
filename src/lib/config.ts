@@ -244,3 +244,20 @@ export function tryNextGateway(imgElement: HTMLImageElement, currentUrl: string)
     imgElement.src = DEFAULT_TOKEN_IMAGE;
   }
 }
+
+/**
+ * Resolves broken logos instantly with avatar fallback.
+ * Use this when you need a symbol-based fallback (e.g., for token rows).
+ */
+export function resolveTokenLogo(imageUri: string | undefined | null, symbol = '???'): string {
+  if (!imageUri || imageUri.includes('null') || imageUri.includes('undefined')) {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(symbol)}&background=2d124d&color=fff&bold=true`;
+  }
+
+  if (imageUri.startsWith('ipfs://')) {
+    const hash = imageUri.replace('ipfs://', '').replace('ipfs/', '');
+    return `https://cloudflare-ipfs.com/ipfs/${hash}`;
+  }
+
+  return imageUri;
+}
