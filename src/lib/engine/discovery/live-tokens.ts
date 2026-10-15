@@ -167,6 +167,23 @@ export function initLiveTokenBroadcast(): void {
     }
     if (hasUpdates) broadcastList();
   }, 2000); // Check every 2 seconds
+
+  // Subscribe to backend WS price_tick events for real-time market list updates
+  try {
+    import('../realtime-ws').then(({ wsManager }) => {
+      // Subscribe to price updates channel
+      wsManager.subscribe('prices:all', (msg: any) => {
+        if (msg.type === 'price_tick' && msg.mint) {
+          const token = tokenStore.get(msg.mint);
+          if (token) {
+            if (msg.priceUsd) token.spotPrice = msg.priceUsd;
+            if (msg.bondingCurveProgress != null) token.bondingCurveProgress = msg.bondingCurveProgress;
+            broadcastList();
+          }
+        }
+      });
+    }).catch(() => {});
+  } catch { /* backend WS optional */ }
 }
 
 /**
