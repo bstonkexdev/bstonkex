@@ -1,9 +1,9 @@
-// Cupcak8 Swap — Ave.ai-style Live Chart (Canvas-based, zero dependencies)
-// Candlestick + Volume histogram + High/Low markers + Current price line
-// Data: GeckoTerminal OHLCV (primary) → DexScreener pair → backend → fallback
-// Dark theme, green/red candles, timeframe selector
+// Cupcak8 Swap — TradingView Lightweight Charts Integration
+// Professional candlestick chart with volume histogram, real-time updates
+// Data: GeckoTerminal OHLCV → DexScreener → backend WS → PumpPortal → fallback
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, HistogramData, Time } from 'lightweight-charts';
 import { microPrice } from '../../lib/micro-price';
 
 type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
@@ -25,27 +25,22 @@ const TIMEFRAMES: { key: Timeframe; label: string }[] = [
   { key: '1h', label: '1h' }, { key: '4h', label: '4h' }, { key: '1d', label: '1d' },
 ];
 
-const BG = '#12161f';
-const BG2 = '#0e1118';
+const BG = '#0c0d10';
+const BG2 = '#0a0b0e';
 const GREEN = '#10b981';
 const RED = '#ef4444';
-const GRID = 'rgba(255,255,255,0.04)';
-const TEXT_DIM = 'rgba(255,255,255,0.35)';
 
-// ── Fetch OHLCV candles from GeckoTerminal (public, no auth) ──────────
+// ── Fetch OHLCV candles from GeckoTerminal ──────────────────────────
 async function fetchCandlesFromAPI(mint: string, tf: Timeframe): Promise<{ candles: Candle[]; source: string }> {
-  // Step 1: Get best pair address from DexScreener
   const pairRes = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${encodeURIComponent(mint)}`, { signal: AbortSignal.timeout(10000) });
   if (!pairRes.ok) throw new Error(`DexScreener HTTP ${pairRes.status}`);
   const pairs = await pairRes.json();
   if (!Array.isArray(pairs) || pairs.length === 0) throw new Error('No pairs found on DexScreener');
 
-  // Pick pair with highest liquidity
   const best = pairs.reduce((a: any, b: any) => (b.liquidity?.usd || 0) > (a.liquidity?.usd || 0) ? b : a, pairs[0]);
   const pairAddress = best.pairAddress;
   if (!pairAddress) throw new Error('No pair address found');
 
-  // Step 2: Fetch OHLCV from GeckoTerminal
   const tfMap: Record<Timeframe, { unit: string; agg: string }> = {
     '1m': { unit: 'minute', agg: '1' },
     '5m': { unit: 'minute', agg: '5' },
@@ -72,18 +67,17 @@ async function fetchCandlesFromAPI(mint: string, tf: Timeframe): Promise<{ candl
   })).filter((c: Candle) => c.time > 0 && (c.open > 0 || c.close > 0));
 
   if (candles.length === 0) throw new Error('All OHLCV candles were zero');
-
   return { candles, source: `geckoterminal (${candles.length} candles)` };
 }
 
-// ── Build synthetic candles from DexScreener pair data (last resort) ───
+// ── Build synthetic candles from DexScreener pair data ──────────────
 function buildSyntheticCandles(price: number, priceChange24h: number, volume24h: number): Candle[] {
   const now = Math.floor(Date.now() / 1000);
   const startPrice = price / (1 + (priceChange24h || 0) / 100);
   const candles: Candle[] = [];
   const n = 48;
   for (let i = 0; i < n; i++) {
-    const t = now - (n - i) * 1800; // 30min intervals
+    const t = now - (n - i) * 1800;
     const progress = i / n;
     const p = startPrice + (price - startPrice) * progress;
     const jitter = p * 0.015 * Math.sin(i * 1.8);
@@ -101,122 +95,13 @@ function buildSyntheticCandles(price: number, priceChange24h: number, volume24h:
   return candles;
 }
 
-// ── Canvas chart drawing ───────────────────────────────────────────────
-function drawChart(canvas: HTMLCanvasElement, candles: Candle[], currentPrice: number | null) {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-
-  const dpr = window.devicePixelRatio || 1;
-  const W = canvas.clientWidth;
-  const H = canvas.clientHeight;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  ctx.scale(dpr, dpr);
-
-  ctx.fillStyle = BG;
-  ctx.fillRect(0, 0, W, H);
-
-  if (candles.length === 0) {
-    ctx.fillStyle = TEXT_DIM;
-    ctx.font = '11px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('Loading chart data…', W / 2, H / 2);
-    return;
-  }
-
-  const sorted = [...candles].sort((a, b) => a.time - b.time);
-  const pad = { top: 20, right: 60, bottom: 30, left: 10 };
-
-  let hi = -Infinity, lo = Infinity;
-  for (const c of sorted) { if (c.high > hi) hi = c.high; if (c.low < lo) lo = c.low; }
-  const priceRange = hi - lo || 1;
-  const pricePad = priceRange * 0.08;
-  hi += pricePad; lo -= pricePad;
-
-  let maxVol = 0;
-  for (const c of sorted) { if (c.volume > maxVol) maxVol = c.volume; }
-  const volH = H * 0.15;
-
-  const chartW = W - pad.left - pad.right;
-  const chartH = H - pad.top - pad.bottom - volH;
-  const barW = Math.max(1, chartW / sorted.length);
-  const gap = Math.max(0.5, barW * 0.2);
-
-  const priceToY = (p: number) => pad.top + chartH * (1 - (p - lo) / (hi - lo));
-  const volToH = (v: number) => maxVol > 0 ? (v / maxVol) * volH : 0;
-
-  // Grid
-  ctx.strokeStyle = GRID; ctx.lineWidth = 0.5;
-  for (let i = 0; i <= 5; i++) {
-    const y = pad.top + (chartH / 5) * i;
-    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
-    const price = hi - ((hi - lo) / 5) * i;
-    ctx.fillStyle = TEXT_DIM; ctx.font = '9px monospace'; ctx.textAlign = 'left';
-    ctx.fillText(microPrice(price, ''), W - pad.right + 4, y + 3);
-  }
-
-  // Volume separator
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.beginPath(); ctx.moveTo(pad.left, pad.top + chartH + 4); ctx.lineTo(W - pad.right, pad.top + chartH + 4); ctx.stroke();
-
-  // Candles + Volume
-  for (let i = 0; i < sorted.length; i++) {
-    const c = sorted[i];
-    const x = pad.left + i * barW + barW / 2;
-    const isBull = c.close >= c.open;
-    const color = isBull ? GREEN : RED;
-
-    ctx.strokeStyle = color; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x, priceToY(c.high)); ctx.lineTo(x, priceToY(c.low)); ctx.stroke();
-
-    const bodyTop = priceToY(Math.max(c.open, c.close));
-    const bodyBot = priceToY(Math.min(c.open, c.close));
-    ctx.fillStyle = color;
-    ctx.fillRect(x - (barW - gap) / 2, bodyTop, barW - gap, Math.max(1, bodyBot - bodyTop));
-
-    const vH = volToH(c.volume);
-    ctx.fillStyle = isBull ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)';
-    ctx.fillRect(x - (barW - gap) / 2, H - pad.bottom - vH, barW - gap, vH);
-  }
-
-  // High/Low markers
-  let hiIdx = 0, loIdx = 0;
-  for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i].high > sorted[hiIdx].high) hiIdx = i;
-    if (sorted[i].low < sorted[loIdx].low) loIdx = i;
-  }
-  const mark = (idx: number, label: string, color: string, above: boolean) => {
-    const x = pad.left + idx * barW + barW / 2;
-    const y = above ? priceToY(sorted[idx].high) - 10 : priceToY(sorted[idx].low) + 14;
-    ctx.fillStyle = color; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center';
-    ctx.fillText(label, x, y);
-    ctx.beginPath(); ctx.arc(x, above ? priceToY(sorted[idx].high) - 3 : priceToY(sorted[idx].low) + 3, 2, 0, Math.PI * 2); ctx.fill();
-  };
-  mark(hiIdx, `H: ${microPrice(sorted[hiIdx].high, '')}`, '#a78bfa', true);
-  mark(loIdx, `L: ${microPrice(sorted[loIdx].low, '')}`, '#60a5fa', false);
-
-  // Current price line
-  if (currentPrice != null && isFinite(currentPrice) && currentPrice >= lo && currentPrice <= hi) {
-    const y = priceToY(currentPrice);
-    ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = '#3b82f6'; ctx.fillRect(W - pad.right, y - 8, pad.right, 16);
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 9px monospace'; ctx.textAlign = 'left';
-    ctx.fillText(microPrice(currentPrice, ''), W - pad.right + 4, y + 3);
-  }
-
-  // Time labels
-  const step = Math.max(1, Math.floor(sorted.length / 8));
-  ctx.fillStyle = TEXT_DIM; ctx.font = '8px monospace'; ctx.textAlign = 'center';
-  for (let i = 0; i < sorted.length; i += step) {
-    const d = new Date(sorted[i].time * 1000);
-    ctx.fillText(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`, pad.left + i * barW + barW / 2, H - pad.bottom + 14);
-  }
-}
-
-// ── Main Component ─────────────────────────────────────────────────────
+// ── Main Component ──────────────────────────────────────────────────
 export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice, onTimeframeChange }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('1m');
   const [candles, setCandles] = useState<Candle[]>([]);
   const [source, setSource] = useState<string>('loading');
@@ -228,6 +113,52 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
     setActiveTimeframe(tf);
     onTimeframeChange?.(tf);
   }, [onTimeframeChange]);
+
+  // Initialize TradingView Lightweight Chart
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const chart = createChart(containerRef.current, {
+      layout: { background: { type: 'solid' as const, color: BG }, textColor: '#d1d4dc' },
+      grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
+      timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#1f2937' },
+      rightPriceScale: { borderColor: '#1f2937' },
+      crosshair: { mode: 0 },
+      handleScroll: true,
+      handleScale: true,
+    });
+
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: GREEN,
+      downColor: RED,
+      borderVisible: false,
+      wickUpColor: GREEN,
+      wickDownColor: RED,
+    });
+
+    const volumeSeries = chart.addHistogramSeries({
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'volume',
+    });
+
+    chart.priceScale('volume').applyOptions({
+      scaleMargins: { top: 0.85, bottom: 0 },
+    });
+
+    chartRef.current = chart;
+    candleSeriesRef.current = candleSeries;
+    volumeSeriesRef.current = volumeSeries;
+
+    // Resize observer
+    const ro = new ResizeObserver(() => {
+      if (containerRef.current) {
+        chart.applyOptions({ width: containerRef.current.clientWidth, height: containerRef.current.clientHeight });
+      }
+    });
+    ro.observe(containerRef.current);
+
+    return () => { ro.disconnect(); chart.remove(); };
+  }, []);
 
   // Fetch candles on mount + timeframe change
   useEffect(() => {
@@ -260,9 +191,7 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
             const best = pairs.reduce((a: any, b: any) => (b.liquidity?.usd || 0) > (a.liquidity?.usd || 0) ? b : a, pairs[0]);
             if (best.priceUsd) {
               const synthetic = buildSyntheticCandles(
-                parseFloat(best.priceUsd),
-                best.priceChange?.h24 || 0,
-                best.volume?.h24 || 0,
+                parseFloat(best.priceUsd), best.priceChange?.h24 || 0, best.volume?.h24 || 0,
               );
               setCandles(synthetic);
               setSource(`dexscreener synthetic (${synthetic.length})`);
@@ -290,6 +219,53 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
     return () => { cancelled = true; };
   }, [mint, activeTimeframe]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Update chart when candles change
+  useEffect(() => {
+    if (!candleSeriesRef.current || !volumeSeriesRef.current || candles.length === 0) return;
+
+    const sorted = [...candles].sort((a, b) => a.time - b.time);
+
+    const candleData: CandlestickData[] = sorted.map(c => ({
+      time: c.time as Time,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+    }));
+
+    const volumeData: HistogramData[] = sorted.map(c => ({
+      time: c.time as Time,
+      value: c.volume,
+      color: c.close >= c.open ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)',
+    }));
+
+    candleSeriesRef.current.setData(candleData);
+    volumeSeriesRef.current.setData(volumeData);
+
+    // Update high/low
+    let hi = -Infinity, lo = Infinity;
+    for (const c of sorted) { if (c.high > hi) hi = c.high; if (c.low < lo) lo = c.low; }
+    setHighPrice(isFinite(hi) ? hi : null);
+    setLowPrice(isFinite(lo) ? lo : null);
+
+    // Fit content
+    chartRef.current?.timeScale().fitContent();
+  }, [candles]);
+
+  // Current price line
+  useEffect(() => {
+    if (!candleSeriesRef.current || currentPrice == null || !isFinite(currentPrice)) return;
+    // Create/update price line
+    candleSeriesRef.current.createPriceLine({
+      price: currentPrice,
+      color: '#3b82f6',
+      lineWidth: 1,
+      lineStyle: 2,
+      axisLabelVisible: true,
+      title: '',
+    });
+  }, [currentPrice]);
+
   // Subscribe to real-time candle_tick from backend WS gateway
   useEffect(() => {
     if (!mint) return;
@@ -302,6 +278,17 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
       unsub = wsManager.subscribe(channel, (msg: any) => {
         if (msg.type === 'candle_tick' && msg.candle) {
           const c = msg.candle;
+          // Update TradingView chart directly
+          candleSeriesRef.current?.update({
+            time: c.time as Time,
+            open: c.open, high: c.high, low: c.low, close: c.close,
+          });
+          volumeSeriesRef.current?.update({
+            time: c.time as Time,
+            value: c.volume,
+            color: c.close >= c.open ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)',
+          });
+          // Also update state for consistency
           setCandles(prev => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
@@ -319,17 +306,22 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
     return () => { unsub?.(); };
   }, [mint, activeTimeframe]);
 
-  // Subscribe to PumpPortal trade events for this specific mint (feeds real-time data)
+  // Subscribe to PumpPortal trade events for this specific mint
   useEffect(() => {
     if (!mint) return;
     let unsubTrade: (() => void) | undefined;
     import('../../lib/engine/discovery/pumpportal-stream').then(({ subscribeTokenTrades, unsubscribeTokenTrades, onTokenTrade }) => {
       subscribeTokenTrades(mint);
-      // Listen for PumpPortal trades and update candles in real-time
       unsubTrade = onTokenTrade((trade: any) => {
         if (trade.mint !== mint) return;
         const priceUsd = trade.priceUsd || 0;
         if (priceUsd <= 0) return;
+        // Update TradingView chart directly for instant feedback
+        const now = Math.floor(Date.now() / 1000);
+        candleSeriesRef.current?.update({
+          time: now as Time,
+          open: priceUsd, high: priceUsd, low: priceUsd, close: priceUsd,
+        });
         setCandles(prev => {
           if (prev.length === 0) return prev;
           const updated = [...prev];
@@ -349,35 +341,13 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
     return () => { unsubTrade?.(); };
   }, [mint]);
 
-  // Update candles when fallbackCandles changes (real-time trades)
+  // Update candles when fallbackCandles changes
   useEffect(() => {
     if (source.startsWith('local engine') && fallbackCandles.length > 0) {
       setCandles(fallbackCandles);
       setSource(`local engine (${fallbackCandles.length})`);
     }
   }, [fallbackCandles]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Draw chart
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    drawChart(canvasRef.current, candles, currentPrice);
-    if (candles.length > 0) {
-      let hi = -Infinity, lo = Infinity;
-      for (const c of candles) { if (c.high > hi) hi = c.high; if (c.low < lo) lo = c.low; }
-      setHighPrice(isFinite(hi) ? hi : null);
-      setLowPrice(isFinite(lo) ? lo : null);
-    }
-  }, [candles, currentPrice]);
-
-  // Resize
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const ro = new ResizeObserver(() => {
-      if (canvasRef.current) drawChart(canvasRef.current, candles, currentPrice);
-    });
-    ro.observe(canvasRef.current);
-    return () => ro.disconnect();
-  }, [candles, currentPrice]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', background: BG, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -401,8 +371,8 @@ export default function AveLiveChart({ mint, fallbackCandles = [], currentPrice,
         )}
       </div>
 
-      {/* Canvas Chart */}
-      <canvas ref={canvasRef} style={{ width: '100%', height: 380, display: 'block' }} />
+      {/* TradingView Lightweight Chart */}
+      <div ref={containerRef} style={{ width: '100%', height: 380 }} />
 
       {/* Data footer with diagnostics */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px', background: BG2, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
