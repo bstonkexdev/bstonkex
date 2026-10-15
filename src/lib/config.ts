@@ -178,3 +178,54 @@ export function explorerAddressUrl(chainId: ChainId, address: string): string {
   if (!chain.explorerUrl) return '#';
   return `${chain.explorerUrl}/address/${address}`;
 }
+
+// ── Safe Image URL (fixes broken IPFS logos) ─────────────────
+
+const DEFAULT_TOKEN_IMAGE = 'https://bstonkex.xyz/assets/tokens/default.png';
+
+const IPFS_GATEWAYS = [
+  'https://cloudflare-ipfs.com/ipfs/',
+  'https://gateway.pinata.cloud/ipfs/',
+  'https://ipfs.io/ipfs/',
+  'https://dweb.link/ipfs/',
+];
+
+/**
+ * Fix broken IPFS logos for frontend display.
+ * Converts ipfs:// to Cloudflare/Pinata HTTPS gateway.
+ * Returns default token image for empty/invalid URLs.
+ */
+export function getSafeImageUrl(rawUrl: string | undefined | null): string {
+  if (!rawUrl) return DEFAULT_TOKEN_IMAGE;
+  if (rawUrl.startsWith('data:image')) return rawUrl;
+
+  // Replace ipfs:// protocol with fast Cloudflare / Pinata gateway
+  if (rawUrl.startsWith('ipfs://')) {
+    const hash = rawUrl.replace('ipfs://', '').replace(/^ipfs\//, '');
+    return `${IPFS_GATEWAYS[0]}${hash}`;
+  }
+
+  // Already HTTPS with /ipfs/ path — use as-is
+  if (rawUrl.includes('/ipfs/')) return rawUrl;
+
+  // Normal HTTPS URL
+  if (rawUrl.startsWith('http')) return rawUrl;
+
+  return DEFAULT_TOKEN_IMAGE;
+}
+
+/** Try multiple IPFS gateways on image error (used as onError fallback). */
+export function tryNextGateway(imgElement: HTMLImageElement, currentUrl: string): void {
+  const hash = currentUrl.match(/\/ipfs\/([a-zA-Z0-9]+)/)?.[1];
+  if (!hash) return;
+
+  const currentGateway = IPFS_GATEWAYS.find(gw => currentUrl.startsWith(gw));
+  const currentIdx = currentGateway ? IPFS_GATEWAYS.indexOf(currentGateway) : -1;
+  const nextIdx = currentIdx + 1;
+
+  if (nextIdx < IPFS_GATEWAYS.length) {
+    imgElement.src = `${IPFS_GATEWAYS[nextIdx]}${hash}`;
+  } else {
+    imgElement.src = DEFAULT_TOKEN_IMAGE;
+  }
+}
