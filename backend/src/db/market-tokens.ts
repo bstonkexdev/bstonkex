@@ -192,6 +192,100 @@ export async function getTokensByChain(): Promise<Record<string, number>> {
 }
 
 /**
+ * Paginated token query — fetches directly from PostgreSQL.
+ * Supports chain/launchpad filtering and sort by updated_at, volume, mcap.
+ * Does NOT load all 81K into memory — uses OFFSET/LIMIT.
+ */
+export interface PaginatedQueryOpts {
+  chain?: string;
+  launchpad?: string;
+  sortBy?: 'updated_at' | 'volume_24h' | 'virtual_mcap' | 'price_change_24h';
+  sortDir?: 'DESC' | 'ASC';
+  offset?: number;
+  limit?: number;
+}
+
+export interface PaginatedResult {
+  tokens: MarketTokenRecord[];
+  total: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+export async function queryTokensPaginated(opts: PaginatedQueryOpts = {}): Promise<PaginatedResult> {
+  if (!isDbConfigured()) return { tokens: [], total: 0, offset: 0, limit: 50, hasMore: false };
+
+  const { chain, launchpad, sortBy = 'updated_at', sortDir = 'DESC', offset = 0, limit = 50 } = opts;
+  const safeLimit = Math.min(Math.max(limit, 1), 200);
+  const safeOffset = Math.max(offset, 0);
+
+  // Whitelist sort columns to prevent SQL injection
+  const allowedSorts = new Set(['updated_at', 'volume_24h', 'virtual_mcap', 'price_change_24h', 'created_at']);
+  const safeSortBy = allowedSorts.has(sortBy) ? sortBy : 'updated_at';
+
+  try {
+    // Build WHERE clause
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIdx = 1;
+
+    if (chain) {
+      conditions.push(`chain = ${paramIdx++}`);
+      params.push(chain);
+    }
+    if (launchpad) {
+      conditions.push(`launchpad = ${paramIdx++}`);
+      params.push(launchpad);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Count total matching rows
+    const countResult = await query(`SELECT COUNT(*) as count FROM market_tokens ${whereClause}`, params);
+    const total = parseInt(countResult.rows[0]?.count) || 0;
+
+    // Fetch page
+    const dataResult = await query(
+      `SELECT * FROM market_tokens ${whereClause} ORDER BY ${safeSortBy} ${sortDir} LIMIT ${paramIdx++} OFFSET ${paramIdx++}`,
+      [...params, safeLimit, safeOffset]
+    );
+
+    const tokens: MarketTokenRecord[] = dataResult.rows.map((row: any) => ({
+      mint: row.mint,
+      name: row.name,
+      symbol: row.symbol,
+      image: row.image || '',
+      chain: row.chain,
+      launchpad: row.launchpad,
+      spotPrice: String(row.spot_price || 0),
+      virtualMcap: String(row.virtual_mcap || 0),
+      priceChange24h: String(row.price_change_24h || 0),
+      bondingCurveProgress: String(row.bonding_curve_progress || 0),
+      holders: String(row.holders || 0),
+      volume24h: String(row.volume_24h || 0),
+      liquidity: String(row.liquidity || 0),
+      buys24h: String(row.buys_24h || 0),
+      sells24h: String(row.sells_24h || 0),
+      uri: row.uri || '',
+      twitter: row.twitter || '',
+      telegram: row.telegram || '',
+      website: row.website || '',
+      dexId: row.dex_id || '',
+      pairAddress: row.pair_address || '',
+      txHash: row.tx_hash || '',
+      source: row.source || 'db',
+      createdAt: row.created_at ? String(new Date(row.created_at).getTime()) : String(Date.now()),
+    }));
+
+    return { tokens, total, offset: safeOffset, limit: safeLimit, hasMore: safeOffset + safeLimit < total };
+  } catch (err: any) {
+    log('warn', `Paginated query failed: ${err.message}`);
+    return { tokens: [], total: 0, offset: 0, limit: safeLimit, hasMore: false };
+  }
+}
+
+/**
  * Ensure the market_tokens table exists (idempotent migration).
  */
 export async function ensureMarketTokensTable(): Promise<boolean> {

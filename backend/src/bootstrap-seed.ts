@@ -137,7 +137,7 @@ function log(level: 'info' | 'warn' | 'error', msg: string) {
   }
   try {
     await ensureMarketTokensTable();
-    const dbTokens = await loadAllTokens(500);
+    const dbTokens = await loadAllTokens(2000);
     let pgCount = 0;
     for (const t of dbTokens) {
       if (!t.mint || seededMints.has(t.mint)) continue;
@@ -468,7 +468,7 @@ async function loadPersistedTokens(): Promise<number> {
   if (isDbConfigured()) {
     try {
       await ensureMarketTokensTable();
-      const dbTokens = await loadAllTokens(500);
+      const dbTokens = await loadAllTokens(2000);
       if (dbTokens.length > 0) {
         loaded = seedTokensToStore(dbTokens.map(t => ({
           mint: t.mint, name: t.name, symbol: t.symbol, image: t.image,

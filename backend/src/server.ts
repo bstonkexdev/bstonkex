@@ -17,7 +17,7 @@ import { runMigrations, getMigrationStatus } from './db/migrate.js';
 import { routeRewards } from './reward-routes.js';
 import { LAUNCHPAD_CONFIG, getAllLaunchpads, getLaunchpad } from './config/launchpads.js';
 import { startMultiChainListeners, getListenerHealth, stopMultiChainListeners } from './multi-chain-listener.js';
-import { upsertMarketToken, getTokenCount, getTokensByChain } from './db/market-tokens.js';
+import { upsertMarketToken, getTokenCount, getTokensByChain, queryTokensPaginated } from './db/market-tokens.js';
 import { hsetAll, hgetall, zadd, zrevrange, getStoreStats } from './trenches-store.js';
 import { startBootstrapSeed, getSeederHealth, isBootstrapReady, waitForBootstrap } from './bootstrap-seed.js';
 import { ingestTrade, getCandles, getLatestCandle, getChartEngineStats, onCandleTick, ALL_INTERVALS, type CandleInterval, type CandleTick } from './chart-engine.js';
@@ -951,6 +951,28 @@ const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
       }));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, data: formatted }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+  },
+  // GET /api/v1/tokens/all — paginated PostgreSQL query (81K+ tokens)
+  'GET /api/v1/tokens/all': async (req, res) => {
+    try {
+      const url = new URL(req.url || '/', `http://${req.headers.host}`);
+      const norm = (v: string | null, fallback: string) =>
+        (v || fallback).trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+      const chain = url.searchParams.get('chain') || undefined;
+      const launchpad = url.searchParams.get('launchpad') || undefined;
+      const sortBy = norm(url.searchParams.get('sortBy'), 'updated_at') as any;
+      const sortDir = norm(url.searchParams.get('sortDir'), 'DESC') as 'DESC' | 'ASC';
+      const offset = parseInt(url.searchParams.get('offset') || '0') || 0;
+      const limit = parseInt(url.searchParams.get('limit') || '50') || 50;
+
+      const result = await queryTokensPaginated({ chain, launchpad, sortBy, sortDir, offset, limit });
+
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ success: true, ...result }));
     } catch (err: any) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
