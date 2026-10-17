@@ -142,6 +142,13 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     return;
   }
 
+  // Dynamic route: /api/v1/token-image/:mint — Image proxy
+  if (req.method === 'GET' && url.pathname.startsWith('/api/v1/token-image/')) {
+    const mint = url.pathname.split('/').pop() || '';
+    handleTokenImage(mint, res);
+    return;
+  }
+
   // Dynamic route: /api/tokens/trenches/:launchpadId
   // Handles any launchpad (bags, stonkfun, flap, fourmeme, etc.)
   if (req.method === 'GET' && url.pathname.startsWith('/api/tokens/trenches/')) {
@@ -1022,6 +1029,121 @@ const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
 };
 
 // ── Launchpad Registry Routes ──────────────────────────────────
+// ── Image Proxy (token logos) ─────────────────────────────────
+// Fetches images from stored URLs, resizes to 64x64 WebP, caches in memory.
+// Never exposes third-party CDN URLs to the client.
+// Security: blocks private IPs, validates content-type, limits size to 2MB.
+
+const imageCache = new Map<string, { data: Buffer; ts: number }>();
+const IMAGE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+async function handleTokenImage(mint: string, res: ServerResponse): Promise<void> {
+  try {
+    if (!mint || mint.length < 10) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing mint address' }));
+      return;
+    }
+
+    // Check in-memory cache
+    const cached = imageCache.get(mint);
+    if (cached && Date.now() - cached.ts < IMAGE_CACHE_TTL) {
+      res.writeHead(200, {
+        'Content-Type': 'image/webp',
+        'Cache-Control': 'public, max-age=86400, immutable',
+        'X-Image-Source': 'cache',
+      });
+      res.end(cached.data);
+      return;
+    }
+
+    // Look up original image URL from DB
+    if (!isDbConfigured()) {
+      res.writeHead(302, { Location: '/fallback-token-icon.svg' });
+      res.end();
+      return;
+    }
+    const dbResult = await query('SELECT image FROM market_tokens WHERE mint = $1', [mint]);
+    const imageUrl: string | null = dbResult.rows[0]?.image || null;
+
+    if (!imageUrl) {
+      res.writeHead(302, { Location: '/fallback-token-icon.svg' });
+      res.end();
+      return;
+    }
+
+    // Security: only allow http/https, block private/internal IPs
+    let parsed: URL;
+    try { parsed = new URL(imageUrl); } catch { parsed = new URL('about:blank'); }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      res.writeHead(302, { Location: '/fallback-token-icon.svg' });
+      res.end();
+      return;
+    }
+    const host = parsed.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0'
+      || host.startsWith('10.') || host.startsWith('192.168.') || host.startsWith('172.')) {
+      res.writeHead(302, { Location: '/fallback-token-icon.svg' });
+      res.end();
+      return;
+    }
+
+    // Fetch image with timeout + size limit
+    let imageBuffer: Buffer;
+    try {
+      const resp = await fetch(imageUrl, {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'User-Agent': 'bstonkex-image-proxy/1.0' },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.startsWith('image/')) throw new Error(`Not an image: ${contentType}`);
+      const arrayBuf = await resp.arrayBuffer();
+      if (arrayBuf.byteLength > 2 * 1024 * 1024) throw new Error('Image too large (>2MB)');
+      imageBuffer = Buffer.from(arrayBuf);
+    } catch (fetchErr: any) {
+      log('warn', `[ImageProxy] Fetch failed for ${mint}: ${fetchErr.message}`);
+      res.writeHead(302, { Location: '/fallback-token-icon.svg' });
+      res.end();
+      return;
+    }
+
+    // Resize to 64x64 WebP
+    let webpBuffer: Buffer;
+    try {
+      // @ts-ignore — sharp is a runtime dependency, types not needed
+      const sharp = (await import('sharp')).default;
+      webpBuffer = await sharp(imageBuffer)
+        .resize(64, 64, { fit: 'cover', background: { r: 26, g: 26, b: 46, alpha: 1 } })
+        .webp({ quality: 80 })
+        .toBuffer();
+    } catch (sharpErr: any) {
+      log('warn', `[ImageProxy] Sharp failed for ${mint}: ${sharpErr.message}, serving raw`);
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+      res.end(imageBuffer);
+      return;
+    }
+
+    // Cache in memory (evict oldest if >5000)
+    imageCache.set(mint, { data: webpBuffer, ts: Date.now() });
+    if (imageCache.size > 5000) {
+      const entries = Array.from(imageCache.entries()).sort((a, b) => a[1].ts - b[1].ts);
+      for (const [k] of entries.slice(0, 1000)) imageCache.delete(k);
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'image/webp',
+      'Cache-Control': 'public, max-age=86400, immutable',
+      'X-Image-Source': 'proxy',
+    });
+    res.end(webpBuffer);
+  } catch (err: any) {
+    log('error', `[ImageProxy] Unexpected error: ${err.message}`);
+    res.writeHead(302, { Location: '/fallback-token-icon.svg' });
+    res.end();
+  }
+}
+
 const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse) => void> = {
   // GET /api/launchpads — full registry with chain context
   'GET /api/launchpads': (_req, res) => {
@@ -1231,7 +1353,8 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
         earliest_seen: row.earliest_seen,
         latest_seen: row.latest_seen,
         sources: row.sources,
-        image: row.image,
+        // Image: proxy through our endpoint (never expose third-party CDN URLs)
+        image: row.token ? `/api/v1/token-image/${row.token}` : null,
         // spot_price: SOL per token. Currency field added for clarity.
         spot_price: row.spot_price,
         spot_price_currency: 'SOL',
