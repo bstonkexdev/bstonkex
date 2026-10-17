@@ -8,7 +8,9 @@
   "scripts": {
     "build": "tsc && mkdir -p dist/db/migrations && cp src/db/migrations/*.sql dist/db/migrations/",
     "start": "node dist/server.js",
+    "start:worker": "node dist/discovery-worker.js",
     "dev": "node --watch --loader ts-node/esm src/server.ts",
+    "dev:worker": "node --watch --loader ts-node/esm src/discovery-worker.ts",
     "migrate": "node dist/db/migrate.js",
     "test:db": "node --loader ts-node/esm src/__tests__/schema.test.ts",
     "test:security": "node --loader ts-node/esm src/__tests__/security.test.ts",
