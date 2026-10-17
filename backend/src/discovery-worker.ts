@@ -870,14 +870,19 @@ const healthServer = createServer((req, res) => {
   res.end('Not found');
 });
 
-healthServer.listen(HEALTH_PORT, () => {
-  log('info', `Worker healthcheck on :${HEALTH_PORT}/health`);
-});
+// Skip health server when running as child process (parent server owns the port)
+if (process.env.SKIP_WORKER_HEALTH) {
+  log('info', 'Worker healthcheck skipped (running as child process)');
+} else {
+  healthServer.listen(HEALTH_PORT, () => {
+    log('info', `Worker healthcheck on :${HEALTH_PORT}/health`);
+  });
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   log('info', 'SIGTERM — shutting down');
   if (ppWs) ppWs.close();
-  healthServer.close();
+  if (!process.env.SKIP_WORKER_HEALTH) healthServer.close();
   process.exit(0);
 });

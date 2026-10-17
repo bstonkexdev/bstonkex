@@ -1603,6 +1603,50 @@ async function initDatabase(): Promise<void> {
   }
 }
 
+// ── Start Discovery Worker (child process) ─────────────────
+// Spawns the worker alongside the server so Railway only needs one service.
+// The worker owns: PumpPortal WS, on-chain scanners, EVM log scanners.
+
+import { fork } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+let workerProcess: ReturnType<typeof fork> | null = null;
+
+function startDiscoveryWorker(): void {
+  const workerPath = join(__dirname, 'discovery-worker.js');
+  log('info', `Starting discovery worker: ${workerPath}`);
+
+  workerProcess = fork(workerPath, [], {
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+    env: { ...process.env, SKIP_WORKER_HEALTH: '1' },
+  });
+
+  workerProcess.stdout?.on('data', (data: Buffer) => {
+    const lines = data.toString().trim().split('\n');
+    for (const line of lines) {
+      if (line.includes('[ERROR]') || line.includes('error')) log('error', `[Worker] ${line}`);
+      else if (line.includes('[WARN]') || line.includes('warn')) log('warn', `[Worker] ${line}`);
+      else log('info', `[Worker] ${line}`);
+    }
+  });
+
+  workerProcess.stderr?.on('data', (data: Buffer) => {
+    log('error', `[Worker STDERR] ${data.toString().trim()}`);
+  });
+
+  workerProcess.on('exit', (code, signal) => {
+    log('warn', `[Worker] Exited with code=${code} signal=${signal}. Restarting in 10s...`);
+    workerProcess = null;
+    setTimeout(startDiscoveryWorker, 10_000);
+  });
+
+  workerProcess.on('error', (err) => {
+    log('error', `[Worker] Failed to start: ${err.message}`);
+  });
+}
+
 // ── Start Server ─────────────────────────────────────────────
 
 initDatabase().then(() => {
@@ -1614,6 +1658,13 @@ initDatabase().then(() => {
     log('info', `Allowed origins: ${ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS.join(', ') : 'all'}`);
     const db = getDbStatus();
     log('info', `Database: ${db.configured ? (db.connected ? 'connected' : 'disconnected') : 'not configured'}`);
+
+    // Start the discovery worker as a child process
+    if (isDbConfigured()) {
+      startDiscoveryWorker();
+    } else {
+      log('warn', 'Discovery worker not started — DATABASE_URL not configured');
+    }
   });
 });
 
@@ -1622,6 +1673,12 @@ initDatabase().then(() => {
 process.on('SIGTERM', () => {
   log('info', 'SIGTERM received, shutting down...');
   pipeline.stop();
+  // Stop discovery worker
+  if (workerProcess) {
+    log('info', 'Stopping discovery worker...');
+    workerProcess.kill('SIGTERM');
+    workerProcess = null;
+  }
   for (const [ws] of clients) {
     ws.close(1001, 'Server shutting down');
   }
