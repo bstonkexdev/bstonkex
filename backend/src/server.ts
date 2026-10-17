@@ -96,7 +96,7 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
 
   // Health endpoints
   if (url.pathname === '/health') {
-    healthHandler(req, res, { clients: clients.size, totalConnections, totalMessages });
+    healthHandler(req, res, { clients: clients.size, totalConnections, totalMessages, worker: workerStatus.running || DISABLE_EMBEDDED_WORKER ? workerStatus : undefined });
     return;
   }
   if (url.pathname === '/ready') {
@@ -1606,6 +1606,7 @@ async function initDatabase(): Promise<void> {
 // ── Start Discovery Worker (child process) ─────────────────
 // Spawns the worker alongside the server so Railway only needs one service.
 // The worker owns: PumpPortal WS, on-chain scanners, EVM log scanners.
+// Set DISABLE_EMBEDDED_WORKER=true to run a dedicated worker service instead.
 
 import { fork } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -1613,15 +1614,40 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let workerProcess: ReturnType<typeof fork> | null = null;
+const DISABLE_EMBEDDED_WORKER = process.env.DISABLE_EMBEDDED_WORKER === 'true';
+
+// Worker status received via IPC from the child process
+export interface WorkerStatus {
+  running: boolean;
+  ppConnected: boolean;
+  ppTokensReceived: number;
+  ppLastMessageTime: number;
+  ppLastError: string | null;
+  totalWritten: number;
+  adapters: Record<string, unknown>;
+  lastUpdate: number;
+}
+
+const workerStatus: WorkerStatus = {
+  running: false,
+  ppConnected: false,
+  ppTokensReceived: 0,
+  ppLastMessageTime: 0,
+  ppLastError: null,
+  totalWritten: 0,
+  adapters: {},
+  lastUpdate: 0,
+};
 
 function startDiscoveryWorker(): void {
   const workerPath = join(__dirname, 'discovery-worker.js');
-  log('info', `Starting discovery worker: ${workerPath}`);
+  log('info', `[WORKER] Spawning embedded worker: ${workerPath}`);
 
   workerProcess = fork(workerPath, [], {
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     env: { ...process.env, SKIP_WORKER_HEALTH: '1' },
   });
+  workerStatus.running = true;
 
   workerProcess.stdout?.on('data', (data: Buffer) => {
     const lines = data.toString().trim().split('\n');
@@ -1636,14 +1662,29 @@ function startDiscoveryWorker(): void {
     log('error', `[Worker STDERR] ${data.toString().trim()}`);
   });
 
+  // Receive status updates from the child via IPC
+  workerProcess.on('message', (msg: any) => {
+    if (msg?.type === 'worker-status') {
+      workerStatus.ppConnected = msg.ppConnected;
+      workerStatus.ppTokensReceived = msg.ppTokensReceived;
+      workerStatus.ppLastMessageTime = msg.ppLastMessageTime;
+      workerStatus.ppLastError = msg.ppLastError;
+      workerStatus.totalWritten = msg.totalWritten;
+      workerStatus.adapters = msg.adapters || {};
+      workerStatus.lastUpdate = Date.now();
+    }
+  });
+
   workerProcess.on('exit', (code, signal) => {
     log('warn', `[Worker] Exited with code=${code} signal=${signal}. Restarting in 10s...`);
     workerProcess = null;
+    workerStatus.running = false;
     setTimeout(startDiscoveryWorker, 10_000);
   });
 
   workerProcess.on('error', (err) => {
     log('error', `[Worker] Failed to start: ${err.message}`);
+    workerStatus.running = false;
   });
 }
 
@@ -1651,6 +1692,7 @@ function startDiscoveryWorker(): void {
 
 initDatabase().then(() => {
   httpServer.listen(PORT, HOST, () => {
+    const mode = DISABLE_EMBEDDED_WORKER ? 'dedicated' : 'embedded';
     log('info', `BSTONKEX WebSocket Gateway listening on ${HOST}:${PORT}`);
     log('info', `WebSocket path: ${WS_PATH}`);
     log('info', `Max connections: ${WS_MAX_CONNECTIONS}`);
@@ -1659,11 +1701,13 @@ initDatabase().then(() => {
     const db = getDbStatus();
     log('info', `Database: ${db.configured ? (db.connected ? 'connected' : 'disconnected') : 'not configured'}`);
 
-    // Start the discovery worker as a child process
-    if (isDbConfigured()) {
+    // Start the discovery worker as a child process (unless disabled)
+    if (DISABLE_EMBEDDED_WORKER) {
+      log('info', `[WORKER] mode=dedicated — embedded worker disabled (DISABLE_EMBEDDED_WORKER=true)`);
+    } else if (isDbConfigured()) {
       startDiscoveryWorker();
     } else {
-      log('warn', 'Discovery worker not started — DATABASE_URL not configured');
+      log('warn', '[WORKER] not started — DATABASE_URL not configured');
     }
   });
 });

@@ -204,9 +204,29 @@ let ppConnected = false;
 let ppTokensReceived = 0;
 let ppReconnects = 0;
 let ppLastError: string | null = null;
+let ppLastMessageTime: number = 0;
+
+// ── IPC status reporting (for embedded mode) ─────────────────
+// When running as a child process, send status updates via IPC so the
+// parent server can include them in /health.
+
+function reportStatusToParent(): void {
+  if (!process.send) return;
+  const totalWritten = Object.values(writesBySource).reduce((a, b) => a + b, 0);
+  process.send({
+    type: 'worker-status',
+    ppConnected,
+    ppTokensReceived,
+    ppLastMessageTime,
+    ppLastError,
+    totalWritten,
+    adapters: adapterStatus,
+  });
+}
 
 async function handlePumpPortalCreate(event: PumpPortalEvent): Promise<void> {
   ppTokensReceived++;
+  ppLastMessageTime = Date.now();
 
   const spotPrice = event.vSolInBondingCurve / event.vTokensInBondingCurve;
   const progress = Math.min(100, Math.round((event.vSolInBondingCurve / 85) * 100 * 100) / 100);
@@ -819,6 +839,19 @@ async function main(): Promise<void> {
     log('info', `[STATUS] pp=${ppStatus} | solWS=${solStatus} | dbc=${dbcStatus} | writes: ${counts} | adapters: ${JSON.stringify(adapterStatus)}`);
   }, 60_000);
 
+  // Send status to parent server via IPC every 5 seconds (when embedded)
+  if (process.send) {
+    setInterval(reportStatusToParent, 5_000);
+    reportStatusToParent();
+  }
+
+  // Clear startup log line
+  const mode = process.send ? 'embedded' : 'dedicated';
+  const dbSet = isDbConfigured() ? 'yes' : 'no';
+  const adapterSummary = Object.entries(adapterStatus)
+    .map(([k, v]: [string, any]) => `${k}=${v.status || 'unknown'}`)
+    .join(', ');
+  log('info', `[WORKER] mode=${mode}, DATABASE_URL=${dbSet}, adapters: ${adapterSummary}`);
   log('info', '═══ Discovery Worker running ═══');
 }
 

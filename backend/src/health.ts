@@ -9,10 +9,22 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { WebSocket } from 'ws';
 import { getDbStatus, pingDb } from './db/pool.js';
 
+interface WorkerHealthStatus {
+  running: boolean;
+  ppConnected: boolean;
+  ppTokensReceived: number;
+  ppLastMessageTime: number;
+  ppLastError: string | null;
+  totalWritten: number;
+  adapters: Record<string, unknown>;
+  lastUpdate: number;
+}
+
 interface HealthContext {
   clients: number;
   totalConnections: number;
   totalMessages: number;
+  worker?: WorkerHealthStatus;
 }
 
 interface DependencyStatus {
@@ -81,6 +93,14 @@ export function healthHandler(
         ? dbStatus.connected ? undefined : 'Connection failed'
         : 'DATABASE_URL not configured',
     },
+    // Discovery Worker status
+    ...(ctx.worker ? [{
+      name: 'Discovery Worker',
+      status: (ctx.worker.running ? 'UP' : 'DOWN') as 'UP' | 'DOWN',
+      detail: ctx.worker.running
+        ? `PumpPortal: ${ctx.worker.ppConnected ? 'connected' : 'disconnected'}, tokens received: ${ctx.worker.ppTokensReceived}, written: ${ctx.worker.totalWritten}, last msg: ${ctx.worker.ppLastMessageTime ? new Date(ctx.worker.ppLastMessageTime).toISOString() : 'never'}${ctx.worker.ppLastError ? `, error: ${ctx.worker.ppLastError}` : ''}`
+        : 'Worker not running',
+    }] : []),
   ];
 
   const hasDown = dependencies.some(d => d.status === 'DOWN');
@@ -89,7 +109,29 @@ export function healthHandler(
 
   const status = hasDown ? 'DOWN' : hasDegraded ? 'DEGRADED' : 'UP';
 
-  const response: HealthResponse = {
+  // Env var audit — report set/missing, NEVER the value
+  const envVars = [
+    { name: 'DATABASE_URL', purpose: 'PostgreSQL persistence', critical: true },
+    { name: 'SOLANA_RPC_URL', purpose: 'Solana RPC for program verification + on-chain scanning', critical: true },
+    { name: 'BSC_RPC_URL', purpose: 'BSC RPC for eth_getLogs (Four.meme, FLAP)', critical: false },
+    { name: 'BASE_RPC_URL', purpose: 'Base RPC for eth_getLogs (Uniswap V3, Aerodrome)', critical: false },
+    { name: 'ROBINHOOD_RPC_URL', purpose: 'Robinhood Chain RPC', critical: false },
+    { name: 'ETHERSCAN_API_KEY', purpose: 'Etherscan V2 unified ABI lookup (BSC/Base/Eth)', critical: false },
+    { name: 'ZERO_EX_API_KEY', purpose: '0x Swap API for quotes', critical: false },
+    { name: 'SESSION_SECRET', purpose: 'HMAC for session tokens', critical: false },
+  ];
+
+  const envAudit = envVars.map(v => ({
+    name: v.name,
+    set: !!process.env[v.name],
+    critical: v.critical,
+    purpose: v.purpose,
+    blocks: !process.env[v.name] ? getBlockedAdapters(v.name) : [],
+  }));
+
+  const blockedAdapters = envAudit.filter(e => !e.set && e.blocks.length > 0);
+
+  const response: HealthResponse & { envAudit?: typeof envAudit; blockedAdapters?: typeof blockedAdapters } = {
     status,
     timestamp: new Date().toISOString(),
     uptime: Math.floor((Date.now() - startTime) / 1000),
@@ -99,10 +141,24 @@ export function healthHandler(
       totalConnections: ctx.totalConnections,
       totalMessages: ctx.totalMessages,
     },
+    envAudit,
+    blockedAdapters,
   };
 
   res.writeHead(status === 'DOWN' ? 503 : 200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(response, null, 2));
+}
+
+function getBlockedAdapters(envVar: string): string[] {
+  const map: Record<string, string[]> = {
+    'DATABASE_URL': ['All token storage', 'token_events', 'checkpoints', 'coverage queries'],
+    'SOLANA_RPC_URL': ['Pump.fun on-chain scanner', 'LaunchLab scanner', 'DBC scanner', 'DAMM v2 verification'],
+    'BSC_RPC_URL': ['Four.meme EVM scanner', 'FLAP EVM scanner', 'Genius EVM scanner'],
+    'BASE_RPC_URL': ['Uniswap V3 scanner', 'Uniswap V4 scanner', 'Aerodrome scanner'],
+    'ROBINHOOD_RPC_URL': ['Robinhood Chain listeners'],
+    'ETHERSCAN_API_KEY': ['Four.meme ABI fetch', 'FLAP ABI fetch', 'Event topic0 extraction'],
+  };
+  return map[envVar] || [];
 }
 
 // ── Ready Handler ─────────────────────────────────────────────
