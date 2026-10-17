@@ -147,7 +147,7 @@ function log(level: 'info' | 'warn' | 'error', msg: string) {
         spotPrice: t.spotPrice, virtualMcap: t.virtualMcap,
         priceChange24h: t.priceChange24h,
         bondingCurveProgress: t.bondingCurveProgress,
-        holders: t.holders, volume24h: t.volume24h,
+        holders: t.holders != null ? String(t.holders) : null, volume24h: t.volume24h,
         liquidity: t.liquidity, buys24h: t.buys24h,
         sells24h: t.sells24h,
         createdAt: t.createdAt,

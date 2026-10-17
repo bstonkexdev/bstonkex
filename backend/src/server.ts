@@ -1158,25 +1158,34 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
       const launchpad = url.searchParams.get('launchpad') || '';
       const chain = url.searchParams.get('chain') || '';
       const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '50') || 50));
+      const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0') || 0);
 
       if (!isDbConfigured()) {
         res.writeHead(503, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-        res.end(JSON.stringify({ error: 'Database not configured', launches: [] }));
+        res.end(JSON.stringify({ error: 'Database not configured', launches: [], total: 0 }));
         return;
       }
 
       const conditions: string[] = [];
-      const params: any[] = [];
+      const filterParams: any[] = [];
       let idx = 1;
 
-      if (launchpad) { conditions.push(`te.launchpad = $${idx++}`); params.push(launchpad); }
-      if (chain) { conditions.push(`te.chain = $${idx++}`); params.push(chain); }
+      if (launchpad) { conditions.push(`te.launchpad = $${idx++}`); filterParams.push(launchpad); }
+      if (chain) { conditions.push(`te.chain = $${idx++}`); filterParams.push(chain); }
 
       const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-      params.push(limit);
+
+      // Get total matching rows (not page size)
+      const countResult = await query(`
+        SELECT COUNT(DISTINCT (te.chain, te.token, te.launchpad)) AS total
+        FROM token_events te
+        ${where}
+      `, filterParams);
+      const total = parseInt(countResult.rows[0]?.total) || 0;
 
       // One row per (chain, token): aggregate sources, pick earliest seen_at,
       // LEFT JOIN market_tokens for image/spot_price/volume enrichment.
+      // Null values from market_tokens are preserved (not coalesced to 0).
       const result = await query(`
         SELECT
           te.chain,
@@ -1189,6 +1198,7 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
           (array_agg(te.symbol ORDER BY te.seen_at))[1]  AS symbol,
           (array_agg(te.creator ORDER BY te.seen_at))[1] AS creator,
           (array_agg(te.tx_hash ORDER BY te.seen_at))[1] AS first_tx_hash,
+          (array_agg(te.source ORDER BY te.seen_at))[1]  AS discovery_source,
           mt.image,
           mt.spot_price,
           mt.bonding_curve_progress,
@@ -1202,14 +1212,44 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
                  mt.image, mt.spot_price, mt.bonding_curve_progress,
                  mt.holders, mt.volume_24h, mt.liquidity
         ORDER BY earliest_seen DESC
-        LIMIT $${idx}
-      `, params);
+        LIMIT $${idx++} OFFSET $${idx}
+      `, [...filterParams, limit, offset]);
+
+      // Shape the response: add currency metadata, strip pumpportal: prefix
+      const launches = result.rows.map((row: any) => ({
+        chain: row.chain,
+        token: row.token,
+        launchpad: row.launchpad,
+        name: row.name,
+        symbol: row.symbol,
+        creator: row.creator,
+        // first_tx_hash: strip "pumpportal:" prefix — this should be a real tx signature
+        first_tx_hash: row.first_tx_hash?.startsWith('pumpportal:')
+          ? row.first_tx_hash.replace('pumpportal:', '')
+          : row.first_tx_hash,
+        discovery_source: row.discovery_source,
+        earliest_seen: row.earliest_seen,
+        latest_seen: row.latest_seen,
+        sources: row.sources,
+        image: row.image,
+        // spot_price: SOL per token. Currency field added for clarity.
+        spot_price: row.spot_price,
+        spot_price_currency: 'SOL',
+        bonding_curve_progress: row.bonding_curve_progress,
+        // holders/volume/buys/sells: null = not fetched; frontend shows "—"
+        holders: row.holders,
+        volume_24h: row.volume_24h,
+        // liquidity: virtual SOL reserves in bonding curve (not real AMM liquidity)
+        // Real liquidity only available after graduation to Raydium
+        liquidity: row.liquidity,
+        liquidity_type: row.liquidity ? 'virtual_sol' : null,
+      }));
 
       res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-      res.end(JSON.stringify({ launches: result.rows, total: result.rowCount }));
+      res.end(JSON.stringify({ launches, total, offset, limit }));
     } catch (err: any) {
       res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-      res.end(JSON.stringify({ error: err.message, launches: [] }));
+      res.end(JSON.stringify({ error: err.message, launches: [], total: 0 }));
     }
   },
 
@@ -1458,8 +1498,8 @@ function ingestTokenEvent(event: {
     mint, name: name || 'Unknown Token', symbol: symbol || 'TOKEN',
     image: directImage, chain: ch, launchpad: lp,
     spotPrice: price || '0', virtualMcap: price ? String(parseFloat(price) * 1e9) : '6000',
-    priceChange24h: '0', bondingCurveProgress: '0', holders: '0',
-    volume24h: '0', liquidity: '0', buys24h: '0', sells24h: '0',
+    priceChange24h: '0', bondingCurveProgress: '0', holders: null,
+    volume24h: null, liquidity: null, buys24h: null, sells24h: null,
     uri: sanitizeUri(uri), twitter: '', telegram: '', website: '',
     dexId: '', pairAddress: '', txHash: '', source: 'live',
     createdAt: String(Date.now()),

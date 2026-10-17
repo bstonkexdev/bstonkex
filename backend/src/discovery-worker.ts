@@ -228,8 +228,21 @@ async function handlePumpPortalCreate(event: PumpPortalEvent): Promise<void> {
   ppTokensReceived++;
   ppLastMessageTime = Date.now();
 
+  // spotPrice = SOL per token (virtual reserves ratio)
+  // Units: SOL/token — e.g. 0.00000003 SOL per token
   const spotPrice = event.vSolInBondingCurve / event.vTokensInBondingCurve;
-  const progress = Math.min(100, Math.round((event.vSolInBondingCurve / 85) * 100 * 100) / 100);
+
+  // bondingCurveProgress = % of SOL deposited toward the 85 SOL graduation threshold
+  // Pump.fun bonding curve: tokens graduate to Raydium at 85 SOL
+  // Source: vSolInBondingCurve from PumpPortal WebSocket (real-time on-chain state)
+  // Units: percentage (0-100)
+  const PUMP_FUN_GRADUATION_SOL = 85;
+  const progress = Math.min(100, (event.vSolInBondingCurve / PUMP_FUN_GRADUATION_SOL) * 100);
+
+  // liquidity = virtual SOL in bonding curve (not real DEX liquidity)
+  // This is the SOL side of the constant-product reserves, NOT real AMM liquidity.
+  // Real liquidity becomes available only after graduation to Raydium.
+  const virtualLiquiditySol = event.vSolInBondingCurve;
 
   const token: MarketTokenRecord = {
     mint: event.mint,
@@ -238,15 +251,19 @@ async function handlePumpPortalCreate(event: PumpPortalEvent): Promise<void> {
     chain: 'solana',
     launchpad: 'pumpfun',
     spotPrice: spotPrice.toFixed(12),
+    spotPriceCurrency: 'SOL',
     virtualMcap: (spotPrice * 1e9).toFixed(2),
     bondingCurveProgress: progress.toFixed(2),
-    volume24h: '0',
-    liquidity: (event.vSolInBondingCurve * 200).toFixed(2), // ~SOL USD
-    buys24h: '1',
-    sells24h: '0',
+    volume24h: null, // Not available from PumpPortal create events
+    liquidity: virtualLiquiditySol.toFixed(6),
+    liquidityType: 'virtual_sol',
+    holders: null, // Not available from PumpPortal create events
+    buys24h: null,
+    sells24h: null,
     uri: event.uri || '',
-    txHash: `pumpportal:${event.bondingCurveKey}`,
+    txHash: event.mint, // Real mint address (no prefix)
     source: 'pumpportal_ws',
+    discoverySource: 'pumpportal',
     createdAt: new Date().toISOString(),
   };
 

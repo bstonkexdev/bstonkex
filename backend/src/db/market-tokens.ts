@@ -19,14 +19,16 @@ export interface MarketTokenRecord {
   launchpad?: string;
   creator?: string;
   spotPrice?: string;
+  spotPriceCurrency?: string; // 'SOL' or 'USD'
   virtualMcap?: string;
   priceChange24h?: string;
   bondingCurveProgress?: string;
-  holders?: string;
-  volume24h?: string;
-  liquidity?: string;
-  buys24h?: string;
-  sells24h?: string;
+  holders?: number | null; // null = not fetched
+  volume24h?: string | null; // null = not fetched
+  liquidity?: string | null; // null = not fetched; value = virtual SOL reserves when from bonding curve
+  liquidityType?: string; // 'virtual_sol' or 'amm' or null
+  buys24h?: string | null; // null = not fetched
+  sells24h?: string | null; // null = not fetched
   uri?: string;
   twitter?: string;
   telegram?: string;
@@ -35,6 +37,7 @@ export interface MarketTokenRecord {
   pairAddress?: string;
   txHash?: string;
   source?: string;
+  discoverySource?: string; // 'pumpportal' or 'onchain'
   createdAt?: string;
 }
 
@@ -69,12 +72,12 @@ export async function upsertMarketToken(token: MarketTokenRecord): Promise<boole
         spot_price = CASE WHEN EXCLUDED.spot_price > 0 THEN EXCLUDED.spot_price ELSE market_tokens.spot_price END,
         virtual_mcap = CASE WHEN EXCLUDED.virtual_mcap > 0 THEN EXCLUDED.virtual_mcap ELSE market_tokens.virtual_mcap END,
         price_change_24h = EXCLUDED.price_change_24h,
-        bonding_curve_progress = EXCLUDED.bonding_curve_progress,
-        holders = CASE WHEN EXCLUDED.holders > 0 THEN EXCLUDED.holders ELSE market_tokens.holders END,
-        volume_24h = CASE WHEN EXCLUDED.volume_24h > 0 THEN EXCLUDED.volume_24h ELSE market_tokens.volume_24h END,
-        liquidity = CASE WHEN EXCLUDED.liquidity > 0 THEN EXCLUDED.liquidity ELSE market_tokens.liquidity END,
-        buys_24h = EXCLUDED.buys_24h,
-        sells_24h = EXCLUDED.sells_24h,
+        bonding_curve_progress = CASE WHEN EXCLUDED.bonding_curve_progress IS NOT NULL THEN EXCLUDED.bonding_curve_progress ELSE market_tokens.bonding_curve_progress END,
+        holders = CASE WHEN EXCLUDED.holders IS NOT NULL AND EXCLUDED.holders > 0 THEN EXCLUDED.holders ELSE market_tokens.holders END,
+        volume_24h = CASE WHEN EXCLUDED.volume_24h IS NOT NULL AND EXCLUDED.volume_24h > 0 THEN EXCLUDED.volume_24h ELSE market_tokens.volume_24h END,
+        liquidity = CASE WHEN EXCLUDED.liquidity IS NOT NULL AND EXCLUDED.liquidity > 0 THEN EXCLUDED.liquidity ELSE market_tokens.liquidity END,
+        buys_24h = CASE WHEN EXCLUDED.buys_24h IS NOT NULL THEN EXCLUDED.buys_24h ELSE market_tokens.buys_24h END,
+        sells_24h = CASE WHEN EXCLUDED.sells_24h IS NOT NULL THEN EXCLUDED.sells_24h ELSE market_tokens.sells_24h END,
         uri = COALESCE(NULLIF(EXCLUDED.uri, ''), market_tokens.uri),
         twitter = COALESCE(NULLIF(EXCLUDED.twitter, ''), market_tokens.twitter),
         telegram = COALESCE(NULLIF(EXCLUDED.telegram, ''), market_tokens.telegram),
@@ -82,13 +85,18 @@ export async function upsertMarketToken(token: MarketTokenRecord): Promise<boole
         dex_id = COALESCE(NULLIF(EXCLUDED.dex_id, ''), market_tokens.dex_id),
         pair_address = COALESCE(NULLIF(EXCLUDED.pair_address, ''), market_tokens.pair_address),
         tx_hash = COALESCE(NULLIF(EXCLUDED.tx_hash, ''), market_tokens.tx_hash),
+        source = EXCLUDED.source,
         updated_at = NOW()
     `, [
       token.mint, token.name, token.symbol, token.image, token.chain, token.launchpad,
       parseFloat(token.spotPrice) || 0, parseFloat(token.virtualMcap) || 0,
-      parseFloat(token.priceChange24h) || 0, parseFloat(token.bondingCurveProgress) || 0,
-      parseInt(token.holders) || 0, parseFloat(token.volume24h) || 0,
-      parseFloat(token.liquidity) || 0, parseInt(token.buys24h) || 0, parseInt(token.sells24h) || 0,
+      parseFloat(token.priceChange24h) || 0,
+      token.bondingCurveProgress != null ? parseFloat(token.bondingCurveProgress) : null,
+      token.holders != null ? (typeof token.holders === 'number' ? token.holders : parseInt(token.holders)) : null,
+      token.volume24h != null ? parseFloat(token.volume24h) : null,
+      token.liquidity != null ? parseFloat(token.liquidity) : null,
+      token.buys24h != null ? parseInt(token.buys24h) : null,
+      token.sells24h != null ? parseInt(token.sells24h) : null,
       token.uri, token.twitter, token.telegram, token.website,
       token.dexId, token.pairAddress, token.txHash,
       token.source,
@@ -138,12 +146,12 @@ export async function loadAllTokens(limit = 500): Promise<MarketTokenRecord[]> {
       spotPrice: String(row.spot_price || 0),
       virtualMcap: String(row.virtual_mcap || 0),
       priceChange24h: String(row.price_change_24h || 0),
-      bondingCurveProgress: String(row.bonding_curve_progress || 0),
-      holders: String(row.holders || 0),
-      volume24h: String(row.volume_24h || 0),
-      liquidity: String(row.liquidity || 0),
-      buys24h: String(row.buys_24h || 0),
-      sells24h: String(row.sells_24h || 0),
+      bondingCurveProgress: row.bonding_curve_progress != null ? String(row.bonding_curve_progress) : null,
+      holders: row.holders ?? null,
+      volume24h: row.volume_24h != null ? String(row.volume_24h) : null,
+      liquidity: row.liquidity != null ? String(row.liquidity) : null,
+      buys24h: row.buys_24h != null ? String(row.buys_24h) : null,
+      sells24h: row.sells_24h != null ? String(row.sells_24h) : null,
       uri: row.uri || '',
       twitter: row.twitter || '',
       telegram: row.telegram || '',
@@ -262,12 +270,12 @@ export async function queryTokensPaginated(opts: PaginatedQueryOpts = {}): Promi
       spotPrice: String(row.spot_price || 0),
       virtualMcap: String(row.virtual_mcap || 0),
       priceChange24h: String(row.price_change_24h || 0),
-      bondingCurveProgress: String(row.bonding_curve_progress || 0),
-      holders: String(row.holders || 0),
-      volume24h: String(row.volume_24h || 0),
-      liquidity: String(row.liquidity || 0),
-      buys24h: String(row.buys_24h || 0),
-      sells24h: String(row.sells_24h || 0),
+      bondingCurveProgress: row.bonding_curve_progress != null ? String(row.bonding_curve_progress) : null,
+      holders: row.holders ?? null,
+      volume24h: row.volume_24h != null ? String(row.volume_24h) : null,
+      liquidity: row.liquidity != null ? String(row.liquidity) : null,
+      buys24h: row.buys_24h != null ? String(row.buys_24h) : null,
+      sells24h: row.sells_24h != null ? String(row.sells_24h) : null,
       uri: row.uri || '',
       twitter: row.twitter || '',
       telegram: row.telegram || '',
