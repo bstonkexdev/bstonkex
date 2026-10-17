@@ -12,7 +12,7 @@ import { WebSocketServer, WebSocket, RawData } from 'ws';
 import { healthHandler, readyHandler, wsHealthHandler } from './health.js';
 import { MarketPipeline } from './market-pipeline.js';
 import { routeDegen } from './degen-routes.js';
-import { isDbConfigured, pingDb, closePool, getDbStatus } from './db/pool.js';
+import { isDbConfigured, pingDb, closePool, getDbStatus, query } from './db/pool.js';
 import { runMigrations, getMigrationStatus } from './db/migrate.js';
 import { routeRewards } from './reward-routes.js';
 import { LAUNCHPAD_CONFIG, getAllLaunchpads, getLaunchpad } from './config/launchpads.js';
@@ -445,6 +445,13 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     });
     return;
   }
+
+  // ── Etherscan V2 ABI / eth_getLogs proxies REMOVED ──────────
+  // These were public endpoints that leaked RPC URLs and API keys.
+  // All RPC and Etherscan V2 calls now run internally in the
+  // discovery-worker (backend/src/discovery-worker.ts) which has
+  // its own env vars (BSC_RPC_URL, BASE_RPC_URL, ETHERSCAN_API_KEY).
+  // Nothing is exposed to the public internet.
 
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Not found' }));
@@ -902,8 +909,17 @@ startMultiChainListeners(
   },
 );
 
+// Build-time constants for /api/v1/version
+const BUILD_COMMIT = process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT || 'unknown';
+const BUILD_TIME = new Date().toISOString();
+
 // Discovery routes now include token data + PumpPortal health
 const discoveryRoutes: Record<string, (req: IncomingMessage, res: ServerResponse) => void> = {
+  'GET /api/v1/version': (_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ commit: BUILD_COMMIT, buildTime: BUILD_TIME }));
+  },
+
   'GET /api/discovery/status': (_req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -1126,6 +1142,142 @@ const launchpadRoutes: Record<string, (req: IncomingMessage, res: ServerResponse
         ? 'DURABLE — PostgreSQL, survives Railway restarts'
         : 'EPHEMERAL — JSON snapshot only, lost on Railway restart',
     }));
+  },
+
+  // GET /api/v1/market/launches — ONE row per (chain, token), aggregating sources.
+  // Query params: launchpad, chain, limit
+  //
+  // SQL produces exactly one row per unique (chain, token):
+  //   SELECT chain, token, MIN(earliest_seen), array_agg(DISTINCT source), ...
+  //   FROM token_events LEFT JOIN market_tokens
+  //   GROUP BY chain, token
+  //   ORDER BY earliest_seen DESC
+  'GET /api/v1/market/launches': async (req, res) => {
+    try {
+      const url = new URL(req.url || '/', `http://${req.headers.host}`);
+      const launchpad = url.searchParams.get('launchpad') || '';
+      const chain = url.searchParams.get('chain') || '';
+      const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '50') || 50));
+
+      if (!isDbConfigured()) {
+        res.writeHead(503, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ error: 'Database not configured', launches: [] }));
+        return;
+      }
+
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let idx = 1;
+
+      if (launchpad) { conditions.push(`te.launchpad = $${idx++}`); params.push(launchpad); }
+      if (chain) { conditions.push(`te.chain = $${idx++}`); params.push(chain); }
+
+      const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      params.push(limit);
+
+      // One row per (chain, token): aggregate sources, pick earliest seen_at,
+      // LEFT JOIN market_tokens for image/spot_price/volume enrichment.
+      const result = await query(`
+        SELECT
+          te.chain,
+          te.token,
+          te.launchpad,
+          MIN(te.seen_at)                           AS earliest_seen,
+          MAX(te.seen_at)                           AS latest_seen,
+          array_agg(DISTINCT te.source)             AS sources,
+          (array_agg(te.name ORDER BY te.seen_at))[1]    AS name,
+          (array_agg(te.symbol ORDER BY te.seen_at))[1]  AS symbol,
+          (array_agg(te.creator ORDER BY te.seen_at))[1] AS creator,
+          (array_agg(te.tx_hash ORDER BY te.seen_at))[1] AS first_tx_hash,
+          mt.image,
+          mt.spot_price,
+          mt.bonding_curve_progress,
+          mt.holders,
+          mt.volume_24h,
+          mt.liquidity
+        FROM token_events te
+        LEFT JOIN market_tokens mt ON mt.mint = te.token
+        ${where}
+        GROUP BY te.chain, te.token, te.launchpad,
+                 mt.image, mt.spot_price, mt.bonding_curve_progress,
+                 mt.holders, mt.volume_24h, mt.liquidity
+        ORDER BY earliest_seen DESC
+        LIMIT $${idx}
+      `, params);
+
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ launches: result.rows, total: result.rowCount }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: err.message, launches: [] }));
+    }
+  },
+
+  // GET /api/v1/market/coverage — Coverage report per launchpad.
+  // Returns per launchpad: count per source, overlap, only-pumpportal, only-onchain, p50/p95 lag per source.
+  'GET /api/v1/market/coverage': async (_req, res) => {
+    try {
+      if (!isDbConfigured()) {
+        res.writeHead(503, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ error: 'Database not configured' }));
+        return;
+      }
+
+      // Per-launchpad summary with counts, overlap, only-in-A, only-in-B
+      const result = await query(`
+        WITH pp AS (
+          SELECT launchpad, token FROM token_events WHERE source = 'pumpportal'
+        ),
+        oc AS (
+          SELECT launchpad, token FROM token_events WHERE source = 'onchain'
+        ),
+        launchpads AS (
+          SELECT DISTINCT launchpad FROM token_events
+        )
+        SELECT
+          l.launchpad,
+          (SELECT COUNT(*) FROM pp WHERE pp.launchpad = l.launchpad)  AS pumpportal_count,
+          (SELECT COUNT(*) FROM oc WHERE oc.launchpad = l.launchpad)  AS onchain_count,
+          (SELECT COUNT(*) FROM pp
+             WHERE pp.launchpad = l.launchpad
+               AND pp.token IN (SELECT token FROM oc WHERE oc.launchpad = l.launchpad)
+          ) AS overlap,
+          (SELECT COUNT(*) FROM pp
+             WHERE pp.launchpad = l.launchpad
+               AND pp.token NOT IN (SELECT token FROM oc WHERE oc.launchpad = l.launchpad)
+          ) AS only_pumpportal,
+          (SELECT COUNT(*) FROM oc
+             WHERE oc.launchpad = l.launchpad
+               AND oc.token NOT IN (SELECT token FROM pp WHERE pp.launchpad = l.launchpad)
+          ) AS only_onchain
+        FROM launchpads l
+        ORDER BY l.launchpad
+      `);
+
+      // Per-source p50/p95 lag (seconds) = seen_at - event_time
+      const lag = await query(`
+        SELECT
+          launchpad,
+          source,
+          COUNT(*) AS detections,
+          PERCENTILE_CONT(0.5) WITHIN GROUP
+            (ORDER BY EXTRACT(EPOCH FROM (seen_at - event_time)))
+            FILTER (WHERE event_time IS NOT NULL) AS p50_lag_sec,
+          PERCENTILE_CONT(0.95) WITHIN GROUP
+            (ORDER BY EXTRACT(EPOCH FROM (seen_at - event_time)))
+            FILTER (WHERE event_time IS NOT NULL) AS p95_lag_sec
+        FROM token_events
+        WHERE event_time IS NOT NULL
+        GROUP BY launchpad, source
+        ORDER BY launchpad, source
+      `);
+
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ perLaunchpad: result.rows, lag: lag.rows }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
   },
 
   // GET /api/v1/chart/history — Historical OHLCV candles

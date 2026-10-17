@@ -17,6 +17,7 @@ export interface MarketTokenRecord {
   image?: string;
   chain?: string;
   launchpad?: string;
+  creator?: string;
   spotPrice?: string;
   virtualMcap?: string;
   priceChange24h?: string;
